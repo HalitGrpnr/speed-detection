@@ -4,7 +4,7 @@
 > "Nerede kaldık" sorusunun cevabı burası + `git log`'tur.
 
 **Son güncelleme:** 2026-06-13
-**Aktif görev:** `tasks/M5.md` (Çıktılar — henüz yazılmadı)
+**Aktif görev:** tasks/M7.md (devam ediyor)
 
 ---
 
@@ -16,9 +16,9 @@
 | M2 | Tespit + takip (YOLO + ByteTrack) | ✅ Bitti | 22/22 test; model mock + gerçek video okuma |
 | M3 | Hız hesabı (temas noktası → metrik → km/h → yumuşatma) | ✅ Bitti | 23/23 test |
 | M4 | Güvenilirlik (leave-one-out, düzlemsellik, güven seviyesi) | ✅ Bitti | 85/85 test |
-| M5 | Çıktılar (overlay video + adli rapor) | ⬜ Beklemede | MVP buraya kadar |
-| M6 | Otomatik referans tespiti (fast-follow) | ⬜ Beklemede | |
-| M7 | UI cilası + paketleme | ⬜ Beklemede | |
+| M5 | Çıktılar (overlay video + adli rapor) | ✅ Bitti | MVP tamamlandı — 104/104 test |
+| M6 | Otomatik referans tespiti (fast-follow) | ✅ Bitti | 129/129 test |
+| M7 | UI cilası + paketleme | 🟡 Devam ediyor | 15/15 test; API + UI tamamlandı; PyInstaller kaldı |
 
 Durum işaretleri: ⬜ Başlanmadı · 🟡 Devam ediyor · ✅ Bitti · ⛔ Engellendi
 
@@ -52,8 +52,42 @@ Durum işaretleri: ⬜ Başlanmadı · 🟡 Devam ediyor · ✅ Bitti · ⛔ Eng
 ## Şu An Devam Eden
 _(Yok — M2 tamamlandı.)_
 
+**M5 (overlay video + adli rapor):**
+- `src/output/models.py` — PipelineResult veri sınıfı
+- `src/output/overlay.py` — draw_frame, write_overlay_video (güven rengi: yeşil/turuncu/kırmızı)
+- `src/output/report.py` — generate_report, collect_report_texts, _build_story (ReportLab)
+- `src/output/pipeline.py` — run_pipeline + __main__ (uçtan uca tek komut)
+- `tests/test_overlay.py` + `tests/test_report.py` — 19 yeni test
+- 104/104 test geçiyor
+
+**M6 (otomatik referans tespiti):**
+- `src/autoref/models.py` — ProposedPoint + to_control_point()
+- `src/autoref/lane.py` — detect_lane_edges (Canny+HoughLinesP), fit_lane_line, sample_line_at_depths
+- `src/autoref/markers.py` — detect_dashed_markers, estimate_depth_scale (px/m)
+- `src/autoref/proposer.py` — AutoProposer.propose() + draw_proposals() + __main__
+- `tests/test_autoref.py` — 25 yeni test
+- 129/129 test geçiyor
+- Gerçek video demo: kare 150'de sol+sağ şerit tespit edildi, 6 öneri üretildi
+
+## Son Oturum Özeti (2026-06-13 — M7 başlangıcı)
+
+**M7 (FastAPI + tarayıcı UI):**
+- `src/ui/schemas.py` — Pydantic istek/yanıt modelleri
+- `src/ui/job_store.py` — Thread-safe iş durumu
+- `src/ui/app.py` — FastAPI: video upload, frame, calibrate, autoref, pipeline, job status, results
+- `src/ui/launcher.py` — PyInstaller başlatıcı (uvicorn + webbrowser.open)
+- `src/ui/static/index.html` — 6 adımlı tek sayfa wizard
+- `src/ui/static/calibration.js` — Canvas nokta tıklama / sürükleme
+- `src/ui/static/app.js` — Durum makinesi, API çağrıları, adım geçişleri
+- `tests/test_ui_api.py` — 15 API testi
+- `requirements.txt`'e fastapi, uvicorn, python-multipart, httpx eklendi
+- **144/144 test geçiyor**
+
+## Şu An Devam Eden
+M7 — PyInstaller paketleme (manuel test gerekiyor).
+
 ## Sıradaki Adım
-M5: `tasks/M5.md` görev dosyası yazılacak, sonra overlay video + adli rapor (PDF).
+M7 tamamlama: PyInstaller paketi + gerçek video ile uçtan uca manuel test.
 
 **M4 (güvenilirlik):**
 - `src/reliability/confidence.py` — ConfidenceSignals, compute_confidence_level (eşik tablosu)

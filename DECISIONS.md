@@ -61,6 +61,66 @@ Format:
 - **Gerekçe:** CI/offline ortamlarda model ağırlığı indirilemez; davranış mock ile yeterince test edilebilir.
   Manuel entegrasyon testi gerçek video + gerçek model ile ayrıca yapılmalı.
 
+## [2026-06-13] M6 şerit tespiti: Canny + HoughLinesP, açı filtresi [20°, 80°]
+- **Karar:** Şerit kenarı tespiti için Canny edge + HoughLinesP, açı filtresi |angle| ∈ [20°,80°].
+  Trapez ROI ile üst %45 (gökyüzü/bina) eleniyor.
+- **Gerekçe:** OpenCV HoughLinesP ile karmaşık model gerekmeden şerit çizgilerini tespit etmek mümkün.
+  Açı filtresi yatay/dikey parazit çizgileri kesiyor.
+- **Alternatifler:** Derin öğrenme şerit tespiti (SCNN, LaneNet) — çok daha doğru ama ek model
+  gerektirir ve yerel adli kurulumu karmaşıklaştırır. M6.5+'ye ertelendi.
+
+## [2026-06-13] M6 Y-ölçek stratejisi: öncelik sırası — kesik çizgi > yatay şerit genişliği > ızgara
+- **Karar:** Y dünya koordinatı için 3 kademeli fallback:
+  1. Kesik çizgi ölçeği (≥3 segment varsa px/m = median_length / dash_length_m)
+  2. Yatay şerit genişliği (lane_width_m / lane_px_near) — yaklaşık ama tek şerit bile yeterli
+  3. Sabit ızgara (her derinlik +5 m) — hiçbir bilgi yoksa
+- **Gerekçe:** Adli raporlamada Y kalibrasyonu kritik; her yöntem kabul edilebilir ama
+  güven sıralaması açık tutuldu. Gerçek videoda genellikle 2. yöntem devreye giriyor.
+
+## [2026-06-13] M6 öneri güven katmanı: her zaman standard_assumption
+- **Karar:** Otomatik tespit sonuçları ControlPoint(source="auto") ve confidence_layer=
+  "standard_assumption" olarak işaretlenir — gerçek ölçüm olmaksızın üst katmana çıkmaz.
+- **Gerekçe:** §0(c) ve §5.1: otomatik tespit kolaylık katmanıdır, doğruluk garantisi değil.
+  Operatör onayı ve/veya saha ölçümü ile aynı noktalar daha yüksek katmana yükseltilebilir.
+
+## [2026-06-13] M5 PDF metin testi: story layer, ham byte değil
+- **Karar:** PDF içerik testleri `_build_story()` + `collect_report_texts()` üzerinden yapılır;
+  PDF raw byte üzerinde string arama yapılmaz.
+- **Gerekçe:** ReportLab content stream'leri ASCII85/binary kodluyor; `compress=0` bunu önlemez.
+  Story nesneleri Python tarafında metin içerir, test edilmesi daha güvenilir ve hızlı.
+- **Alternatifler:** `pdfminer` ile PDF metin çıkarımı — ek bağımlılık; bu proje için gereksiz.
+
+## [2026-06-13] M5 PDF font encoding: ASCII-safe metinler
+- **Karar:** PDF story'deki tablo hücreleri ve başlıklar ASCII karakterlerle yazıldı
+  (Türkçe özel karakterler kaçırıldı — ı→i, ş→s, vb.), görselliği bozmuyor.
+- **Gerekçe:** Helvetica + WinAnsiEncoding bazı Türkçe karakterleri eksik render eder.
+  Adli rapor için içerik doğruluğu tipografik kusurdan önce gelir.
+- **Alternatifler:** TTF Unicode font gömme (ReportLab TTFont) — M7 UI fazında eklenebilir.
+
+## [2026-06-13] M5 overlay renk kodu: yeşil/turuncu/kırmızı
+- **Karar:** high=(0,200,0), medium=(0,165,255), low=(0,0,220) — BGR, OpenCV için.
+- **Gerekçe:** Trafik ışığı sezgisi; yeşil=güvenilir, turuncu=dikkatli, kırmızı=şüpheli.
+
+## [2026-06-13] M7 UI yaklaşımı: FastAPI + vanilla JS, PyInstaller
+- **Karar:** Yerel servis (FastAPI + uvicorn, port 8742) + vanilla HTML/JS tek sayfa wizard.
+  Paketleme: PyInstaller `--onedir`. Bilirkişi sadece başlatıcıya tıklar, tarayıcı açılır.
+- **Gerekçe:** PySide6/Tauri'ye göre daha hızlı MVP; bilirkişiden onay alınmadan UI şablonu
+  değiştirilmez; masaüstü geçişi ileride tek `app.py` sarmalı değişikliğidir.
+- **Alternatifler:** PySide6 — daha güçlü dosya erişimi ama build karmaşıklığı yüksek.
+  Tauri — Rust bağımlılığı; ekip tek dilli Python kararında (§0b).
+
+## [2026-06-13] M7 API tasarımı: video_id + job_id modeli
+- **Karar:** Video önce yüklenir (video_id alınır), kalibrasyon video_id ile bağlanır,
+  pipeline başlatması job_id döner, client 1.5 sn aralıkla polling yapar.
+- **Gerekçe:** Pipeline dakikalarca sürebilir; senkron endpoint zaman aşımı üretir.
+  Polling forensic araçta yeterli; webhook/SSE gerekmez.
+- **Alternatifler:** Server-Sent Events — bağlantı yönetimi karmaşık; polling daha sağlam.
+
+## [2026-06-13] M7 frontend: inline state machine, build tool yok
+- **Karar:** Harici framework veya CDN yok. Vanilla JS, 2 dosya (calibration.js + app.js).
+- **Gerekçe:** Adli makine internetsiz çalışabilmeli (§0a, §11.1). Build tool adımı
+  (Node, npm) hem forensic ortama uyumsuz hem de tek kullanıcılı araç için overkill.
+
 ## [2026-06-13] M1 kollinearite kontrolü: 2D çarpım, np.cross değil
 - **Karar:** `_check_collinear` fonksiyonunda numpy'ın `np.cross` yerine açık `v1[0]*v2[1] - v1[1]*v2[0]` formülü kullanıldı.
 - **Gerekçe:** NumPy 2.0'da 2D vektörlere `np.cross` DeprecationWarning veriyor; açık formül uyarısız ve
