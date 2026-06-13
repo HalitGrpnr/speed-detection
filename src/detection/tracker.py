@@ -111,7 +111,7 @@ class VehicleTracker:
                 for f, t, bbox in data["raw_points"]
             ]
             frames = [p.frame for p in points]
-            gaps = compute_occlusion_gaps(frames)
+            gaps = compute_occlusion_gaps(frames, expected_step=frame_step)
             tracks.append(Track(
                 track_id=tid,
                 vehicle_class=data["cls"],

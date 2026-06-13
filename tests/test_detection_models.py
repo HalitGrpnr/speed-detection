@@ -86,6 +86,20 @@ def test_multiple_gaps():
     assert gaps == [(3, 4), (7, 9)]
 
 
+def test_frame_step_no_false_occlusion():
+    # frame_step=3: frames 0,3,6,9 — boşluk yok, sadece örnekleme
+    frames = [0, 3, 6, 9, 12]
+    gaps = compute_occlusion_gaps(frames, expected_step=3)
+    assert gaps == []
+
+
+def test_frame_step_real_gap():
+    # frame_step=3 ama 9→15 arası gerçek boşluk (6 kare atlandı)
+    frames = [0, 3, 6, 15, 18]
+    gaps = compute_occlusion_gaps(frames, expected_step=3)
+    assert gaps == [(7, 14)]
+
+
 def test_empty_frame_list():
     assert compute_occlusion_gaps([]) == []
 

@@ -39,10 +39,17 @@ def contact_point(bbox: tuple[float, float, float, float]) -> tuple[float, float
     return ((x1 + x2) / 2.0, y2)
 
 
-def compute_occlusion_gaps(frames: list[int]) -> list[tuple[int, int]]:
-    """Find frame-index gaps in a sorted frame list."""
+def compute_occlusion_gaps(
+    frames: list[int],
+    expected_step: int = 1,
+) -> list[tuple[int, int]]:
+    """Find gaps larger than expected_step in a sorted frame list.
+
+    expected_step should match the frame_step used during video processing
+    so that normal sampling gaps are not mistaken for occlusions.
+    """
     gaps = []
     for i in range(len(frames) - 1):
-        if frames[i + 1] - frames[i] > 1:
+        if frames[i + 1] - frames[i] > expected_step:
             gaps.append((frames[i] + 1, frames[i + 1] - 1))
     return gaps
