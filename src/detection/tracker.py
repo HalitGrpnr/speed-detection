@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import sys
 from collections import defaultdict
+from collections.abc import Callable
 from pathlib import Path
 
 import numpy as np
@@ -42,6 +43,7 @@ class VehicleTracker:
         video_path: str | Path,
         frame_step: int = 1,
         progress: bool = False,
+        on_progress: "Callable[[int, int], None] | None" = None,
     ) -> tuple[list[Track], VideoMeta]:
         """Process video and return (tracks, video_meta)."""
         import time
@@ -84,6 +86,8 @@ class VehicleTracker:
                     raw[tid]["raw_points"].append((frame_idx, t_s, bbox))
 
             processed += 1
+            if on_progress is not None:
+                on_progress(processed, total)
             if progress and processed % 10 == 0:
                 elapsed = time.monotonic() - t0
                 fps_proc = processed / elapsed if elapsed > 0 else 0

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import sys
 import time
+from collections.abc import Callable
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -25,6 +26,7 @@ def run_pipeline(
     model_name: str = "yolo11n.pt",
     min_track_points: int = 2,
     progress: bool = True,
+    on_progress: Callable[[float], None] | None = None,
 ) -> PipelineResult:
     """M1→M5 uçtan uca pipeline.
 
@@ -56,9 +58,17 @@ def run_pipeline(
             flush=True,
         )
         print("İşleniyor...", flush=True)
-    tracks, _ = tracker.process_video(video_path, frame_step=frame_step, progress=progress)
+    def _track_cb(done: int, total: int) -> None:
+        if on_progress is not None:
+            on_progress(15.0 + done / total * 70.0)
+
+    tracks, _ = tracker.process_video(
+        video_path, frame_step=frame_step, progress=progress, on_progress=_track_cb
+    )
     if progress:
         print(f"Takip: {len(tracks)} track", flush=True)
+    if on_progress:
+        on_progress(87.0)
 
     # 3. Hız hesabı
     speed_estimates = []
@@ -70,6 +80,8 @@ def run_pipeline(
 
     if progress:
         print(f"Hız hesabı: {len(speed_estimates)} aktif track", flush=True)
+    if on_progress:
+        on_progress(90.0)
 
     result = PipelineResult(
         video_path=str(video_path),
@@ -88,6 +100,8 @@ def run_pipeline(
         if progress:
             print(f"Overlay video yazılıyor → {out_video}", flush=True)
         write_overlay_video(result, out_video)
+        if on_progress:
+            on_progress(97.0)
 
     if out_report is not None:
         if progress:

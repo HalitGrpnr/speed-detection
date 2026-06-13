@@ -196,7 +196,7 @@ def test_run_pipeline_returns_result(tmp_path, monkeypatch):
 
     class _FakeTracker:
         def __init__(self, **kw): pass
-        def process_video(self, vp, frame_step=1, progress=False):
+        def process_video(self, vp, frame_step=1, progress=False, on_progress=None):
             return [], VideoMeta(fps=25.0, frame_count=5, width=320, height=240)
 
     monkeypatch.setattr(pipe_mod, "VehicleTracker", _FakeTracker)

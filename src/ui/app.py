@@ -252,6 +252,9 @@ def _run_pipeline_thread(
         out_video = out_dir / "overlay.mp4"
         out_report = out_dir / "report.pdf"
 
+        def _progress(pct: float) -> None:
+            job.progress_pct = pct
+
         result = run_pipeline(
             video_path=video_path,
             calibration_path=cal_json_path,
@@ -259,7 +262,8 @@ def _run_pipeline_thread(
             out_report=out_report,
             frame_step=frame_step,
             model_name=model_name,
-            progress=False,
+            progress=True,
+            on_progress=_progress,
         )
 
         track_class = {t.track_id: t.vehicle_class for t in result.tracks}
@@ -283,8 +287,11 @@ def _run_pipeline_thread(
         job.state = "done"
 
     except Exception as exc:
+        import traceback as _tb
+        full = _tb.format_exc()
+        print(f"\n[PIPELINE HATA] job={job.job_id}\n{full}", flush=True)
         job.state = "error"
-        job.error = str(exc)
+        job.error = f"{type(exc).__name__}: {exc}"
 
 
 @app.post("/api/pipeline", status_code=202)
