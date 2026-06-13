@@ -4,7 +4,7 @@
 > "Nerede kaldık" sorusunun cevabı burası + `git log`'tur.
 
 **Son güncelleme:** 2026-06-13
-**Aktif görev:** tasks/M7.md (devam ediyor)
+**Aktif görev:** — (M7 bitti, tüm milestone'lar tamamlandı)
 
 ---
 
@@ -18,7 +18,7 @@
 | M4 | Güvenilirlik (leave-one-out, düzlemsellik, güven seviyesi) | ✅ Bitti | 85/85 test |
 | M5 | Çıktılar (overlay video + adli rapor) | ✅ Bitti | MVP tamamlandı — 104/104 test |
 | M6 | Otomatik referans tespiti (fast-follow) | ✅ Bitti | 129/129 test |
-| M7 | UI cilası + paketleme | 🟡 Devam ediyor | 15/15 test; API + UI tamamlandı; PyInstaller kaldı |
+| M7 | UI cilası + paketleme | ✅ Bitti | 15/15 test; FastAPI + wizard UI + PyInstaller paketi |
 
 Durum işaretleri: ⬜ Başlanmadı · 🟡 Devam ediyor · ✅ Bitti · ⛔ Engellendi
 
@@ -83,11 +83,18 @@ _(Yok — M2 tamamlandı.)_
 - `requirements.txt`'e fastapi, uvicorn, python-multipart, httpx eklendi
 - **144/144 test geçiyor**
 
+## PyInstaller paketi:
+- `SpeedDetection.spec` — onedir build, collect_all(uvicorn/fastapi/starlette/anyio)
+- `launcher.py` subprocess→thread yaklaşımına alındı (frozen'da -m uvicorn çalışmaz)
+- `app.py` sys._MEIPASS fallback eklendi (static dosya yolu)
+- `dist/SpeedDetection/` — ~771 MB, macOS arm64
+- Smoke test: ana sayfa, static JS, video upload, frame, calibrate, autoref — hepsi ✓
+
 ## Şu An Devam Eden
-M7 — PyInstaller paketleme (manuel test gerekiyor).
+_(Yok — tüm milestone'lar tamamlandı.)_
 
 ## Sıradaki Adım
-M7 tamamlama: PyInstaller paketi + gerçek video ile uçtan uca manuel test.
+Gerçek trafik videosuyla uçtan uca manuel doğrulama (GPS referanslı — teknik analiz §15.2).
 
 **M4 (güvenilirlik):**
 - `src/reliability/confidence.py` — ConfidenceSignals, compute_confidence_level (eşik tablosu)

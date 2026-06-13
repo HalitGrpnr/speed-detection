@@ -34,7 +34,12 @@ from .schemas import (
     VideoMetaOut,
 )
 
-_STATIC_DIR = Path(__file__).parent / "static"
+import sys as _sys
+if getattr(_sys, "frozen", False) and hasattr(_sys, "_MEIPASS"):
+    # PyInstaller --onedir: statik dosyalar _MEIPASS altındaki yola yerleştirilir
+    _STATIC_DIR = Path(_sys._MEIPASS) / "src" / "ui" / "static"
+else:
+    _STATIC_DIR = Path(__file__).parent / "static"
 _MODEL_MAP = {"nano": "yolo11n.pt", "small": "yolo11s.pt", "medium": "yolo11m.pt"}
 _MAX_UPLOAD_BYTES = 10 * 1024 * 1024 * 1024  # 10 GB
 
