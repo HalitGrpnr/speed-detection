@@ -41,12 +41,18 @@ class VehicleTracker:
         self,
         video_path: str | Path,
         frame_step: int = 1,
+        progress: bool = False,
     ) -> tuple[list[Track], VideoMeta]:
         """Process video and return (tracks, video_meta)."""
+        import time
         meta = read_video_meta(video_path)
+        total = max(1, (meta.frame_count + frame_step - 1) // frame_step)
 
         # track_id → {"cls": str, "points": list of raw tuples}
         raw: dict[int, dict] = defaultdict(lambda: {"cls": "", "raw_points": []})
+
+        t0 = time.monotonic()
+        processed = 0
 
         for frame_idx, frame in iter_video_frames(video_path, frame_step):
             results = self._model.track(
@@ -77,6 +83,22 @@ class VehicleTracker:
                     raw[tid]["cls"] = cls_name
                     raw[tid]["raw_points"].append((frame_idx, t_s, bbox))
 
+            processed += 1
+            if progress and processed % 10 == 0:
+                elapsed = time.monotonic() - t0
+                fps_proc = processed / elapsed if elapsed > 0 else 0
+                remaining = (total - processed) / fps_proc if fps_proc > 0 else 0
+                pct = processed / total * 100
+                print(
+                    f"\r  {pct:5.1f}%  kare {frame_idx}/{meta.frame_count}"
+                    f"  {fps_proc:.1f} kare/s  kalan ~{remaining:.0f}s"
+                    f"  track: {len(raw)}   ",
+                    end="", flush=True,
+                )
+
+        if progress:
+            print()  # newline after progress
+
         tracks: list[Track] = []
         for tid, data in raw.items():
             points = [
@@ -100,21 +122,42 @@ class VehicleTracker:
         return tracks, meta
 
 
-def _main(video_path: str) -> None:
+def _main(video_path: str, frame_step: int = 1) -> None:
+    import time
+    print(f"Model yükleniyor...")
     tracker = VehicleTracker()
-    tracks, meta = tracker.process_video(video_path)
-    print(f"Video: {meta.width}x{meta.height} @ {meta.fps:.1f} fps, {meta.frame_count} kare")
+
+    meta = read_video_meta(video_path)
+    sampled = (meta.frame_count + frame_step - 1) // frame_step
+    dur_s = meta.frame_count / meta.fps
+    print(
+        f"Video: {meta.width}x{meta.height} @ {meta.fps:.1f} fps  "
+        f"{meta.frame_count} kare  ({dur_s:.1f} sn)"
+    )
+    print(f"İşlenecek kare: {sampled} (adım={frame_step})  Cihaz: {tracker._device}")
+    print("İşleniyor...")
+
+    t0 = time.monotonic()
+    tracks, meta = tracker.process_video(video_path, frame_step=frame_step, progress=True)
+    elapsed = time.monotonic() - t0
+
+    print(f"Tamamlandı: {elapsed:.1f} sn")
     print(f"Bulunan track sayısı: {len(tracks)}")
     for t in sorted(tracks, key=lambda x: x.track_id):
         gap_str = f"{len(t.occlusion_gaps)} boşluk"
         if t.occlusion_gaps:
-            gaps_fmt = ", ".join(f"kare {a}-{b}" for a, b in t.occlusion_gaps)
+            gaps_fmt = ", ".join(f"kare {a}-{b}" for a, b in t.occlusion_gaps[:3])
+            if len(t.occlusion_gaps) > 3:
+                gaps_fmt += f" +{len(t.occlusion_gaps)-3} daha"
             gap_str += f" [{gaps_fmt}]"
         print(f"  Track #{t.track_id} — {t.vehicle_class} — {len(t.points)} nokta, {gap_str}")
 
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print("Kullanım: python -m src.detection.tracker <video.mp4>")
-        sys.exit(1)
-    _main(sys.argv[1])
+    import argparse
+    parser = argparse.ArgumentParser(description="Araç takip demo")
+    parser.add_argument("video", help="Video dosyası")
+    parser.add_argument("--step", type=int, default=1,
+                        help="Kare örnekleme adımı (varsayılan: 1, 4K için 3-5 önerilir)")
+    args = parser.parse_args()
+    _main(args.video, frame_step=args.step)
