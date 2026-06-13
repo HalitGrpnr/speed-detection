@@ -98,11 +98,17 @@ def write_overlay_video(
     out_path = Path(out_path)
     meta = result.video_meta
 
-    fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-    writer = cv2.VideoWriter(
-        str(out_path), fourcc, meta.fps, (meta.width, meta.height)
-    )
-    if not writer.isOpened():
+    # avc1 (H.264) tarayıcı uyumlu; açılamazsa mp4v'ye düş
+    writer: cv2.VideoWriter | None = None
+    for fourcc_str in ("avc1", "mp4v"):
+        fourcc = cv2.VideoWriter_fourcc(*fourcc_str)
+        w = cv2.VideoWriter(str(out_path), fourcc, meta.fps,
+                            (meta.width, meta.height))
+        if w.isOpened():
+            writer = w
+            break
+        w.release()
+    if writer is None:
         raise IOError(f"VideoWriter açılamadı: {out_path}")
 
     try:
@@ -114,4 +120,4 @@ def write_overlay_video(
             )
             writer.write(out_frame)
     finally:
-        writer.release()
+        writer.release()  # type: ignore[union-attr]
