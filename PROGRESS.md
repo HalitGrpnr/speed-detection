@@ -4,7 +4,7 @@
 > "Nerede kaldık" sorusunun cevabı burası + `git log`'tur.
 
 **Son güncelleme:** 2026-06-13
-**Aktif görev:** `tasks/M2.md` (Tespit + Takip — henüz yazılmadı)
+**Aktif görev:** `tasks/M3.md` (Hız hesabı — henüz yazılmadı)
 
 ---
 
@@ -12,9 +12,9 @@
 
 | # | Milestone | Durum | Not |
 |---|-----------|-------|-----|
-| M1 | Kalibrasyon çekirdeği (elle nokta + standart referans → H → RMS) | ✅ Bitti | 14/14 test geçiyor |
-| M2 | Tespit + takip (YOLO + ByteTrack) | ⬜ Beklemede | Sonraki görev |
-| M3 | Hız hesabı (temas noktası → metrik → km/h → yumuşatma) | ⬜ Beklemede | |
+| M1 | Kalibrasyon çekirdeği (elle nokta + standart referans → H → RMS) | ✅ Bitti | 14/14 test |
+| M2 | Tespit + takip (YOLO + ByteTrack) | ✅ Bitti | 22/22 test; model mock + gerçek video okuma |
+| M3 | Hız hesabı (temas noktası → metrik → km/h → yumuşatma) | ⬜ Beklemede | Sonraki görev |
 | M4 | Güvenilirlik (leave-one-out, düzlemsellik, güven seviyesi) | ⬜ Beklemede | |
 | M5 | Çıktılar (overlay video + adli rapor) | ⬜ Beklemede | MVP buraya kadar |
 | M6 | Otomatik referans tespiti (fast-follow) | ⬜ Beklemede | |
@@ -25,25 +25,34 @@ Durum işaretleri: ⬜ Başlanmadı · 🟡 Devam ediyor · ✅ Bitti · ⛔ Eng
 ---
 
 ## Son Oturum Özeti
-**2026-06-13:** M1 kalibrasyon çekirdeği tamamlandı.
-- `src/calibration/models.py` — ControlPoint, CalibrationResult, CalibrationError
-- `src/calibration/homography.py` — compute_homography (RANSAC), pixel_to_world
-- `src/calibration/metrics.py` — reprojection_rms, holdout_validation
-- `src/calibration/io.py` — §8 şemasına uygun JSON kaydet/yükle
-- `tests/test_homography.py` + `tests/test_metrics.py` — 14 test, hepsi geçiyor
-- `requirements.txt` pinlendi (numpy 2.4.6, opencv-python 4.13.0.92, scipy 1.17.1, pytest 9.0.3)
-- Commit: "feat(M1): kalibrasyon çekirdeği — homografi, metrikler, JSON I/O, testler"
+**2026-06-13:** M1 + M2 tamamlandı.
+
+**M1 (kalibrasyon çekirdeği):**
+- `src/calibration/` — models, homography, metrics, io
+- 14 test geçiyor
+
+**M2 (tespit + takip):**
+- `src/detection/models.py` — Detection, TrackPoint, Track, contact_point, compute_occlusion_gaps
+- `src/detection/video.py` — VideoMeta, read_video_meta, iter_video_frames
+- `src/detection/detector.py` — YOLODetector
+- `src/detection/tracker.py` — VehicleTracker + `__main__` (demo komutu)
+- 22 test geçiyor (mock YOLO + gerçek video I/O)
+- ultralytics==8.4.66 pinlendi, bytetrack.yaml kullanıldı
+- Commit: "feat(M2): tespit + takip modülü"
+
+**Toplam: 36/36 test geçiyor.**
 
 ## Şu An Devam Eden
-_(Yok — M1 tamamlandı.)_
+_(Yok — M2 tamamlandı.)_
 
 ## Sıradaki Adım
-M2: `tasks/M2.md` görev dosyası yazılacak, sonra YOLO + ByteTrack ile tespit ve takip modülü.
+M3: `tasks/M3.md` görev dosyası yazılacak, sonra temas noktası → H → km/h → yumuşatma.
 
 ## Bilinen Sorunlar / Açık Notlar
-- Doğrulama veri seti henüz yok (GPS'li test çekimi yapılacak — `docs/teknik-analiz.md` §15.2).
-- Tolerans ve güven eşikleri başlangıç değerleri; gerçek veriyle sıkılaştırılacak.
-- `ultralytics` M2'ye kadar pinlenmedi (YOLO model seçimiyle birlikte yapılacak).
+- Doğrulama veri seti henüz yok (GPS'li test çekimi — `docs/teknik-analiz.md` §15.2).
+- `python -m src.detection.tracker <video>` demo komutu yazıldı ama gerçek trafik videosu
+  üzerinde manuel test henüz yapılmadı (model yolo11n.pt ilk çalıştırmada indirilecek).
+- Tolerans ve güven eşikleri M4'te belirlenecek.
 
 ---
 

@@ -32,6 +32,17 @@ Format:
 - **Gerekçe:** Box merkezi yol düzleminin üstündedir, paralaks hatası üretir; temas noktası kalibre
   edilen düzlemin üzerindedir.
 
+## [2026-06-13] M2 model seçimi: yolo11n.pt + bytetrack.yaml
+- **Karar:** Başlangıç modeli `yolo11n.pt` (nano), tracker `bytetrack.yaml`. ultralytics==8.4.66 pinlendi.
+- **Gerekçe:** Nano varyant CPU'da çalışır; stabil prod sürümü; gerçek vaka videosuyla
+  performans yetersiz kalırsa small (`yolo11s.pt`) geçişi tek satır değişiklik.
+- **Alternatifler:** BoT-SORT — ByteTrack ile eşdeğer doğruluk, ByteTrack daha hafif.
+
+## [2026-06-13] M2 tracker testi: YOLO mock
+- **Karar:** Birim testlerinde `ultralytics.YOLO` monkeypatch ile mock edildi; model indirimi gerektirmez.
+- **Gerekçe:** CI/offline ortamlarda model ağırlığı indirilemez; davranış mock ile yeterince test edilebilir.
+  Manuel entegrasyon testi gerçek video + gerçek model ile ayrıca yapılmalı.
+
 ## [2026-06-13] M1 kollinearite kontrolü: 2D çarpım, np.cross değil
 - **Karar:** `_check_collinear` fonksiyonunda numpy'ın `np.cross` yerine açık `v1[0]*v2[1] - v1[1]*v2[0]` formülü kullanıldı.
 - **Gerekçe:** NumPy 2.0'da 2D vektörlere `np.cross` DeprecationWarning veriyor; açık formül uyarısız ve
