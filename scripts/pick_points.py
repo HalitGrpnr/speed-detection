@@ -127,6 +127,14 @@ class PointPicker:
         self.points.append(cp)
         print(f"  ✓ Nokta {n} eklendi.")
 
+        if len(self.points) >= 4:
+            print(f"  [{len(self.points)} nokta var] Bitirmek için: 'bitti' yaz veya video penceresinde Enter/q bas.")
+            ans = input("  Devam mı, bitti mi? [Enter=devam / 'bitti'=kaydet]: ").strip().lower()
+            if ans in ("bitti", "b", "q", "done", "exit"):
+                cv2.destroyAllWindows()
+                self._finish()
+                raise SystemExit(0)
+
     def _finish(self) -> bool:
         if len(self.points) < 4:
             print(f"\n! En az 4 nokta gerekli ({len(self.points)} girildi). Devam et.")
