@@ -7,3 +7,9 @@ dist/
 build/
 .pytest_cache/
 *.DS_Store
+# Model ağırlıkları — ultralytics ilk çalıştırmada indirir
+*.pt
+*.onnx
+# Çalışma zamanı artifact'ları
+calibration.json
+audit/
