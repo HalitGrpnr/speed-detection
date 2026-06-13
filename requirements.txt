@@ -1,0 +1,7 @@
+# NOT: surumleri ilk kurulumda guncel kararli surume PINLE (==x.y.z).
+# Asagidakiler yer tutucudur; agent ilk oturumda dogrulayip sabitler.
+numpy
+scipy
+opencv-python
+ultralytics
+pytest
