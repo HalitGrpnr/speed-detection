@@ -11,11 +11,13 @@ def sliding_window_smooth(
     samples: list[SpeedSample],
     window_s: float,
     method: Literal["median", "mean", "regression"] = "median",
+    min_detectable_kmh: float = 0.0,
 ) -> list[tuple[float, float]]:
     """Kayan pencere yumuşatma — her nokta için çevresindeki window_s saniyelik örnekleri kullanır.
 
+    min_detectable_kmh: bu değerin altı ölçüm gürültüsü sayılır → 0 olarak raporlanır
+    (durmuş araçtaki tespit jitter'ından kaynaklanan sahte hız baskılanır).
     Dönüş: [(t_s, smoothed_kmh)] — girdiyle aynı uzunluk.
-    Smoothed hız negatif olamaz.
     """
     if not samples:
         return []
@@ -47,6 +49,7 @@ def sliding_window_smooth(
         else:
             raise ValueError(f"Bilinmeyen method: {method!r}")
 
-        result.append((t, max(0.0, smoothed)))
+        clamped = max(0.0, smoothed)
+        result.append((t, 0.0 if clamped < min_detectable_kmh else clamped))
 
     return result

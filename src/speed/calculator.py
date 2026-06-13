@@ -60,7 +60,8 @@ def estimate_speed(
 ) -> SpeedEstimate:
     """Tam pipeline: track → metrik → ham seri → yumuşatma → SpeedEstimate."""
     samples = track_to_world(track, H, fps)
-    smoothed = sliding_window_smooth(samples, window_s, method)
+    # 3 km/h altı tespit jitter'ı — durmuş araçta 0 göster
+    smoothed = sliding_window_smooth(samples, window_s, method, min_detectable_kmh=3.0)
 
     smoothed_values = np.array([v for _, v in smoothed])
 

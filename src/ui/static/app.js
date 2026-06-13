@@ -467,8 +467,23 @@ function enterStep6() {
   }
 
   $('btn-download-report').href   = `/api/job/${State.jobId}/report`;
-  $('btn-download-overlay').href  = `/api/job/${State.jobId}/overlay`;
-  $('overlay-video').src          = `/api/job/${State.jobId}/overlay`;
+  $('btn-download-overlay').href  = `/api/job/${State.jobId}/overlay/download`;
+
+  // Tarayıcı moov-atom sorununu (OpenCV mp4v varsayılanı) aşmak için
+  // videoyu önce belleğe çekip Blob URL'e bağla.
+  const videoEl = $('overlay-video');
+  videoEl.src = '';
+  videoEl.textContent = 'Video yükleniyor…';
+  fetch(`/api/job/${State.jobId}/overlay`)
+    .then(r => r.blob())
+    .then(blob => {
+      videoEl.src = URL.createObjectURL(blob);
+      videoEl.load();
+    })
+    .catch(() => {
+      videoEl.src = `/api/job/${State.jobId}/overlay`;
+      videoEl.load();
+    });
 }
 
 // ── Buton bağlantıları ────────────────────────────────────────────────────────

@@ -372,14 +372,33 @@ async def download_report(job_id: str) -> FileResponse:
 
 
 @app.get("/api/job/{job_id}/overlay")
-async def download_overlay(job_id: str) -> FileResponse:
+async def stream_overlay(job_id: str) -> FileResponse:
+    """Tarayıcı içi oynatma — inline Content-Disposition."""
     job = _job_store.get(job_id)
     if job is None:
         raise HTTPException(status_code=404, detail="İş bulunamadı.")
     if job.state != "done" or job.overlay_path is None:
         raise HTTPException(status_code=404, detail="Overlay video henüz hazır değil.")
     return FileResponse(
-        path=job.overlay_path, filename="overlay.mp4", media_type="video/mp4"
+        path=job.overlay_path,
+        media_type="video/mp4",
+        content_disposition_type="inline",
+    )
+
+
+@app.get("/api/job/{job_id}/overlay/download")
+async def download_overlay(job_id: str) -> FileResponse:
+    """İndirme — attachment Content-Disposition."""
+    job = _job_store.get(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="İş bulunamadı.")
+    if job.state != "done" or job.overlay_path is None:
+        raise HTTPException(status_code=404, detail="Overlay video henüz hazır değil.")
+    return FileResponse(
+        path=job.overlay_path,
+        filename="overlay.mp4",
+        media_type="video/mp4",
+        content_disposition_type="attachment",
     )
 
 
