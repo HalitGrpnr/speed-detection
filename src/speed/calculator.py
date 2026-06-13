@@ -7,7 +7,9 @@ from typing import Literal
 import numpy as np
 
 from src.calibration.homography import pixel_to_world
+from src.calibration.models import CalibrationResult
 from src.detection.models import Track
+from src.reliability.confidence import ConfidenceSignals, compute_confidence_level
 from .models import SpeedSample, SpeedEstimate, TrackQuality
 from .smoother import sliding_window_smooth
 
@@ -52,6 +54,7 @@ def estimate_speed(
     track: Track,
     H: np.ndarray,
     fps: float,
+    calibration_result: CalibrationResult,
     window_s: float = 0.4,
     method: Literal["median", "mean", "regression"] = "median",
 ) -> SpeedEstimate:
@@ -87,11 +90,15 @@ def estimate_speed(
         smoothness_residual=smoothness_residual,
     )
 
-    # Güven seviyesi iskeleti — M4'te kalibrasyon RMS ile genişletilecek
-    if quality.frame_count >= 20 and not quality.has_occlusion:
-        confidence_level: Literal["high", "medium", "low"] = "medium"
-    else:
-        confidence_level = "low"
+    signals = ConfidenceSignals(
+        calibration_layer=calibration_result.confidence_layer,
+        reprojection_rms_m=calibration_result.reprojection_rms_m,
+        track_frame_count=quality.frame_count,
+        has_occlusion=quality.has_occlusion,
+        smoothness_residual_kmh=quality.smoothness_residual,
+        planarity_warning=calibration_result.planarity_warning,
+    )
+    confidence_level = compute_confidence_level(signals)
 
     return SpeedEstimate(
         track_id=track.track_id,
@@ -136,7 +143,7 @@ def _main(video_path: str, calibration_path: str, frame_step: int = 1) -> None:
     for t in sorted(tracks, key=lambda x: x.track_id):
         if len(t.points) < 2:
             continue
-        est = estimate_speed(t, H, meta.fps)
+        est = estimate_speed(t, H, meta.fps, calibration_result=cal_result)
         gap_str = f"oklüzyon {'var' if est.track_quality.has_occlusion else 'yok'}"
         print(
             f"Track #{t.track_id} — {t.vehicle_class}\n"

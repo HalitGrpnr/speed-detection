@@ -67,13 +67,17 @@ def compute_homography(points: list[ControlPoint]) -> CalibrationResult:
     from .metrics import reprojection_rms
     rms = reprojection_rms(H, active)
 
+    # Lazy import — avoids circular dependency with reliability module
+    from src.reliability.planarity import planarity_check
+    planarity_warning, _ = planarity_check(H, active)
+
     return CalibrationResult(
         homography=H,
         used_point_ids=used_ids,
         excluded_point_ids=excluded_ids,
         reprojection_rms_m=rms,
         confidence_layer=_confidence_layer(active),
-        planarity_warning=False,
+        planarity_warning=planarity_warning,
     )
 
 

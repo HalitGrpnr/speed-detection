@@ -5,6 +5,7 @@ import numpy as np
 import pytest
 
 from src.calibration.homography import pixel_to_world
+from src.calibration.models import CalibrationResult
 from src.detection.models import Track, TrackPoint
 from src.speed.calculator import track_to_world, estimate_speed
 
@@ -17,6 +18,21 @@ def _make_H() -> np.ndarray:
         [0.001, 0.05,  -5.0],
         [0.0,   0.0,    1.0],
     ], dtype=np.float64)
+
+
+def _make_cal_result(
+    layer: str = "operator",
+    rms: float = 0.05,
+    planarity: bool = False,
+) -> CalibrationResult:
+    return CalibrationResult(
+        homography=_make_H(),
+        used_point_ids=[],
+        excluded_point_ids=[],
+        reprojection_rms_m=rms,
+        confidence_layer=layer,
+        planarity_warning=planarity,
+    )
 
 
 def _world_to_pixel(H: np.ndarray, world: tuple[float, float]) -> tuple[float, float]:
@@ -54,7 +70,7 @@ def _make_constant_speed_track(
 def test_estimate_speed_constant_60kmh():
     H = _make_H()
     track = _make_constant_speed_track(H, speed_kmh=60.0, fps=25.0, n_frames=30)
-    est = estimate_speed(track, H, fps=25.0)
+    est = estimate_speed(track, H, fps=25.0, calibration_result=_make_cal_result())
     assert abs(est.value_kmh - 60.0) < 1.0, (
         f"Beklenen ~60 km/h, alınan {est.value_kmh:.2f} km/h"
     )
@@ -63,7 +79,7 @@ def test_estimate_speed_constant_60kmh():
 def test_estimate_speed_constant_100kmh():
     H = _make_H()
     track = _make_constant_speed_track(H, speed_kmh=100.0, fps=25.0, n_frames=30)
-    est = estimate_speed(track, H, fps=25.0)
+    est = estimate_speed(track, H, fps=25.0, calibration_result=_make_cal_result())
     assert abs(est.value_kmh - 100.0) < 1.0
 
 
@@ -129,7 +145,7 @@ def test_stationary_vehicle_near_zero():
         for i in range(25)
     ]
     track = Track(track_id=1, vehicle_class="car", points=points)
-    est = estimate_speed(track, H, fps=25.0)
+    est = estimate_speed(track, H, fps=25.0, calibration_result=_make_cal_result())
     assert est.value_kmh < 1.0, f"Duran araç için hız {est.value_kmh:.2f} km/h — sıfır olmalı"
 
 
@@ -138,7 +154,7 @@ def test_stationary_vehicle_near_zero():
 def test_short_track_low_confidence():
     H = _make_H()
     track = _make_constant_speed_track(H, speed_kmh=50.0, fps=25.0, n_frames=3)
-    est = estimate_speed(track, H, fps=25.0)
+    est = estimate_speed(track, H, fps=25.0, calibration_result=_make_cal_result())
     assert est.track_quality.frame_count == 3
     assert est.confidence_level == "low"
 
@@ -146,7 +162,7 @@ def test_short_track_low_confidence():
 def test_long_track_no_occlusion_medium_confidence():
     H = _make_H()
     track = _make_constant_speed_track(H, speed_kmh=50.0, fps=25.0, n_frames=25)
-    est = estimate_speed(track, H, fps=25.0)
+    est = estimate_speed(track, H, fps=25.0, calibration_result=_make_cal_result())
     assert est.confidence_level == "medium"
 
 
@@ -156,14 +172,14 @@ def test_occlusion_flag_propagated():
     H = _make_H()
     track = _make_constant_speed_track(H, speed_kmh=60.0, fps=25.0, n_frames=25)
     track.occlusion_gaps = [(10, 13)]
-    est = estimate_speed(track, H, fps=25.0)
+    est = estimate_speed(track, H, fps=25.0, calibration_result=_make_cal_result())
     assert est.track_quality.has_occlusion is True
 
 
 def test_no_occlusion_flag():
     H = _make_H()
     track = _make_constant_speed_track(H, speed_kmh=60.0, fps=25.0, n_frames=25)
-    est = estimate_speed(track, H, fps=25.0)
+    est = estimate_speed(track, H, fps=25.0, calibration_result=_make_cal_result())
     assert est.track_quality.has_occlusion is False
 
 
@@ -172,7 +188,7 @@ def test_no_occlusion_flag():
 def test_ci_nonnegative():
     H = _make_H()
     track = _make_constant_speed_track(H, speed_kmh=60.0, fps=25.0, n_frames=30)
-    est = estimate_speed(track, H, fps=25.0)
+    est = estimate_speed(track, H, fps=25.0, calibration_result=_make_cal_result())
     assert est.ci_kmh >= 0.0
 
 
@@ -196,8 +212,9 @@ def test_noisy_track_larger_ci():
         ))
     noisy_track = Track(track_id=2, vehicle_class="car", points=noisy_points)
 
-    est_clean = estimate_speed(clean_track, H, fps)
-    est_noisy = estimate_speed(noisy_track, H, fps)
+    cal = _make_cal_result()
+    est_clean = estimate_speed(clean_track, H, fps, calibration_result=cal)
+    est_noisy = estimate_speed(noisy_track, H, fps, calibration_result=cal)
 
     assert est_noisy.ci_kmh >= est_clean.ci_kmh, (
         "Gürültülü track CI'ı temiz track'ten küçük olamaz"

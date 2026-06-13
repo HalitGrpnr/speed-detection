@@ -32,6 +32,13 @@ Format:
 - **Gerekçe:** Box merkezi yol düzleminin üstündedir, paralaks hatası üretir; temas noktası kalibre
   edilen düzlemin üzerindedir.
 
+## [2026-06-13] M4 güven seviyesi eşikleri (başlangıç)
+- **Karar:** high: site_measurement + RMS<5cm + ≥30 kare + oklüzyon yok + residual<5 km/h.
+  medium: operator/site_measurement + RMS<20cm + ≥15 kare + residual<15 km/h. Diğerleri low.
+- **Gerekçe:** Başlangıç değerleri. Gerçek doğrulama verisiyle (GPS referanslı test çekimi)
+  sıkılaştırılacak. Teknik analiz §15.2.
+- **planarity_warning:** Pearson |r|>0.7, artıklar<1mm ise gürültü sayılır.
+
 ## [2026-06-13] M3 smoothing method: median varsayılan, window_s=0.4
 - **Karar:** Varsayılan smoothing median, pencere 0.4 saniye. Mean ve regression alternatif olarak mevcut.
 - **Gerekçe:** Median outlier'lara karşı dayanıklı; tek sıçrayan kare tespiti tüm pencereyi bozmaz.

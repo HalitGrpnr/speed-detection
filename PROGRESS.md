@@ -4,7 +4,7 @@
 > "Nerede kaldık" sorusunun cevabı burası + `git log`'tur.
 
 **Son güncelleme:** 2026-06-13
-**Aktif görev:** `tasks/M4.md` (Güvenilirlik — henüz yazılmadı)
+**Aktif görev:** `tasks/M5.md` (Çıktılar — henüz yazılmadı)
 
 ---
 
@@ -15,7 +15,7 @@
 | M1 | Kalibrasyon çekirdeği (elle nokta + standart referans → H → RMS) | ✅ Bitti | 14/14 test |
 | M2 | Tespit + takip (YOLO + ByteTrack) | ✅ Bitti | 22/22 test; model mock + gerçek video okuma |
 | M3 | Hız hesabı (temas noktası → metrik → km/h → yumuşatma) | ✅ Bitti | 23/23 test |
-| M4 | Güvenilirlik (leave-one-out, düzlemsellik, güven seviyesi) | ⬜ Beklemede | |
+| M4 | Güvenilirlik (leave-one-out, düzlemsellik, güven seviyesi) | ✅ Bitti | 85/85 test |
 | M5 | Çıktılar (overlay video + adli rapor) | ⬜ Beklemede | MVP buraya kadar |
 | M6 | Otomatik referans tespiti (fast-follow) | ⬜ Beklemede | |
 | M7 | UI cilası + paketleme | ⬜ Beklemede | |
@@ -53,7 +53,14 @@ Durum işaretleri: ⬜ Başlanmadı · 🟡 Devam ediyor · ✅ Bitti · ⛔ Eng
 _(Yok — M2 tamamlandı.)_
 
 ## Sıradaki Adım
-M4: `tasks/M4.md` görev dosyası yazılacak, sonra güven skoru + düzlemsellik kontrolü.
+M5: `tasks/M5.md` görev dosyası yazılacak, sonra overlay video + adli rapor (PDF).
+
+**M4 (güvenilirlik):**
+- `src/reliability/confidence.py` — ConfidenceSignals, compute_confidence_level (eşik tablosu)
+- `src/reliability/planarity.py` — pearsonr tabanlı düzlemsellik kontrolü
+- `src/calibration/homography.py` güncellendi — planarity_warning artık gerçekten doluyor
+- `src/speed/calculator.py` güncellendi — estimate_speed CalibrationResult alıyor, iskelet kaldırıldı
+- 85/85 test geçiyor (M1+M2+M3+M4)
 
 ## Bilinen Sorunlar / Açık Notlar
 - Doğrulama veri seti henüz yok (GPS'li test çekimi — `docs/teknik-analiz.md` §15.2).
