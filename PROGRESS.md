@@ -4,7 +4,7 @@
 > "Nerede kaldık" sorusunun cevabı burası + `git log`'tur.
 
 **Son güncelleme:** 2026-06-13
-**Aktif görev:** `tasks/M3.md` (Hız hesabı — henüz yazılmadı)
+**Aktif görev:** `tasks/M4.md` (Güvenilirlik — henüz yazılmadı)
 
 ---
 
@@ -14,7 +14,7 @@
 |---|-----------|-------|-----|
 | M1 | Kalibrasyon çekirdeği (elle nokta + standart referans → H → RMS) | ✅ Bitti | 14/14 test |
 | M2 | Tespit + takip (YOLO + ByteTrack) | ✅ Bitti | 22/22 test; model mock + gerçek video okuma |
-| M3 | Hız hesabı (temas noktası → metrik → km/h → yumuşatma) | ⬜ Beklemede | Sonraki görev |
+| M3 | Hız hesabı (temas noktası → metrik → km/h → yumuşatma) | ✅ Bitti | 23/23 test |
 | M4 | Güvenilirlik (leave-one-out, düzlemsellik, güven seviyesi) | ⬜ Beklemede | |
 | M5 | Çıktılar (overlay video + adli rapor) | ⬜ Beklemede | MVP buraya kadar |
 | M6 | Otomatik referans tespiti (fast-follow) | ⬜ Beklemede | |
@@ -31,6 +31,13 @@ Durum işaretleri: ⬜ Başlanmadı · 🟡 Devam ediyor · ✅ Bitti · ⛔ Eng
 - `src/calibration/` — models, homography, metrics, io
 - 14 test geçiyor
 
+**M3 (hız hesabı):**
+- `src/speed/models.py` — SpeedSample, TrackQuality, SpeedEstimate
+- `src/speed/smoother.py` — sliding_window_smooth (median/mean/regression)
+- `src/speed/calculator.py` — track_to_world, estimate_speed + __main__ demo
+- 23 test geçiyor (sabit hız, Δt doğruluğu, gürültü, CI, oklüzyon, method tutarlılığı)
+- Commit: "feat(M3): hız hesabı modülü"
+
 **M2 (tespit + takip):**
 - `src/detection/models.py` — Detection, TrackPoint, Track, contact_point, compute_occlusion_gaps
 - `src/detection/video.py` — VideoMeta, read_video_meta, iter_video_frames
@@ -46,7 +53,7 @@ Durum işaretleri: ⬜ Başlanmadı · 🟡 Devam ediyor · ✅ Bitti · ⛔ Eng
 _(Yok — M2 tamamlandı.)_
 
 ## Sıradaki Adım
-M3: `tasks/M3.md` görev dosyası yazılacak, sonra temas noktası → H → km/h → yumuşatma.
+M4: `tasks/M4.md` görev dosyası yazılacak, sonra güven skoru + düzlemsellik kontrolü.
 
 ## Bilinen Sorunlar / Açık Notlar
 - Doğrulama veri seti henüz yok (GPS'li test çekimi — `docs/teknik-analiz.md` §15.2).

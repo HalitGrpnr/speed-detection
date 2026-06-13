@@ -32,6 +32,17 @@ Format:
 - **Gerekçe:** Box merkezi yol düzleminin üstündedir, paralaks hatası üretir; temas noktası kalibre
   edilen düzlemin üzerindedir.
 
+## [2026-06-13] M3 smoothing method: median varsayılan, window_s=0.4
+- **Karar:** Varsayılan smoothing median, pencere 0.4 saniye. Mean ve regression alternatif olarak mevcut.
+- **Gerekçe:** Median outlier'lara karşı dayanıklı; tek sıçrayan kare tespiti tüm pencereyi bozmaz.
+  0.4 sn ~10 kare (25 fps) — yeterli istatistik, fazla gecikme yok.
+- **Alternatifler:** Kalman filtresi — daha karmaşık, M3 için overkill; ileride değerlendirilebilir.
+
+## [2026-06-13] M3 CI hesabı: IQR/2
+- **Karar:** Güven aralığı = (Q75 - Q25) / 2 (yumuşatılmış seri üzerinde).
+- **Gerekçe:** Dağılım şeklinden bağımsız, robust. M4'te kalibrasyon RMS ve track kalitesiyle
+  birleştirilecek; şimdilik spread-based yeterli.
+
 ## [2026-06-13] M2 model seçimi: yolo11n.pt + bytetrack.yaml
 - **Karar:** Başlangıç modeli `yolo11n.pt` (nano), tracker `bytetrack.yaml`. ultralytics==8.4.66 pinlendi.
 - **Gerekçe:** Nano varyant CPU'da çalışır; stabil prod sürümü; gerçek vaka videosuyla
