@@ -114,6 +114,7 @@ function initStep1() {
 }
 
 async function handleUpload(file) {
+  $('upload-status').style.display = 'block';
   $('upload-status').textContent = 'Yükleniyor…';
   $('upload-status').className = 'status info';
   try {
