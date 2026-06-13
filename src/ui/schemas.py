@@ -41,6 +41,7 @@ class AutoRefRequest(BaseModel):
     frame_n: int
     lane_width_m: float = 3.5
     dash_length_m: float = 3.0
+    d_near_m: float = 5.0  # yakın örnekleme noktasının kameradan tahmini mesafesi (m)
 
 
 class ProposedPointOut(BaseModel):

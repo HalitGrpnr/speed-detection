@@ -15,6 +15,35 @@ _COLOR_RIGHT = (0, 180, 255)    # BGR: sarı-turuncu → sağ
 _DEPTH_LABELS = {0: "near", 1: "mid", 2: "far"}
 
 
+def _vanishing_point_y(
+    m_l: float, b_l: float, m_r: float, b_r: float
+) -> float | None:
+    """İki şerit doğrusunun piksel-uzayındaki kesişim noktasının Y koordinatı.
+
+    Kaçış noktası (vanishing point) perspektif derinlik tahmini için gereklidir.
+    Çizgiler yakın paralel ise None döner.
+    """
+    if abs(m_l - m_r) < 1e-9:
+        return None
+    x_vp = (b_r - b_l) / (m_l - m_r)
+    return float(m_l * x_vp + b_l)
+
+
+def _y_world_perspective(
+    y_px: float, y_near_px: float, y_vp: float, d_near_m: float
+) -> float:
+    """Kaçış noktasına dayalı perspektif derinlik formülü.
+
+    Düzlem yüzey varsayımıyla: D(y) = D_near * (y_near - y_vp) / (y - y_vp)
+    Y_world = D(y) - D_near
+    """
+    denom = y_px - y_vp
+    if abs(denom) < 1.0:
+        return 0.0
+    ratio = (y_near_px - y_vp) / denom
+    return float(d_near_m * (ratio - 1.0))
+
+
 class AutoProposer:
     """Video karesi üzerinden kalibrasyon kontrol noktası öneren sınıf."""
 
@@ -24,11 +53,13 @@ class AutoProposer:
         dash_length_m: float = 3.0,
         n_sample_depths: int = 3,
         roi_top_ratio: float = 0.45,
+        d_near_m: float = 5.0,
     ) -> None:
         self.lane_width_m = lane_width_m
         self.dash_length_m = dash_length_m
         self.n_sample_depths = n_sample_depths
         self.roi_top_ratio = roi_top_ratio
+        self.d_near_m = d_near_m  # kamera altındaki yakın noktanın tahmini mesafesi (m)
 
     def propose(self, frame: np.ndarray) -> list[ProposedPoint]:
         """Şerit + marker tespiti → öneri kontrol noktaları listesi."""
@@ -52,11 +83,17 @@ class AutoProposer:
         y_far = float(roi_top + int((h - roi_top) * 0.1))
         y_samples = np.linspace(y_near, y_far, self.n_sample_depths).tolist()
 
-        # Önce yakın noktada yatay piksel/metre oranı hesapla (fallback için)
+        # Kaçış noktası (her iki şerit varsa) + yatay ölçek (fallback)
+        y_vp: float | None = None
         px_per_m_lateral: float | None = None
         if line_left is not None and line_right is not None:
             m_l, b_l = line_left
             m_r, b_r = line_right
+            # Kaçış noktası — perspektif derinlik için
+            vp_candidate = _vanishing_point_y(m_l, b_l, m_r, b_r)
+            if vp_candidate is not None and vp_candidate < y_near - 10:
+                y_vp = vp_candidate
+            # Yatay ölçek — fallback
             if abs(m_l) > 1e-9 and abs(m_r) > 1e-9:
                 x_left_near = (y_near - b_l) / m_l
                 x_right_near = (y_near - b_r) / m_r
@@ -76,15 +113,16 @@ class AutoProposer:
             samples = sample_line_at_depths(m, b, y_samples)
 
             for i, (x_px, y_px) in enumerate(samples):
-                y_world = self._y_world(y_px, y_near, px_per_m, px_per_m_lateral, i)
+                y_world = self._y_world(y_px, y_near, px_per_m, px_per_m_lateral, i, y_vp)
                 depth_tag = _DEPTH_LABELS.get(i, f"d{i}")
-                # Güven: yakın nokta daha güvenilir, uzaklaştıkça düşer
                 conf = round(max(0.3, 0.90 - i * 0.12), 2)
+                # Y kaynağını description'a ekle — operatör ne kadar güvenmeli bilsin
+                y_src = "marker" if px_per_m else ("vp" if y_vp else "lateral")
                 proposals.append(ProposedPoint(
                     pixel=(float(x_px), float(y_px)),
                     world_m=(float(x_world_val), float(y_world)),
                     detection_confidence=conf,
-                    description=f"{side}_lane_{depth_tag}",
+                    description=f"{side}_lane_{depth_tag} [y:{y_src}]",
                 ))
 
         return proposals
@@ -96,15 +134,19 @@ class AutoProposer:
         px_per_m: float | None,
         px_per_m_lateral: float | None,
         sample_idx: int,
+        y_vp: float | None = None,
     ) -> float:
         if px_per_m is not None:
             # Kesik çizgi ölçeği — en güvenilir
             return (y_near_px - y_px) / px_per_m
+        if y_vp is not None:
+            # Perspektif formülü (kaçış noktası) — lateral ölçekten çok daha doğru
+            return _y_world_perspective(y_px, y_near_px, y_vp, self.d_near_m)
         if px_per_m_lateral is not None:
-            # Yatay şerit genişliği ölçeği — yaklaşık
+            # Yatay ölçek fallback — perspektif bozukluğu nedeniyle hatalı olabilir
             return (y_near_px - y_px) / px_per_m_lateral
-        # Fallback: sabit ızgara
-        return float(sample_idx * 5)
+        # Son çare: sabit ızgara
+        return float(sample_idx * self.d_near_m)
 
     def draw_proposals(
         self,

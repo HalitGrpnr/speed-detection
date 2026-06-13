@@ -25,11 +25,16 @@ const API = {
     return r.json();
   },
 
-  async autoref(videoId, frameN, laneWidth, dashLength) {
+  async autoref(videoId, frameN, laneWidth, dashLength, dNear) {
     const r = await fetch(`/api/video/${videoId}/autoref`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ frame_n: frameN, lane_width_m: laneWidth, dash_length_m: dashLength }),
+      body: JSON.stringify({
+        frame_n: frameN,
+        lane_width_m: laneWidth,
+        dash_length_m: dashLength,
+        d_near_m: dNear,
+      }),
     });
     if (!r.ok) throw new Error((await r.json()).detail || r.statusText);
     return r.json();
@@ -330,8 +335,9 @@ async function runAutoRef() {
   try {
     const laneWidth = parseFloat($('autoref-lane-width').value) || 3.5;
     const dashLen   = parseFloat($('autoref-dash-length').value) || 3.0;
+    const dNear     = parseFloat($('autoref-d-near').value) || 5.0;
     const proposals = await API.autoref(
-      State.videoMeta.video_id, State.frameN, laneWidth, dashLen
+      State.videoMeta.video_id, State.frameN, laneWidth, dashLen, dNear
     );
     if (proposals.length === 0) {
       alert('Şerit tespit edilemedi. Farklı bir kare deneyin veya noktaları elle girin.');

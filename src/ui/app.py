@@ -221,6 +221,7 @@ async def autoref(video_id: str, req: AutoRefRequest) -> list[ProposedPointOut]:
     proposer = AutoProposer(
         lane_width_m=req.lane_width_m,
         dash_length_m=req.dash_length_m,
+        d_near_m=req.d_near_m,
     )
     proposals = proposer.propose(frame)
 
