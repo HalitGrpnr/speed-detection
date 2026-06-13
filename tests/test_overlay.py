@@ -9,7 +9,7 @@ import pytest
 
 from src.detection.models import Track, TrackPoint
 from src.speed.models import SpeedEstimate, SpeedSample, TrackQuality
-from src.output.overlay import CONFIDENCE_COLORS, draw_frame
+from src.output.overlay import CONFIDENCE_COLORS, draw_frame, _instant_speed
 
 
 # ── helpers ──────────────────────────────────────────────────────────────────

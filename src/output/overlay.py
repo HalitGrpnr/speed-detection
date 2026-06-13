@@ -23,6 +23,22 @@ _THICK = 2
 _THIN = 1
 
 
+def _instant_speed(est: SpeedEstimate, frame_idx: int) -> float:
+    """O karedeki anlık yumuşatılmış hız.
+
+    speed_series ve smoothed_series bire-bir eşleşir (aynı uzunluk, aynı sıra).
+    frame_idx'e eşit veya daha önce olan en son örneğin değerini döndürür.
+    Hiç örnek yoksa track özet değerine düşer.
+    """
+    best = est.value_kmh
+    for i, sample in enumerate(est.speed_series):
+        if sample.frame > frame_idx:
+            break
+        if i < len(est.smoothed_series):
+            best = est.smoothed_series[i][1]
+    return best
+
+
 def draw_frame(
     frame: np.ndarray,
     frame_idx: int,
@@ -30,7 +46,7 @@ def draw_frame(
     tracks: list[Track],
     frame_step: int = 1,
 ) -> np.ndarray:
-    """Tek kareye overlay çiz — bbox, track ID, hız, güven rengi.
+    """Tek kareye overlay çiz — bbox, track ID, anlık hız, güven rengi.
 
     Her SpeedEstimate için eşleşen Track bulunur; son noktası frame_step
     içindeyse aktif kabul edilir ve bbox çizilir.
@@ -57,7 +73,8 @@ def draw_frame(
 
         cv2.rectangle(out, (x1, y1), (x2, y2), color, _THICK)
 
-        label = f"#{est.track_id} {est.value_kmh:.0f} km/h"
+        speed_now = _instant_speed(est, frame_idx)
+        label = f"#{est.track_id} {speed_now:.0f} km/h"
         (tw, th), bl = cv2.getTextSize(label, _FONT, _FONT_SCALE, _THIN)
         bg_y1 = max(0, y1 - th - bl - 4)
         cv2.rectangle(out, (x1, bg_y1), (x1 + tw + 4, y1), color, -1)
