@@ -31,3 +31,9 @@ Format:
 - **Karar:** Hız hesabında bbox merkezi değil, aracın zeminle temas noktası kullanılır.
 - **Gerekçe:** Box merkezi yol düzleminin üstündedir, paralaks hatası üretir; temas noktası kalibre
   edilen düzlemin üzerindedir.
+
+## [2026-06-13] M1 kollinearite kontrolü: 2D çarpım, np.cross değil
+- **Karar:** `_check_collinear` fonksiyonunda numpy'ın `np.cross` yerine açık `v1[0]*v2[1] - v1[1]*v2[0]` formülü kullanıldı.
+- **Gerekçe:** NumPy 2.0'da 2D vektörlere `np.cross` DeprecationWarning veriyor; açık formül uyarısız ve
+  daha net.
+- **Alternatifler:** `np.cross` ile 3B vektöre dönüştürmek — gereksiz karmaşıklık.

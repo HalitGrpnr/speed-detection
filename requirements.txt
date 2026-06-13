@@ -1,7 +1,5 @@
-# NOT: surumleri ilk kurulumda guncel kararli surume PINLE (==x.y.z).
-# Asagidakiler yer tutucudur; agent ilk oturumda dogrulayip sabitler.
-numpy
-scipy
-opencv-python
-ultralytics
-pytest
+numpy==2.4.6
+scipy==1.17.1
+opencv-python==4.13.0.92
+pytest==9.0.3
+# ultralytics pinlenmesi M2'de yapılacak (YOLO model seçimiyle birlikte)
