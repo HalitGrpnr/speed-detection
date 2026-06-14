@@ -200,16 +200,18 @@ def _build_story(result: PipelineResult) -> list:
     story.append(Paragraph("Guven Seviyesi Kriterleri", S["SectionTitle"]))
 
     crit_rows = [
-        ["Seviye", "Kalibrasyon", "RMS", "Min. Kare", "Okluzon", "Smoothness"],
-        ["Yuksek", "Saha Olcumu", "< 5 cm", ">= 30", "Yok", "< 5 km/h"],
-        ["Orta",   "Operator/Saha", "< 20 cm", ">= 15", "-", "< 15 km/h"],
-        ["Dusuk",  "Diger", ">= 20 cm", "< 15", "-", ">= 15 km/h"],
+        ["Seviye", "Kalibrasyon", "RMS", "Min. Kare", "CI/Hiz", "Smooth/Hiz"],
+        ["Yuksek", "Saha Olcumu", "< 5 cm", ">= 30", "< %10", "< %40"],
+        ["Orta",   "Operator/Saha", "< 20 cm", ">= 15", "< %25", "-"],
+        ["Dusuk",  "Diger/Std.", ">= 20 cm", "< 15", ">= %25", "-"],
     ]
     t5 = Table(crit_rows, colWidths=[2.5 * cm, 3 * cm, 2.5 * cm, 2.5 * cm, 2.5 * cm, 3 * cm])
     t5.setStyle(_header_table_style())
     story.append(t5)
     story.append(Spacer(1, 0.2 * cm))
     story.append(Paragraph(
+        "CI/Hiz: guven araliginin hiz tahminine orani. Smooth/Hiz: duzlestirilmis "
+        "kalinti orani (yalnizca Yuksek seviyeyi engeller). "
         "Duzlemsellik uyarisi varliginda guven seviyesi bir kademe dusuruLur "
         "(Yuksek -> Orta, Orta -> Dusuk).",
         S["Note"],

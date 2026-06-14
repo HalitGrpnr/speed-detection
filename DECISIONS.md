@@ -126,3 +126,17 @@ Format:
 - **Gerekçe:** NumPy 2.0'da 2D vektörlere `np.cross` DeprecationWarning veriyor; açık formül uyarısız ve
   daha net.
 - **Alternatifler:** `np.cross` ile 3B vektöre dönüştürmek — gereksiz karmaşıklık.
+
+## [2026-06-14] R2 — Güven seviyesi oransal CI eşikleri (geçici, GPS kalibrasyonu beklenyor)
+- **Karar:** `compute_confidence_level` artık mutlak smoothness eşiği yerine oransal eşikler kullanıyor.
+  `_REL_CI_LOW=0.25`, `_REL_CI_HIGH=0.10`, `_REL_SMOOTH_LOW=0.40`.
+- **Gerekçe:** Mutlak `smoothness_residual_kmh >= 15.0` low trigger, yüksek hızlı/uzak araçlarda
+  iyi tahminleri de low'a düşürüyordu (gerçek video: 200 kare, operator, RMS 16.6 cm → low).
+  Sorun: smoother'ın silmesi gereken girdi gürültüsünü ölçüyor, hız ölçeğiyle büyüyor.
+  CI (IQR/2) nihai tahminin kesinliğini ölçer ve hızla aynı ölçektedir → daha güvenilir.
+- **Değişiklik:** Mutlak smoothness low trigger kaldırıldı. CI/value oranı primary low/high kriteri.
+  Smoothness/value oranı yalnızca high'ı engeller (secondary, low tetiklemez).
+  value_kmh=0 (bilinmiyor) → oransal kontroller atlanır.
+- **Sınırlama:** Eşikler GPS referanslı veri setiyle henüz kalibre edilmedi. Geçici değerler
+  review tartışmasından türetildi. `docs/teknik-analiz.md §15.2` doğrulama seti hazır olunca
+  bu kararın üzerine yeni karar yazılmalı.

@@ -98,6 +98,9 @@ def estimate_speed(
         has_occlusion=quality.has_occlusion,
         smoothness_residual_kmh=quality.smoothness_residual,
         planarity_warning=calibration_result.planarity_warning,
+        value_kmh=value_kmh,
+        ci_kmh=ci_kmh,
+        calibration_point_count=len(calibration_result.used_point_ids),
     )
     confidence_level = compute_confidence_level(signals)
 
