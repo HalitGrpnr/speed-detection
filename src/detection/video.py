@@ -14,7 +14,7 @@ class VideoMeta:
     frame_count: int
     width: int
     height: int
-    fps_source: Literal["container"] = "container"
+    fps_source: Literal["container", "operator_override"] = "container"
 
 
 def read_video_meta(video_path: str | Path) -> VideoMeta:

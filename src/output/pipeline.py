@@ -27,10 +27,15 @@ def run_pipeline(
     min_track_points: int = 2,
     progress: bool = True,
     on_progress: Callable[[float], None] | None = None,
+    fps: float | None = None,
+    fps_source: str | None = None,
 ) -> PipelineResult:
     """M1→M5 uçtan uca pipeline.
 
     Kalibrasyon yükle → araç takibi → hız hesabı → overlay video + PDF rapor.
+
+    fps/fps_source: operator override değerleri. Verilmezse kalibrasyon JSON'u,
+    sonra konteyner FPS'i denenir. Hız hesabı fps_used'u kullanır — Δt doğruluğu için kritik.
     """
     video_path = Path(video_path)
     calibration_path = Path(calibration_path)
@@ -39,7 +44,7 @@ def run_pipeline(
     # 1. Kalibrasyon
     if progress:
         print("Kalibrasyon yükleniyor...", flush=True)
-    cal_result, control_points = load_calibration(calibration_path)
+    cal_result, control_points, (cal_fps, cal_fps_source) = load_calibration(calibration_path)
     H = cal_result.homography
     if progress:
         rms_cm = cal_result.reprojection_rms_m * 100
@@ -50,10 +55,24 @@ def run_pipeline(
         print("Model yükleniyor...", flush=True)
     tracker = VehicleTracker(model_name=model_name)
     meta = read_video_meta(video_path)
-    dur_s = meta.frame_count / meta.fps if meta.fps > 0 else 0.0
+
+    # FPS öncelik sırası: explicit param → kalibrasyon JSON → konteyner
+    if fps is not None:
+        fps_used = fps
+        fps_source_used = fps_source or "operator_override"
+    elif cal_fps is not None:
+        fps_used = cal_fps
+        fps_source_used = cal_fps_source
+    else:
+        fps_used = meta.fps
+        fps_source_used = "container"
+    meta.fps = fps_used
+    meta.fps_source = fps_source_used  # type: ignore[assignment]
+
+    dur_s = meta.frame_count / fps_used if fps_used > 0 else 0.0
     if progress:
         print(
-            f"Video: {meta.width}×{meta.height} @ {meta.fps:.1f} fps  "
+            f"Video: {meta.width}×{meta.height} @ {fps_used:.1f} fps [{fps_source_used}]  "
             f"{meta.frame_count} kare ({dur_s:.1f} sn)",
             flush=True,
         )
@@ -75,7 +94,7 @@ def run_pipeline(
     for track in tracks:
         if len(track.points) < min_track_points:
             continue
-        est = estimate_speed(track, H, meta.fps, calibration_result=cal_result)
+        est = estimate_speed(track, H, fps_used, calibration_result=cal_result)
         speed_estimates.append(est)
 
     if progress:

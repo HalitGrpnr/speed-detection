@@ -56,8 +56,14 @@ def save_calibration(
     Path(path).write_text(json.dumps(data, indent=2, ensure_ascii=False))
 
 
-def load_calibration(path: str | Path) -> tuple[CalibrationResult, list[ControlPoint]]:
-    """Load CalibrationResult and ControlPoints from JSON file."""
+def load_calibration(
+    path: str | Path,
+) -> tuple[CalibrationResult, list[ControlPoint], tuple[float | None, str]]:
+    """Load CalibrationResult, ControlPoints, and fps info from JSON file.
+
+    Returns (result, points, (fps, fps_source)).
+    fps is None when the JSON was written without an fps override.
+    """
     data = json.loads(Path(path).read_text())
 
     points = [
@@ -82,4 +88,7 @@ def load_calibration(path: str | Path) -> tuple[CalibrationResult, list[ControlP
         planarity_warning=data["metrics"].get("planarity_warning", False),
     )
 
-    return result, points
+    fps_in_json: float | None = data.get("fps")
+    fps_source_in_json: str = data.get("fps_source", "container")
+
+    return result, points, (fps_in_json, fps_source_in_json)

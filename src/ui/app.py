@@ -245,6 +245,8 @@ def _run_pipeline_thread(
     out_dir: Path,
     frame_step: int,
     model_name: str,
+    fps: float | None = None,
+    fps_source: str | None = None,
 ) -> None:
     try:
         job.state = "running"
@@ -265,6 +267,8 @@ def _run_pipeline_thread(
             model_name=model_name,
             progress=True,
             on_progress=_progress,
+            fps=fps,
+            fps_source=fps_source,
         )
 
         track_class = {t.track_id: t.vehicle_class for t in result.tracks}
@@ -345,7 +349,7 @@ async def start_pipeline(req: PipelineRequest) -> dict:
 
     thread = threading.Thread(
         target=_run_pipeline_thread,
-        args=(job, video_path, cal_json_path, out_dir, req.frame_step, model_name),
+        args=(job, video_path, cal_json_path, out_dir, req.frame_step, model_name, fps, fps_source),
         daemon=True,
     )
     thread.start()

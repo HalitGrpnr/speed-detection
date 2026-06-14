@@ -119,7 +119,7 @@ def _main(video_path: str, calibration_path: str, frame_step: int = 1) -> None:
     from src.detection.video import read_video_meta
 
     print("Kalibrasyon yükleniyor...")
-    cal_result, _ = load_calibration(calibration_path)
+    cal_result, _, (cal_fps, _cal_fps_src) = load_calibration(calibration_path)
     H = cal_result.homography
 
     print("Model yükleniyor...")

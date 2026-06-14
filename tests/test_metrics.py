@@ -107,7 +107,7 @@ def test_json_roundtrip_data_integrity():
             fps_source="container",
         )
 
-        loaded_result, loaded_points = load_calibration(path)
+        loaded_result, loaded_points, (loaded_fps, loaded_fps_source) = load_calibration(path)
 
     # Homography matrix preserved
     assert np.allclose(result.homography, loaded_result.homography, atol=1e-10)
