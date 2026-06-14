@@ -249,3 +249,121 @@ def test_load_calibration_returns_none_fps_when_absent(tmp_path):
     _, _, (fps_out, fps_src_out) = load_calibration(path)
     assert fps_out is None
     assert fps_src_out == "container"
+
+
+# ── R6: Entegrasyon test katmanı ─────────────────────────────────────────────
+
+def test_frame_step_forwarded_to_tracker(tmp_path):
+    """frame_step=3 → VehicleTracker.process_video, frame_step=3 keyword arg ile çağrılır."""
+    from src.output.pipeline import run_pipeline
+
+    cal_path = _write_calibration_json(tmp_path)
+    track = _straight_track(frames=30, dx_per_frame=1.0)
+    fake_meta = MagicMock()
+    fake_meta.fps = 25.0
+    fake_meta.frame_count = 30
+    fake_meta.width = 320
+    fake_meta.height = 240
+    fake_meta.fps_source = "container"
+
+    with (
+        patch("src.output.pipeline.read_video_meta", return_value=fake_meta),
+        patch("src.output.pipeline.VehicleTracker") as MockTracker,
+        patch("src.output.pipeline.write_overlay_video"),
+        patch("src.output.pipeline.generate_report"),
+    ):
+        MockTracker.return_value.process_video.return_value = ([track], {})
+        run_pipeline(
+            video_path=tmp_path / "fake.mp4",
+            calibration_path=cal_path,
+            frame_step=3,
+            progress=False,
+        )
+
+    actual_step = MockTracker.return_value.process_video.call_args.kwargs.get("frame_step")
+    assert actual_step == 3, f"frame_step=3 bekleniyordu, gelen: {actual_step}"
+
+
+def test_sha256_propagated_to_pipeline_result(tmp_path):
+    """run_pipeline(..., video_sha256=X) → PipelineResult.video_sha256 == X."""
+    from src.output.pipeline import run_pipeline
+
+    cal_path = _write_calibration_json(tmp_path)
+    track = _straight_track(frames=30, dx_per_frame=1.0)
+    fake_meta = MagicMock()
+    fake_meta.fps = 25.0
+    fake_meta.frame_count = 30
+    fake_meta.width = 320
+    fake_meta.height = 240
+    fake_meta.fps_source = "container"
+
+    expected_sha = "a" * 64
+
+    with (
+        patch("src.output.pipeline.read_video_meta", return_value=fake_meta),
+        patch("src.output.pipeline.VehicleTracker") as MockTracker,
+        patch("src.output.pipeline.write_overlay_video"),
+        patch("src.output.pipeline.generate_report"),
+    ):
+        MockTracker.return_value.process_video.return_value = ([track], {})
+        result = run_pipeline(
+            video_path=tmp_path / "fake.mp4",
+            calibration_path=cal_path,
+            video_sha256=expected_sha,
+            progress=False,
+        )
+
+    assert result.video_sha256 == expected_sha
+
+
+def test_e2e_run_pipeline_real_video(tmp_path):
+    """Gerçek mp4 dosyası + kalibrasyon JSON → run_pipeline tam zincir (YOLO mock'lu).
+
+    Doğrulanır: fps override, frame_step, sha256, hız hesabı hepsi uçtan uca çalışır.
+    """
+    import cv2
+    from src.output.pipeline import run_pipeline
+
+    # Sentetik video dosyası yaz
+    video_path = tmp_path / "test.mp4"
+    fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+    writer = cv2.VideoWriter(str(video_path), fourcc, 25.0, (320, 240))
+    rng = np.random.default_rng(42)
+    for _ in range(30):
+        frame = (rng.random((240, 320, 3)) * 255).astype(np.uint8)
+        writer.write(frame)
+    writer.release()
+
+    # Kalibrasyon JSON yaz (fps yok → override=30 kullanılacak)
+    cal_path = tmp_path / "cal.json"
+    save_calibration(cal_path, _make_cal_result(), _make_control_points(),
+                     fps=None, fps_source="container")
+
+    # 0.5 m/frame × 30 fps × 3.6 = 54 km/h beklenir (kimlik H ile)
+    track = _straight_track(frames=25, dx_per_frame=0.5)
+    sha_val = "b" * 64
+
+    with (
+        patch("src.output.pipeline.VehicleTracker") as MockTracker,
+        patch("src.output.pipeline.write_overlay_video"),
+        patch("src.output.pipeline.generate_report"),
+    ):
+        MockTracker.return_value.process_video.return_value = ([track], {})
+        result = run_pipeline(
+            video_path=video_path,
+            calibration_path=cal_path,
+            fps=30.0,
+            fps_source="operator_override",
+            video_sha256=sha_val,
+            frame_step=2,
+            progress=False,
+        )
+
+    assert len(result.speed_estimates) >= 1
+    assert abs(result.speed_estimates[0].value_kmh - 54.0) < 5.0, (
+        f"Beklenen ~54 km/h, gelen: {result.speed_estimates[0].value_kmh:.1f}"
+    )
+    assert result.video_sha256 == sha_val
+    assert result.video_meta.fps == 30.0
+    assert result.video_meta.fps_source == "operator_override"
+    assert result.frame_step == 2

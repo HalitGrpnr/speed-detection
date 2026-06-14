@@ -373,3 +373,130 @@ def test_calibrate_holdout_validation_runs(client):
     row = data['holdout_rows'][0]
     assert row['id'] == 'cp5'
     assert 'error_m' in row
+
+
+# ── R6: Entegrasyon test katmanı (UI) ─────────────────────────────────────────
+
+def _make_simple_track():
+    """Yatay, sabit hızlı 30 karelık sentetik track (test_ui_api yerel yardımcısı)."""
+    from src.detection.models import Track, TrackPoint
+    points = [
+        TrackPoint(
+            frame=i, t_s=float(i),
+            contact_pixel=(float(i), 20.0),
+            bbox=(float(i), 10.0, float(i + 20), 30.0),
+        )
+        for i in range(30)
+    ]
+    return Track(track_id=1, vehicle_class="car", points=points)
+
+
+def test_pipeline_frame_step_reaches_thread_args(client):
+    """start_pipeline frame_step=3 → thread args içinde 3 görünür."""
+    vid = client._video_id
+    cal_r = client.post('/api/calibrate', json={
+        'video_id': vid, 'frame_n': 0, 'control_points': _valid_points()
+    })
+    calibration = cal_r.json()
+
+    captured = {}
+
+    class _CapturingThread:
+        def __init__(self, target=None, args=(), daemon=False, **kw):
+            captured['args'] = args
+        def start(self):
+            pass
+
+    with patch('threading.Thread', _CapturingThread):
+        client.post('/api/pipeline', json={
+            'video_id': vid,
+            'calibration': calibration,
+            'control_points': _valid_points(),
+            'frame_step': 3,
+        })
+
+    thread_args = captured.get('args', ())
+    assert 3 in thread_args, f"frame_step=3 thread args içinde bulunamadı: {thread_args}"
+
+
+def test_pipeline_fps_override_reaches_thread_args(client):
+    """fps_override=60 → thread args içinde 60.0 görünür."""
+    vid = client._video_id
+    cal_r = client.post('/api/calibrate', json={
+        'video_id': vid, 'frame_n': 0, 'control_points': _valid_points()
+    })
+    calibration = cal_r.json()
+
+    captured = {}
+
+    class _CapturingThread:
+        def __init__(self, target=None, args=(), daemon=False, **kw):
+            captured['args'] = args
+        def start(self):
+            pass
+
+    with patch('threading.Thread', _CapturingThread):
+        client.post('/api/pipeline', json={
+            'video_id': vid,
+            'calibration': calibration,
+            'control_points': _valid_points(),
+            'fps_override': 60.0,
+        })
+
+    thread_args = captured.get('args', ())
+    assert 60.0 in thread_args, f"fps_override=60.0 thread args içinde bulunamadı: {thread_args}"
+
+
+def test_pipeline_e2e_thread_completes(client):
+    """UI e2e: gerçek thread (YOLO mock'lu) → job 'done' state'e ulaşır, sonuçlar erişilebilir."""
+    import time
+
+    vid = client._video_id
+    cal_r = client.post('/api/calibrate', json={
+        'video_id': vid, 'frame_n': 0, 'control_points': _valid_points()
+    })
+    calibration = cal_r.json()
+
+    track = _make_simple_track()
+
+    # patch.start/stop: thread boyunca patch'ler aktif kalır
+    p_tracker = patch('src.output.pipeline.VehicleTracker')
+    p_overlay = patch('src.output.pipeline.write_overlay_video')
+    p_report = patch('src.output.pipeline.generate_report')
+
+    MockTracker = p_tracker.start()
+    p_overlay.start()
+    p_report.start()
+    MockTracker.return_value.process_video.return_value = ([track], {})
+
+    try:
+        r = client.post('/api/pipeline', json={
+            'video_id': vid,
+            'calibration': calibration,
+            'control_points': _valid_points(),
+            'frame_step': 1,
+            'model_size': 'nano',
+        })
+        assert r.status_code == 202
+        job_id = r.json()['job_id']
+
+        state = 'queued'
+        sr = None
+        for _ in range(60):
+            time.sleep(0.1)
+            sr = client.get(f'/api/job/{job_id}/status')
+            state = sr.json()['state']
+            if state in ('done', 'error'):
+                break
+
+        assert state == 'done', f"İş tamamlanamadı: {sr.json() if sr else 'no response'}"
+
+        rr = client.get(f'/api/job/{job_id}/results')
+        assert rr.status_code == 200
+        data = rr.json()
+        assert 'estimates' in data
+        assert 'vehicle_count' in data
+    finally:
+        p_tracker.stop()
+        p_overlay.stop()
+        p_report.stop()

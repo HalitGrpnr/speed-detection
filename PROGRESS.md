@@ -3,8 +3,8 @@
 > **Agent:** Bu dosyayı her oturumun **başında oku**, **sonunda güncelle.**
 > "Nerede kaldık" sorusunun cevabı burası + `git log`'tur.
 
-**Son güncelleme:** 2026-06-13
-**Aktif görev:** — (M7 bitti, tüm milestone'lar tamamlandı)
+**Son güncelleme:** 2026-06-14
+**Aktif görev:** —  (refactor.md tamamlandı, R1–R6 hepsi ✅)
 
 ---
 
@@ -93,8 +93,71 @@ _(Yok — M2 tamamlandı.)_
 ## Şu An Devam Eden
 _(Yok — tüm milestone'lar tamamlandı.)_
 
+## Son Oturum (2026-06-14 — Refactor R1)
+
+**R3 (leave-one-out + redundancy):**
+- `CalibrationResult`'a `holdout_rows` + `loo_rms_m` alanları eklendi
+- `loo_rms()` fonksiyonu (≥5 aktif nokta gerekir)
+- `calibrate` endpoint: holdout_validation + LOO RMS artık çalıştırılıyor
+- `CalibrateResponse`: `point_count`, `loo_rms_m`, `holdout_rows` alanları
+- `confidence.py`: `high` için `calibration_point_count >= 6` şartı
+- `report.py`: LOO RMS satırı + redundancy uyarısı + held-out tablo
+- `app.js`: RMS kutusunda LOO + redundancy uyarısı
+- 17 yeni test — 179/179 geçiyor
+- Commit: `d4fc304 refactor(R3): leave-one-out doğrulama + kalibrasyon redundancy`
+
+**R2 (oransal CI güven sistemi):**
+- `ConfidenceSignals`'a `value_kmh`, `ci_kmh`, `calibration_point_count` eklendi
+- Oransal eşikler: `_REL_CI_LOW=0.25`, `_REL_CI_HIGH=0.10`, `_REL_SMOOTH_LOW=0.40`
+- Mutlak smoothness low trigger kaldırıldı; CI/value primary sinyal
+- `calculator.py` yeni sinyalleri doldurur; `report.py` tablosu güncellendi
+- DECISIONS.md'ye eşik gerekçesi eklendi
+- 8 yeni test, 2 güncellendi — 162/162 geçiyor
+- Commit: `1e5cbfd refactor(R2): güven seviyesi oransal CI tabanlı sinyal setine geçiş`
+
+**R1 (FPS pipeline wiring — K1 kritik düzeltme):**
+- `load_calibration` → 3-tuple `(CalibrationResult, points, (fps, fps_source))`
+- `run_pipeline` → `fps`/`fps_source` param eklendi; öncelik: explicit > JSON > konteyner
+- `VideoMeta.fps_source` Literal'e `"operator_override"` eklendi
+- `_run_pipeline_thread` + `start_pipeline` resolved fps'i iletir
+- `tests/test_pipeline.py` (yeni, 7 test) — 154/154 geçiyor
+- Commit: `545885a refactor(R1): FPS override pipeline'a bağlandı`
+
+**R5 (drift & robustluk):**
+- `report.py`: güven kriteri tablosu `confidence.py` sabitlerinden dinamik üretiliyor
+- `planarity_check` 3-tuple döndürüyor `(warning, corr, evaluated)` — yetersiz veride `evaluated=False`
+- `CalibrationResult.planarity_evaluated` alanı eklendi; rapor "Değerlendirilemedi" gösteriyor
+- `calculator.py`: 2-nokta track CI = `value_kmh` (0.0 yanılsaması kalktı)
+- `app.js:328`: `catch {}` → `catch (e) { console.warn(...) }` (sessiz hata yok)
+- 7 yeni test — 191/191 geçiyor
+- Commit: `17a54d2 refactor(R5): drift temizliği`
+
+**R4 (adli bütünlük):**
+- `start_pipeline` artık istemcinin H'sini kabul etmiyor; `compute_homography` ile yeniden üretiyor
+- İstemci H ≠ sunucu H ise `[AUDIT UYARI]` logu atılıyor
+- LOO ve holdout da `start_pipeline`'da yeniden hesaplanıyor
+- `PipelineResult.video_sha256` + `run_pipeline(video_sha256=...)` eklendi
+- `report.py` meta tablosuna "Video SHA-256" satırı eklendi
+- 5 yeni test — 184/184 geçiyor
+- Commit: `95d43c2 refactor(R4): adli bütünlük — sunucu-tarafı H + rapora SHA-256`
+
+## Son Oturum (2026-06-14 — Refactor R6)
+
+**R6 (entegrasyon test katmanı):**
+- `tests/test_pipeline.py`: 3 yeni test
+  - `test_frame_step_forwarded_to_tracker` — frame_step=3 → process_video kwarg doğrulaması
+  - `test_sha256_propagated_to_pipeline_result` — sha256 PipelineResult'ta end-to-end
+  - `test_e2e_run_pipeline_real_video` — gerçek mp4 + kalibrasyon JSON + mock YOLO → hız hesabı + meta + frame_step doğrulama
+- `tests/test_ui_api.py`: 3 yeni test
+  - `test_pipeline_frame_step_reaches_thread_args` — frame_step thread args'ta
+  - `test_pipeline_fps_override_reaches_thread_args` — fps_override thread args'ta
+  - `test_pipeline_e2e_thread_completes` — gerçek thread (YOLO mock), job "done", sonuçlar erişilebilir
+- **197/197 test geçiyor**
+- Commit: R6 commit
+
 ## Sıradaki Adım
-Gerçek trafik videosuyla uçtan uca manuel doğrulama (GPS referanslı — teknik analiz §15.2).
+**Tüm refactoring tamamlandı (R1–R6).** GPS referanslı doğrulama seti hazırlandığında
+güven eşikleri (`_REL_CI_LOW`, `_REL_CI_HIGH`) kalibre edilmeli (DECISIONS.md + teknik-analiz §15.2).
 
 **M4 (güvenilirlik):**
 - `src/reliability/confidence.py` — ConfidenceSignals, compute_confidence_level (eşik tablosu)
