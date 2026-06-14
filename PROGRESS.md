@@ -4,7 +4,7 @@
 > "Nerede kaldık" sorusunun cevabı burası + `git log`'tur.
 
 **Son güncelleme:** 2026-06-14
-**Aktif görev:** `tasks/M8/01-shell.md` (M8 Step 1 — tasarım sistemi & app shell)
+**Aktif görev:** `tasks/M8/02-upload.md` (M8 Step 2 — Adım 1: Video Yükle)
 
 ---
 
@@ -19,7 +19,7 @@
 | M5 | Çıktılar (overlay video + adli rapor) | ✅ Bitti | MVP tamamlandı — 104/104 test |
 | M6 | Otomatik referans tespiti (fast-follow) | ✅ Bitti | 129/129 test |
 | M7 | UI cilası + paketleme | ✅ Bitti | 15/15 test; FastAPI + wizard UI + PyInstaller paketi |
-| M8 | Frontend modernizasyonu (React+Vite+TS+Tailwind+shadcn) | 🟡 Devam ediyor | Step 0 ✅; sırada Step 1 (shell). `tasks/M8.md` + `tasks/M8/*` |
+| M8 | Frontend modernizasyonu (React+Vite+TS+Tailwind+shadcn) | 🟡 Devam ediyor | Step 0–1 ✅; sırada Step 2 (upload). `tasks/M8.md` + `tasks/M8/*` |
 
 Durum işaretleri: ⬜ Başlanmadı · 🟡 Devam ediyor · ✅ Bitti · ⛔ Engellendi
 
@@ -184,10 +184,27 @@ _(Yok — tüm milestone'lar tamamlandı.)_
 - Bilinen ufak konu: `npm run lint` Node 20.19+ isteyen transitive (eslint-visitor-keys) yüzünden
   uyarı verebilir — build'i etkilemez, kritik değil. 3 npm high-sev audit (dev deps) sonraya.
 
+## Son Oturum (2026-06-14 — M8 Step 1 tamamlandı)
+
+**Step 1 (tasarım sistemi & app shell) — ✅:**
+- Tasarım token'ları: shadcn HSL değişkenleri (açık enterprise + mavi primary), `--canvas`
+  koyu workspace tonu, semantik `success/warning/danger`. `index.css` + `tailwind.config.js`.
+- shadcn **manuel** kuruldu (CLI Tailwind v4 varsayıyor; biz v3'teyiz). Primitives: button, card,
+  badge, separator (`@/components/ui/`). Button radix Slot'suz (ekstra bağımlılık yok).
+- Bağımlılıklar: zustand, @tanstack/react-query, @fontsource/inter (self-host, CDN yok),
+  cva/clsx/tailwind-merge/lucide-react/tailwindcss-animate. `components.json` eklendi (ileride `shadcn add` için).
+- `lib/utils.ts` (cn), `lib/models.ts` (üretilen tiplere okunabilir alias), `lib/api.ts` (tip-güvenli istemci).
+- `store/wizard.ts` (Zustand): adım + videoMeta/points/calibration/jobId + **canEnter guard'ları**.
+- Layout: AppShell (Header + Stepper sidebar), ortak: StatusBanner, ConfidenceBadge, RmsBadge, StepFooter.
+- 6 adım placeholder (`features/*`) + `App.tsx` (QueryClientProvider + adım router).
+  Placeholder'larda **geçici demo butonları** var (kabuğu gezilebilir kılar; Step 2+'da gerçek ekranlarla değişecek).
+- **Doğrulama:** `npm run build` temiz (tsc + vite), Inter fontları yerele gömüldü; `/` yeni SPA
+  bundle'ını (hash'li JS+CSS) servis ediyor; **pytest 197/197 yeşil**.
+
 ## Sıradaki Adım
-**M8 Step 1** — `tasks/M8/01-shell.md`: tasarım token'ları (açık enterprise + koyu canvas),
-shadcn init + primitives, AppShell (Header + Stepper), Zustand wizard store + guard'lar,
-ortak bileşenler, `lib/api.ts` typed client.
+**M8 Step 2** — `tasks/M8/02-upload.md`: gerçek Video Yükle ekranı (drag-drop + progress,
+SHA-256 gösterimi, meta kartı; `POST /api/video/upload`). UploadStep placeholder'ı + geçici
+demo butonu kaldırılıp gerçek upload akışıyla değiştirilecek.
 
 **Açık (M8 dışı):** GPS referanslı doğrulama seti hazırlandığında güven eşikleri
 (`_REL_CI_LOW`, `_REL_CI_HIGH`) kalibre edilmeli (DECISIONS.md + teknik-analiz §15.2).

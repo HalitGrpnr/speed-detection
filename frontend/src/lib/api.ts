@@ -1,0 +1,82 @@
+/**
+ * Tip-güvenli API istemcisi. Tüm istekler aynı-origin /api'ye gider (dev'de Vite
+ * proxy uvicorn'a yönlendirir). Hiçbir harici servise çağrı yok (forensic, yerel).
+ */
+import type {
+  AutoRefRequest,
+  CalibrateRequest,
+  CalibrateResponse,
+  JobResult,
+  JobStatus,
+  PipelineRequest,
+  ProposedPoint,
+  VideoMeta,
+} from '@/lib/models'
+
+async function unwrap<T>(res: Response): Promise<T> {
+  if (!res.ok) {
+    let detail: string = res.statusText
+    try {
+      const body = (await res.json()) as { detail?: unknown }
+      if (typeof body.detail === 'string') detail = body.detail
+    } catch {
+      /* gövde JSON değil — statusText kullan */
+    }
+    throw new Error(detail || `İstek başarısız (${res.status})`)
+  }
+  return (await res.json()) as T
+}
+
+const jsonHeaders = { 'Content-Type': 'application/json' }
+
+export const api = {
+  async uploadVideo(file: File): Promise<VideoMeta> {
+    const fd = new FormData()
+    fd.append('file', file)
+    return unwrap(await fetch('/api/video/upload', { method: 'POST', body: fd }))
+  },
+
+  frameUrl: (videoId: string, frame: number) => `/api/video/${videoId}/frame/${frame}`,
+
+  async calibrate(req: CalibrateRequest): Promise<CalibrateResponse> {
+    return unwrap(
+      await fetch('/api/calibrate', {
+        method: 'POST',
+        headers: jsonHeaders,
+        body: JSON.stringify(req),
+      }),
+    )
+  },
+
+  async autoref(videoId: string, req: AutoRefRequest): Promise<ProposedPoint[]> {
+    return unwrap(
+      await fetch(`/api/video/${videoId}/autoref`, {
+        method: 'POST',
+        headers: jsonHeaders,
+        body: JSON.stringify(req),
+      }),
+    )
+  },
+
+  async startPipeline(req: PipelineRequest): Promise<{ job_id: string }> {
+    return unwrap(
+      await fetch('/api/pipeline', {
+        method: 'POST',
+        headers: jsonHeaders,
+        body: JSON.stringify(req),
+      }),
+    )
+  },
+
+  async jobStatus(jobId: string): Promise<JobStatus> {
+    return unwrap(await fetch(`/api/job/${jobId}/status`))
+  },
+
+  async jobResults(jobId: string): Promise<JobResult> {
+    return unwrap(await fetch(`/api/job/${jobId}/results`))
+  },
+
+  reportUrl: (jobId: string) => `/api/job/${jobId}/report`,
+  overlayUrl: (jobId: string) => `/api/job/${jobId}/overlay`,
+  overlayDownloadUrl: (jobId: string) => `/api/job/${jobId}/overlay/download`,
+}
