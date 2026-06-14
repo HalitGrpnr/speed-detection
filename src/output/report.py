@@ -11,6 +11,11 @@ from reportlab.platypus import (
     SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle,
 )
 
+from src.reliability.confidence import (
+    _HIGH_RMS_M, _HIGH_FRAME,
+    _MEDIUM_RMS_M, _MEDIUM_FRAME,
+    _REL_CI_LOW, _REL_CI_HIGH, _REL_SMOOTH_LOW,
+)
 from .models import PipelineResult
 
 _MARGIN = 2 * cm
@@ -130,10 +135,12 @@ def _build_story(result: PipelineResult) -> list:
     story.append(Paragraph("Kalibrasyon", S["SectionTitle"]))
 
     rms_m = cal.reprojection_rms_m
-    planarity_str = (
-        "UYARI - yuzey egimi/duzlemsellik sorunu tespit edildi"
-        if cal.planarity_warning else "Yok"
-    )
+    if cal.planarity_warning:
+        planarity_str = "UYARI - yuzey egimi/duzlemsellik sorunu tespit edildi"
+    elif not cal.planarity_evaluated:
+        planarity_str = "Değerlendirilemedi (yetersiz nokta veya derinlik çeşitliliği yok)"
+    else:
+        planarity_str = "Yok"
 
     point_count = len(cal.used_point_ids)
     redundancy_ok = point_count >= 6
@@ -244,19 +251,39 @@ def _build_story(result: PipelineResult) -> list:
 
     crit_rows = [
         ["Seviye", "Kalibrasyon", "RMS", "Min. Kare", "CI/Hiz", "Smooth/Hiz"],
-        ["Yuksek", "Saha Olcumu", "< 5 cm", ">= 30", "< %10", "< %40"],
-        ["Orta",   "Operator/Saha", "< 20 cm", ">= 15", "< %25", "-"],
-        ["Dusuk",  "Diger/Std.", ">= 20 cm", "< 15", ">= %25", "-"],
+        [
+            "Yuksek", "Saha Olcumu",
+            f"< {int(_HIGH_RMS_M * 100)} cm",
+            f">= {_HIGH_FRAME}",
+            f"< %{int(_REL_CI_HIGH * 100)}",
+            f"< %{int(_REL_SMOOTH_LOW * 100)}",
+        ],
+        [
+            "Orta", "Operator/Saha",
+            f"< {int(_MEDIUM_RMS_M * 100)} cm",
+            f">= {_MEDIUM_FRAME}",
+            f"< %{int(_REL_CI_LOW * 100)}",
+            "-",
+        ],
+        [
+            "Dusuk", "Diger/Std.",
+            f">= {int(_MEDIUM_RMS_M * 100)} cm",
+            f"< {_MEDIUM_FRAME}",
+            f">= %{int(_REL_CI_LOW * 100)}",
+            "-",
+        ],
     ]
     t5 = Table(crit_rows, colWidths=[2.5 * cm, 3 * cm, 2.5 * cm, 2.5 * cm, 2.5 * cm, 3 * cm])
     t5.setStyle(_header_table_style())
     story.append(t5)
     story.append(Spacer(1, 0.2 * cm))
     story.append(Paragraph(
-        "CI/Hiz: guven araliginin hiz tahminine orani. Smooth/Hiz: duzlestirilmis "
-        "kalinti orani (yalnizca Yuksek seviyeyi engeller). "
-        "Duzlemsellik uyarisi varliginda guven seviyesi bir kademe dusuruLur "
-        "(Yuksek -> Orta, Orta -> Dusuk).",
+        f"CI/Hiz: guven araliginin hiz tahminine orani. Smooth/Hiz: duzlestirilmis "
+        f"kalinti orani (yalnizca Yuksek seviyeyi engeller). "
+        f"Duzlemsellik uyarisi varliginda guven seviyesi bir kademe dusurulur "
+        f"(Yuksek -> Orta, Orta -> Dusuk). "
+        f"Esikler: RMS_H={int(_HIGH_RMS_M*100)}cm / RMS_M={int(_MEDIUM_RMS_M*100)}cm, "
+        f"CI_H={int(_REL_CI_HIGH*100)}% / CI_L={int(_REL_CI_LOW*100)}%.",
         S["Note"],
     ))
     story.append(Spacer(1, 0.5 * cm))

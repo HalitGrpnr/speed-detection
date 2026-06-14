@@ -325,7 +325,8 @@ async function triggerRmsUpdate(pts) {
   try {
     const cal = await API.calibrate(State.videoMeta.video_id, State.frameN, pts);
     updateRmsDisplay(cal);
-  } catch {
+  } catch (e) {
+    console.warn('Kalibrasyon RMS güncellenemedi:', e);
     updateRmsDisplay(null);
   }
 }

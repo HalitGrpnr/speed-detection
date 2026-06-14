@@ -219,3 +219,24 @@ def test_noisy_track_larger_ci():
     assert est_noisy.ci_kmh >= est_clean.ci_kmh, (
         "Gürültülü track CI'ı temiz track'ten küçük olamaz"
     )
+
+
+# ── R5: Kısa track CI=0 yanıltıcı kesinlik ───────────────────────────────────
+
+def test_two_point_track_ci_nonzero():
+    """2-nokta track için ci_kmh = 0 'mükemmel kesinlik' sinyali verir —
+    bunun yerine value_kmh'ye eşit (geniş/tanımsız) olmalı."""
+    H = _make_H()
+    track = _make_constant_speed_track(H, speed_kmh=60.0, fps=25.0, n_frames=2)
+    est = estimate_speed(track, H, fps=25.0, calibration_result=_make_cal_result())
+    assert est.ci_kmh > 0.0, "2-nokta track CI'ı sıfır olmamalı (tanımsız → geniş)"
+
+
+def test_two_point_track_ci_equals_value_kmh():
+    """2-nokta track'te ci_kmh, value_kmh'ye eşit olmalı (tanımsız CI sinyali)."""
+    H = _make_H()
+    track = _make_constant_speed_track(H, speed_kmh=60.0, fps=25.0, n_frames=2)
+    est = estimate_speed(track, H, fps=25.0, calibration_result=_make_cal_result())
+    assert est.ci_kmh == pytest.approx(est.value_kmh, abs=1e-6), (
+        "2-nokta track'te CI tanımsız → value_kmh'e eşit olmalı"
+    )

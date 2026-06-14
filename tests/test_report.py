@@ -229,6 +229,44 @@ def test_report_story_shows_holdout_table_when_present():
     assert "p5" in text, "Held-out nokta ID'si raporda görünmeli"
 
 
+# ── R5: Düzlemsellik "değerlendirilemedi" + eşik sabitlerinden tablo ─────────
+
+def test_report_shows_unevaluated_planarity():
+    """planarity_evaluated=False → raporda 'değerlendirilemedi' görünmeli."""
+    from src.calibration.models import CalibrationResult
+    cal = CalibrationResult(
+        homography=np.eye(3),
+        used_point_ids=["p1", "p2", "p3", "p4"],
+        excluded_point_ids=[],
+        reprojection_rms_m=0.10,
+        confidence_layer="operator",
+        planarity_warning=False,
+        planarity_evaluated=False,
+    )
+    result = _make_result(calibration_result=cal)
+    text = _story_text(result)
+    assert "değerlendirilemedi" in text.lower(), "planarity_evaluated=False → raporda 'değerlendirilemedi' olmalı"
+
+
+def test_report_shows_yok_when_evaluated_no_warning():
+    """planarity_evaluated=True, planarity_warning=False → raporda 'Yok' görünmeli."""
+    result = _make_result(calibration_result=_make_cal(planarity=False))
+    text = _story_text(result)
+    assert "yok" in text.lower() or "Yok" in text, "Planarity normal → 'Yok' olmalı"
+
+
+def test_report_criteria_table_contains_threshold_values():
+    """Güven kriteri tablosu confidence.py sabitlerinden türetilen değerleri içermeli."""
+    from src.reliability.confidence import _HIGH_RMS_M, _MEDIUM_RMS_M, _HIGH_FRAME, _MEDIUM_FRAME
+    result = _make_result()
+    text = _story_text(result)
+    # HIGH RMS eşiği cm cinsinden (örn. 5 cm)
+    high_rms_cm = int(_HIGH_RMS_M * 100)
+    assert str(high_rms_cm) in text, f"Yüksek RMS eşiği ({high_rms_cm} cm) tabloda olmalı"
+    # MEDIUM frame eşiği
+    assert str(_MEDIUM_FRAME) in text, f"Orta kare eşiği ({_MEDIUM_FRAME}) tabloda olmalı"
+
+
 # ── R4: Video SHA-256 raporda görünür ────────────────────────────────────────
 
 def test_report_collect_texts_includes_sha256():

@@ -69,7 +69,7 @@ def compute_homography(points: list[ControlPoint]) -> CalibrationResult:
 
     # Lazy import — avoids circular dependency with reliability module
     from src.reliability.planarity import planarity_check
-    planarity_warning, _ = planarity_check(H, active)
+    planarity_warning, _, planarity_evaluated = planarity_check(H, active)
 
     return CalibrationResult(
         homography=H,
@@ -78,6 +78,7 @@ def compute_homography(points: list[ControlPoint]) -> CalibrationResult:
         reprojection_rms_m=rms,
         confidence_layer=_confidence_layer(active),
         planarity_warning=planarity_warning,
+        planarity_evaluated=planarity_evaluated,
     )
 
 

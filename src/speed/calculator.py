@@ -69,12 +69,12 @@ def estimate_speed(
     est_values = smoothed_values[1:] if len(smoothed_values) > 1 else smoothed_values
     value_kmh = float(np.median(est_values)) if len(est_values) > 0 else 0.0
 
-    # CI: IQR/2
+    # CI: IQR/2; tek örnek varsa CI tanımsız → value_kmh (geniş/tanımsız sinyal)
     if len(est_values) >= 2:
         q75, q25 = np.percentile(est_values, [75, 25])
         ci_kmh = float((q75 - q25) / 2.0)
     else:
-        ci_kmh = 0.0
+        ci_kmh = value_kmh
 
     # Smoothness residual (ilk sample atlanır)
     if len(samples) > 1:

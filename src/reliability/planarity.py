@@ -12,17 +12,20 @@ _CORRELATION_THRESHOLD = 0.7
 def planarity_check(
     H: np.ndarray,
     points: list[ControlPoint],
-) -> tuple[bool, float]:
+) -> tuple[bool, float, bool]:
     """Kalibrasyon artıklarının Y-derinliğiyle Pearson korelasyonunu hesapla.
 
     Artıklar derinlikle sistematik artıyorsa yol eğimi/kabarıklığı vardır.
-    Dönüş: (warning: bool, correlation: float)
+    Dönüş: (warning: bool, correlation: float, evaluated: bool)
+
+    evaluated=False: yetersiz veri (< 4 nokta, tek derinlik veya sıfır artık)
+    → "uyarı yok" değil, "değerlendirilemedi" anlamına gelir.
     """
     # Lazy import — circular dependency'yi kırar
     from src.calibration.homography import pixel_to_world
 
     if len(points) < 4:
-        return False, 0.0
+        return False, 0.0, False
 
     depths: list[float] = []
     residuals: list[float] = []
@@ -35,13 +38,13 @@ def planarity_check(
         depths.append(float(p.world_m[1]))
 
     if len(set(depths)) < 2:
-        return False, 0.0
+        return False, 0.0, False
 
-    # Artıklar < 1 mm ise sayısal gürültü — anlamlı eğim yok
+    # Artıklar < 1 mm: 4-nokta tam çözüm veya mükemmel fit — Pearson anlamlı değil
     if max(residuals) < 0.001:
-        return False, 0.0
+        return False, 0.0, False
 
     from scipy.stats import pearsonr
     corr, _ = pearsonr(depths, residuals)
     corr = float(corr)
-    return abs(corr) > _CORRELATION_THRESHOLD, corr
+    return abs(corr) > _CORRELATION_THRESHOLD, corr, True
