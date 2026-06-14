@@ -4,7 +4,7 @@
 > "Nerede kaldık" sorusunun cevabı burası + `git log`'tur.
 
 **Son güncelleme:** 2026-06-14
-**Aktif görev:** `tasks/M8/03-frame.md` (M8 Step 3 — Adım 2: Kare Seç)
+**Aktif görev:** `tasks/M8/04-calibration.md` (M8 Step 4 — Adım 3: Kalibrasyon canvas, EN BÜYÜK)
 
 ---
 
@@ -19,7 +19,7 @@
 | M5 | Çıktılar (overlay video + adli rapor) | ✅ Bitti | MVP tamamlandı — 104/104 test |
 | M6 | Otomatik referans tespiti (fast-follow) | ✅ Bitti | 129/129 test |
 | M7 | UI cilası + paketleme | ✅ Bitti | 15/15 test; FastAPI + wizard UI + PyInstaller paketi |
-| M8 | Frontend modernizasyonu (React+Vite+TS+Tailwind+shadcn) | 🟡 Devam ediyor | Step 0–2 ✅; sırada Step 3 (kare seç). `tasks/M8.md` + `tasks/M8/*` |
+| M8 | Frontend modernizasyonu (React+Vite+TS+Tailwind+shadcn) | 🟡 Devam ediyor | Step 0–3 ✅; sırada Step 4 (kalibrasyon canvas). `tasks/M8.md` + `tasks/M8/*` |
 
 Durum işaretleri: ⬜ Başlanmadı · 🟡 Devam ediyor · ✅ Bitti · ⛔ Engellendi
 
@@ -213,9 +213,20 @@ _(Yok — tüm milestone'lar tamamlandı.)_
   alanlarıyla birebir (`video_id, fps, fps_source, width, height, frame_count, sha256`).
   Backend değişmedi → pytest 197/197 geçerli.
 
+## Son Oturum (2026-06-15 — M8 Step 3 tamamlandı)
+
+**Step 3 (Adım 2: Kare Seç) — ✅:**
+- `FrameStep.tsx`: koyu canvas zeminli kare önizleme (`GET /api/video/{id}/frame/{n}`),
+  slider + numeric input + ◀▶ butonları (senkron), yüklenme spinner'ı + hata durumu.
+- Kaydırırken istek yağmurunu önlemek için **debounce** (200 ms) → önizleme + `selectedFrame` store'a.
+- `Input` bileşeni eklendi (sonraki adımlar da kullanacak). Kare/süre göstergesi.
+- **Doğrulama:** `npm run build` temiz. Kare endpoint'i mevcut pytest'lerle kanıtlı; backend değişmedi.
+
 ## Sıradaki Adım
-**M8 Step 3** — `tasks/M8/03-frame.md`: Kalibrasyon karesi seçimi (slider + numeric + ◀▶,
-`GET /api/video/{id}/frame/{n}` önizleme, debounce). FrameStep placeholder'ı gerçek ekranla değişecek.
+**M8 Step 4 (EN BÜYÜK)** — `tasks/M8/04-calibration.md`: kalibrasyon canvas'ı. `calibration.js`
+matematiğini `CalibrationCanvas.tsx`'e port (tıkla-ekle/sürükle/sil, kaynak renkleri, koyu zemin),
+`PointsTable` (X/Y/kaynak düzenleme), `GridPresetBar`, `AutoRefPanel` (M6), canlı RMS rozeti
+(debounce `/api/calibrate`). Solda koyu canvas, sağda nokta/RMS paneli.
 
 **Açık (M8 dışı):** GPS referanslı doğrulama seti hazırlandığında güven eşikleri
 (`_REL_CI_LOW`, `_REL_CI_HIGH`) kalibre edilmeli (DECISIONS.md + teknik-analiz §15.2).
