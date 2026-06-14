@@ -30,10 +30,41 @@ async function unwrap<T>(res: Response): Promise<T> {
 const jsonHeaders = { 'Content-Type': 'application/json' }
 
 export const api = {
-  async uploadVideo(file: File): Promise<VideoMeta> {
-    const fd = new FormData()
-    fd.append('file', file)
-    return unwrap(await fetch('/api/video/upload', { method: 'POST', body: fd }))
+  /** Video yükler. onProgress 0–100 arası yükleme yüzdesini bildirir (büyük adli dosyalar için). */
+  uploadVideo(file: File, onProgress?: (pct: number) => void): Promise<VideoMeta> {
+    return new Promise<VideoMeta>((resolve, reject) => {
+      const fd = new FormData()
+      fd.append('file', file)
+      const xhr = new XMLHttpRequest()
+      xhr.open('POST', '/api/video/upload')
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable && onProgress) onProgress(Math.round((e.loaded / e.total) * 100))
+      }
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try {
+            resolve(JSON.parse(xhr.responseText) as VideoMeta)
+          } catch {
+            reject(new Error('Sunucu yanıtı çözümlenemedi'))
+          }
+          return
+        }
+        let detail = `Yükleme başarısız (${xhr.status})`
+        if (xhr.status === 413) {
+          detail = 'Dosya çok büyük (maksimum 10 GB).'
+        } else {
+          try {
+            const b = JSON.parse(xhr.responseText) as { detail?: unknown }
+            if (typeof b.detail === 'string') detail = b.detail
+          } catch {
+            /* gövde JSON değil */
+          }
+        }
+        reject(new Error(detail))
+      }
+      xhr.onerror = () => reject(new Error('Ağ hatası — yükleme tamamlanamadı'))
+      xhr.send(fd)
+    })
   },
 
   frameUrl: (videoId: string, frame: number) => `/api/video/${videoId}/frame/${frame}`,

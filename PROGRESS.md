@@ -4,7 +4,7 @@
 > "Nerede kaldık" sorusunun cevabı burası + `git log`'tur.
 
 **Son güncelleme:** 2026-06-14
-**Aktif görev:** `tasks/M8/02-upload.md` (M8 Step 2 — Adım 1: Video Yükle)
+**Aktif görev:** `tasks/M8/03-frame.md` (M8 Step 3 — Adım 2: Kare Seç)
 
 ---
 
@@ -19,7 +19,7 @@
 | M5 | Çıktılar (overlay video + adli rapor) | ✅ Bitti | MVP tamamlandı — 104/104 test |
 | M6 | Otomatik referans tespiti (fast-follow) | ✅ Bitti | 129/129 test |
 | M7 | UI cilası + paketleme | ✅ Bitti | 15/15 test; FastAPI + wizard UI + PyInstaller paketi |
-| M8 | Frontend modernizasyonu (React+Vite+TS+Tailwind+shadcn) | 🟡 Devam ediyor | Step 0–1 ✅; sırada Step 2 (upload). `tasks/M8.md` + `tasks/M8/*` |
+| M8 | Frontend modernizasyonu (React+Vite+TS+Tailwind+shadcn) | 🟡 Devam ediyor | Step 0–2 ✅; sırada Step 3 (kare seç). `tasks/M8.md` + `tasks/M8/*` |
 
 Durum işaretleri: ⬜ Başlanmadı · 🟡 Devam ediyor · ✅ Bitti · ⛔ Engellendi
 
@@ -201,10 +201,21 @@ _(Yok — tüm milestone'lar tamamlandı.)_
 - **Doğrulama:** `npm run build` temiz (tsc + vite), Inter fontları yerele gömüldü; `/` yeni SPA
   bundle'ını (hash'li JS+CSS) servis ediyor; **pytest 197/197 yeşil**.
 
+## Son Oturum (2026-06-15 — M8 Step 2 tamamlandı)
+
+**Step 2 (Adım 1: Video Yükle) — ✅:**
+- `UploadStep.tsx`: gerçek drag-drop + dosya seçici, yükleme ilerleme çubuğu, meta kartı
+  (çözünürlük / FPS+kaynak / kare sayısı / süre), kopyalanabilir SHA-256 chip, hata bannerı.
+- `api.uploadVideo` XHR'a alındı → gerçek yükleme yüzdesi (büyük adli dosyalar için); 413 mesajı.
+- `Progress` bileşeni eklendi (bağımlılıksız). TanStack Query `useMutation`.
+- Yeni video yüklenince downstream durum (points/calibration/job) sıfırlanıyor. Header meta+SHA gösteriyor.
+- **Doğrulama:** `npm run build` temiz; sentetik mp4 gerçek sunucuya yüklendi → yanıt `VideoMeta`
+  alanlarıyla birebir (`video_id, fps, fps_source, width, height, frame_count, sha256`).
+  Backend değişmedi → pytest 197/197 geçerli.
+
 ## Sıradaki Adım
-**M8 Step 2** — `tasks/M8/02-upload.md`: gerçek Video Yükle ekranı (drag-drop + progress,
-SHA-256 gösterimi, meta kartı; `POST /api/video/upload`). UploadStep placeholder'ı + geçici
-demo butonu kaldırılıp gerçek upload akışıyla değiştirilecek.
+**M8 Step 3** — `tasks/M8/03-frame.md`: Kalibrasyon karesi seçimi (slider + numeric + ◀▶,
+`GET /api/video/{id}/frame/{n}` önizleme, debounce). FrameStep placeholder'ı gerçek ekranla değişecek.
 
 **Açık (M8 dışı):** GPS referanslı doğrulama seti hazırlandığında güven eşikleri
 (`_REL_CI_LOW`, `_REL_CI_HIGH`) kalibre edilmeli (DECISIONS.md + teknik-analiz §15.2).
