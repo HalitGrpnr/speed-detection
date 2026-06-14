@@ -183,6 +183,20 @@ main { max-width: 960px; margin: 0 auto; padding: 20px 16px 40px; }
 .autoref-row label { font-size: .82rem; color: #475569; }
 .autoref-row input { width: 70px; padding: 4px 6px; border: 1px solid #cbd5e1; border-radius: 4px; }
 
+/* ── Grid preset ── */
+.grid-preset-row {
+  display: flex; align-items: center; gap: 8px; margin-top: 10px; flex-wrap: wrap;
+  background: #f8fafc; padding: 8px 12px; border-radius: 6px; border: 1px solid #e2e8f0;
+}
+.grid-preset-row label { font-size: .82rem; color: #475569; white-space: nowrap; }
+.grid-preset-row select {
+  padding: 4px 6px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: .875rem;
+}
+.grid-preset-row input[type=number] {
+  width: 65px; padding: 4px 6px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: .875rem;
+}
+#grid-hint { font-size: .82rem; min-height: 1.3em; margin-top: 5px; font-weight: 500; }
+
 /* ── RMS box ── */
 .rms-box {
   margin-top: 12px; padding: 8px 14px; border-radius: 6px;
@@ -320,25 +334,55 @@ hr { border: none; border-top: 1px solid #e2e8f0; margin: 16px 0; }
   <div class="card">
     <h2>Adım 3 — Kontrol Noktaları</h2>
 
-    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px;">
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px;align-items:center;">
       <button class="btn btn-secondary btn-tiny" id="btn-delete-point">Seçili Noktayı Sil</button>
-      <button class="btn btn-secondary btn-tiny" id="btn-preset-lane">Preset: Son 2 = Şerit (X: 0 / 3.5 m)</button>
       <button class="btn btn-primary btn-tiny" id="btn-autoref">M6 Otomatik Öner</button>
     </div>
 
-    <div class="autoref-row">
-      <label>Şerit genişliği (m):</label>
-      <input type="number" id="autoref-lane-width" value="3.5" step="0.1" min="1">
-      <label>Kesik çizgi boyu (m):</label>
-      <input type="number" id="autoref-dash-length" value="3.0" step="0.1" min="0.5">
-      <label>Yakın mesafe (m):</label>
-      <input type="number" id="autoref-d-near" value="5.0" step="0.5" min="1"
-             title="Görüntünün alt kenarındaki yol noktasının kameraya yaklaşık mesafesi">
+    <!-- Grid preset -->
+    <div class="grid-preset-row">
+      <label>Grid:</label>
+      <select id="grid-cols">
+        <option value="2" selected>2 sütun</option>
+        <option value="3">3 sütun</option>
+        <option value="4">4 sütun</option>
+        <option value="5">5 sütun</option>
+      </select>
+      <span>×</span>
+      <select id="grid-rows">
+        <option value="2" selected>2 satır</option>
+        <option value="3">3 satır</option>
+        <option value="4">4 satır</option>
+      </select>
+      <label>Şerit gen.:</label>
+      <input type="number" id="autoref-lane-width" value="3.5" step="0.1" min="0.5"
+             title="Bitişik sütunlar arası mesafe (m)">
+      <span style="color:#64748b;font-size:.82rem;">m</span>
+      <label>Satır aralığı:</label>
+      <input type="number" id="grid-row-spacing" value="5.0" step="0.5" min="0.5"
+             title="Bitişik satırlar arası mesafe (m)">
+      <span style="color:#64748b;font-size:.82rem;">m</span>
+      <button class="btn btn-secondary btn-tiny" id="btn-apply-grid">Grid Uygula</button>
     </div>
-    <p class="hint" style="color:#b45309; margin-top:4px;">
-      ⚠ Otomatik öneride Y koordinatları tahminidir — tabloda düzeltip doğrulayın.
-      Kesik şerit çizgileri görünüyorsa daha doğru tahmin yapılır.
-    </p>
+    <div id="grid-hint"></div>
+
+    <!-- Otomatik öneri parametreleri -->
+    <details style="margin-top:8px;">
+      <summary class="hint" style="cursor:pointer;user-select:none;">
+        Otomatik Öneri Parametreleri (M6)
+      </summary>
+      <div class="autoref-row" style="margin-top:6px;">
+        <label>Kesik çizgi boyu (m):</label>
+        <input type="number" id="autoref-dash-length" value="3.0" step="0.1" min="0.5">
+        <label>Yakın mesafe (m):</label>
+        <input type="number" id="autoref-d-near" value="5.0" step="0.5" min="1"
+               title="Görüntünün alt kenarındaki yol noktasının kameraya yaklaşık mesafesi">
+      </div>
+      <p class="hint" style="color:#b45309; margin-top:4px;">
+        ⚠ Y koordinatları tahminidir — tabloda düzeltip doğrulayın.
+        Kesik şerit çizgileri görünüyorsa daha doğru tahmin yapılır.
+      </p>
+    </details>
 
     <p class="hint" style="margin-top:4px;">
       Canvas'a tıklayarak nokta ekleyin. Varolan noktayı sürükleyin.

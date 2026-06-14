@@ -210,36 +210,15 @@ function initStep3() {
 
   $('btn-autoref').addEventListener('click', runAutoRef);
 
-  $('btn-preset-lane').addEventListener('click', () => {
-    const pts = CalibrationCanvas.getPoints();
-    if (pts.length < 2) {
-      alert('En az 2 nokta gerekli. İlk tıkladığınız iki nokta sol ve sağ şerit olarak atanır.');
-      return;
-    }
-    // Sol şerit X=0, sağ şerit X=3.5 — en son eklenen 2 nokta
-    const last2 = pts.slice(-2);
-    last2[0].world_m = [0.0, last2[0].world_m[1]];
-    last2[1].world_m = [3.5, last2[1].world_m[1]];
-    const updated = [...pts.slice(0, -2), ...last2];
-    CalibrationCanvas.setPoints(updated);
-    onPointsChanged(updated);
+  $('btn-apply-grid').addEventListener('click', applyGrid);
+
+  // Grid hint güncelle: selector değişince ve nokta değişince
+  ['grid-cols', 'grid-rows', 'autoref-lane-width', 'grid-row-spacing'].forEach(id => {
+    $(id).addEventListener('change', updateGridHint);
+    $(id).addEventListener('input',  updateGridHint);
   });
 
-  $('btn-preset-rect').addEventListener('click', () => {
-    const pts = CalibrationCanvas.getPoints();
-    if (pts.length < 4) {
-      alert('En az 4 nokta gerekli.\nTıklama sırası: (1) yakın-sol  (2) yakın-sağ  (3) uzak-sol  (4) uzak-sağ');
-      return;
-    }
-    const laneWidth = parseFloat($('autoref-lane-width').value) || 3.5;
-    const yDist     = parseFloat($('autoref-dash-length').value) || 3.0;
-    // Son 4 noktaya sırayla koordinat ata
-    const n = pts.length;
-    const coords = [[0, 0], [laneWidth, 0], [0, yDist], [laneWidth, yDist]];
-    coords.forEach(([x, y], i) => { pts[n - 4 + i].world_m = [x, y]; });
-    CalibrationCanvas.setPoints(pts);
-    onPointsChanged(pts);
-  });
+  updateGridHint();
 }
 
 async function enterStep3() {
@@ -255,6 +234,66 @@ function onPointsChanged(pts) {
   State.calPoints = pts;
   renderPointsTable(pts);
   scheduleRmsUpdate(pts);
+  updateGridHint();
+}
+
+// ── Grid preset ───────────────────────────────────────────────────────────────
+
+function applyGrid() {
+  const cols       = parseInt($('grid-cols').value);
+  const rows       = parseInt($('grid-rows').value);
+  const laneWidth  = parseFloat($('autoref-lane-width').value) || 3.5;
+  const rowSpacing = parseFloat($('grid-row-spacing').value)   || 5.0;
+  const needed     = cols * rows;
+  const pts        = CalibrationCanvas.getPoints();
+
+  if (pts.length < needed) {
+    alert(
+      `Grid için ${needed} nokta gerekli (şu an: ${pts.length} var).\n` +
+      `Sol→sağ, yakın→uzak sırası ile tıklayın, sonra "Grid Uygula"ya basın.`
+    );
+    return;
+  }
+
+  const startIdx = pts.length - needed;
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      pts[startIdx + r * cols + c].world_m = [
+        parseFloat((c * laneWidth).toFixed(4)),
+        parseFloat((r * rowSpacing).toFixed(4)),
+      ];
+    }
+  }
+
+  CalibrationCanvas.setPoints(pts);
+  onPointsChanged(pts);
+}
+
+function updateGridHint() {
+  const cols       = parseInt(($('grid-cols')       || {value: '2'}).value);
+  const rows       = parseInt(($('grid-rows')       || {value: '2'}).value);
+  const laneWidth  = parseFloat(($('autoref-lane-width') || {value: '3.5'}).value) || 3.5;
+  const rowSpacing = parseFloat(($('grid-row-spacing')   || {value: '5.0'}).value) || 5.0;
+  const needed     = cols * rows;
+  const have       = CalibrationCanvas ? CalibrationCanvas.getPoints().length : 0;
+  const el         = $('grid-hint');
+  if (!el) return;
+
+  if (have >= needed) {
+    el.textContent = `✓ ${have} nokta var — "Grid Uygula" son ${needed} noktaya koordinat atayacak`;
+    el.style.color = '#16a34a';
+  } else {
+    const nextLocal = have % needed;           // grid içindeki sıra (0-based)
+    const r = Math.floor(nextLocal / cols);
+    const c = nextLocal % cols;
+    const xNext = (c * laneWidth).toFixed(2);
+    const yNext = (r * rowSpacing).toFixed(2);
+    el.textContent =
+      `${have} / ${needed} nokta — ` +
+      `sıradaki: satır ${r + 1}, sütun ${c + 1}  →  X = ${xNext} m, Y = ${yNext} m` +
+      `  (sol→sağ, yakın→uzak)`;
+    el.style.color = '#b45309';
+  }
 }
 
 function renderPointsTable(pts) {
