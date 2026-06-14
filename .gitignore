@@ -13,3 +13,7 @@ build/
 # Çalışma zamanı artifact'ları
 calibration.json
 audit/
+# Frontend (M8) — dev bağımlılıkları ve build çıktısı (build sırasında üretilir)
+frontend/node_modules/
+frontend/dist/
+src/ui/web/

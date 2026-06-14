@@ -38,9 +38,12 @@ from .schemas import (
 import sys as _sys
 if getattr(_sys, "frozen", False) and hasattr(_sys, "_MEIPASS"):
     # PyInstaller --onedir: statik dosyalar _MEIPASS altındaki yola yerleştirilir
-    _STATIC_DIR = Path(_sys._MEIPASS) / "src" / "ui" / "static"
+    _UI_DIR = Path(_sys._MEIPASS) / "src" / "ui"
 else:
-    _STATIC_DIR = Path(__file__).parent / "static"
+    _UI_DIR = Path(__file__).parent
+# Yeni React/Vite SPA build çıktısı (M8). Legacy vanilla UI parite sağlanana kadar /legacy'de.
+_WEB_DIR = _UI_DIR / "web"
+_LEGACY_STATIC_DIR = _UI_DIR / "static"
 _MODEL_MAP = {"nano": "yolo11n.pt", "small": "yolo11s.pt", "medium": "yolo11m.pt"}
 _MAX_UPLOAD_BYTES = 10 * 1024 * 1024 * 1024  # 10 GB
 
@@ -469,10 +472,22 @@ async def job_results(job_id: str) -> JobResultOut:
 
 
 # ── Static files ──────────────────────────────────────────────────────────────
+# Not: Bu mount'lar dosyanın SONUNDA kalmalı. "/" mount'u açgözlüdür; yukarıda
+# tanımlı /api/* rotaları daha önce kaydedildiği için onlar öncelik kazanır.
 
-@app.get("/")
-async def index() -> HTMLResponse:
-    return HTMLResponse((_STATIC_DIR / "index.html").read_text(encoding="utf-8"))
+# Legacy (eski vanilla UI) — yeni SPA parite sağlayana kadar erişilebilir (M8 geçişi).
+@app.get("/legacy", response_class=HTMLResponse)
+async def legacy_index() -> HTMLResponse:
+    return HTMLResponse((_LEGACY_STATIC_DIR / "index.html").read_text(encoding="utf-8"))
 
 
-app.mount("/static", StaticFiles(directory=str(_STATIC_DIR)), name="static")
+app.mount("/static", StaticFiles(directory=str(_LEGACY_STATIC_DIR)), name="legacy-static")
+
+# Yeni React/Vite SPA. Build edilmişse "/"'te servis edilir; aksi halde (pytest /
+# build öncesi) legacy index'e düşülür ki uygulama yine de ayağa kalksın.
+if (_WEB_DIR / "index.html").exists():
+    app.mount("/", StaticFiles(directory=str(_WEB_DIR), html=True), name="web")
+else:
+    @app.get("/", response_class=HTMLResponse)
+    async def _spa_not_built() -> HTMLResponse:
+        return HTMLResponse((_LEGACY_STATIC_DIR / "index.html").read_text(encoding="utf-8"))

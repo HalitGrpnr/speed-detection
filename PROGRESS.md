@@ -4,7 +4,7 @@
 > "Nerede kaldık" sorusunun cevabı burası + `git log`'tur.
 
 **Son güncelleme:** 2026-06-14
-**Aktif görev:** —  (refactor.md tamamlandı, R1–R6 hepsi ✅)
+**Aktif görev:** `tasks/M8/01-shell.md` (M8 Step 1 — tasarım sistemi & app shell)
 
 ---
 
@@ -19,6 +19,7 @@
 | M5 | Çıktılar (overlay video + adli rapor) | ✅ Bitti | MVP tamamlandı — 104/104 test |
 | M6 | Otomatik referans tespiti (fast-follow) | ✅ Bitti | 129/129 test |
 | M7 | UI cilası + paketleme | ✅ Bitti | 15/15 test; FastAPI + wizard UI + PyInstaller paketi |
+| M8 | Frontend modernizasyonu (React+Vite+TS+Tailwind+shadcn) | 🟡 Devam ediyor | Step 0 ✅; sırada Step 1 (shell). `tasks/M8.md` + `tasks/M8/*` |
 
 Durum işaretleri: ⬜ Başlanmadı · 🟡 Devam ediyor · ✅ Bitti · ⛔ Engellendi
 
@@ -155,9 +156,41 @@ _(Yok — tüm milestone'lar tamamlandı.)_
 - **197/197 test geçiyor**
 - Commit: R6 commit
 
+## Son Oturum (2026-06-14 — M8 planlama)
+
+**M8 (frontend modernizasyonu) planı oluşturuldu:**
+- Stack kararı: React 18 + Vite + TS + Tailwind + shadcn/ui (kullanıcı onaylı; "agentic kodlamaya en uygun").
+- Tasarım: açık enterprise + koyu kalibrasyon canvas'ı. Yaklaşım: kademeli (shell → ekran ekran).
+- Çok-oturumlu, token-dostu görev dosyaları yazıldı: `tasks/M8.md` (özet+checklist) +
+  `tasks/M8/00-scaffold.md` … `08-cleanup.md` (9 bağımsız adım).
+- `DECISIONS.md`'ye M8 stack kararı eklendi.
+- **Henüz kod yazılmadı** — sadece takip iskelesi. Backend (197/197 test) değişmedi.
+
+## Son Oturum (2026-06-14 — M8 Step 0 tamamlandı)
+
+**Step 0 (frontend iskele & build entegrasyonu) — ✅:**
+- `frontend/` Vite + React 19 + TS + Tailwind v3 kuruldu.
+  - **Toolchain Node 20.18.3 ile uyumlu sürümlere sabitlendi** (Vite 6, TS 5.8, eslint 9):
+    scaffold Vite 8/TS 6 üretti ama Node ≥20.19 istiyordu; global Node'a dokunmamak için pinlendi.
+    (Vite sürümü yalnızca dev aracı; build çıktısı/ürün kalitesi etkilenmez. Node 22 LTS'e geçilirse
+    en güncel Vite'a dönülebilir — opsiyonel.)
+- `vite.config.ts`: `build.outDir=../src/ui/web`, `/api`→127.0.0.1:8000 dev proxy, `@`→src alias.
+- `npm run gen:types` (openapi-typescript) → `src/lib/types.ts` (`schemas.py` 1:1).
+- `src/ui/app.py`: yeni SPA `src/ui/web`'den `/`'te servis (build yoksa legacy'ye guard'lı düşüş);
+  eski UI `/legacy` + `/static`'te. `_STATIC_DIR` → `_WEB_DIR`/`_LEGACY_STATIC_DIR`.
+- `SpeedDetection.spec` datas'a `src/ui/web` eklendi; `.gitignore` (node_modules, web, dist).
+- **Doğrulama:** `npm run build` temiz; `/`→SPA, `/legacy`→eski UI, `/openapi.json`→200,
+  `/api/*` çalışıyor; **pytest 197/197 yeşil**.
+- Bilinen ufak konu: `npm run lint` Node 20.19+ isteyen transitive (eslint-visitor-keys) yüzünden
+  uyarı verebilir — build'i etkilemez, kritik değil. 3 npm high-sev audit (dev deps) sonraya.
+
 ## Sıradaki Adım
-**Tüm refactoring tamamlandı (R1–R6).** GPS referanslı doğrulama seti hazırlandığında
-güven eşikleri (`_REL_CI_LOW`, `_REL_CI_HIGH`) kalibre edilmeli (DECISIONS.md + teknik-analiz §15.2).
+**M8 Step 1** — `tasks/M8/01-shell.md`: tasarım token'ları (açık enterprise + koyu canvas),
+shadcn init + primitives, AppShell (Header + Stepper), Zustand wizard store + guard'lar,
+ortak bileşenler, `lib/api.ts` typed client.
+
+**Açık (M8 dışı):** GPS referanslı doğrulama seti hazırlandığında güven eşikleri
+(`_REL_CI_LOW`, `_REL_CI_HIGH`) kalibre edilmeli (DECISIONS.md + teknik-analiz §15.2).
 
 **M4 (güvenilirlik):**
 - `src/reliability/confidence.py` — ConfidenceSignals, compute_confidence_level (eşik tablosu)

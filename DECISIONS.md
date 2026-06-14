@@ -121,6 +121,22 @@ Format:
 - **Gerekçe:** Adli makine internetsiz çalışabilmeli (§0a, §11.1). Build tool adımı
   (Node, npm) hem forensic ortama uyumsuz hem de tek kullanıcılı araç için overkill.
 
+## [2026-06-14] M8 frontend stack: React + Vite + TS + Tailwind + shadcn/ui (M7 vanilla kararını günceller)
+- **Karar:** UI, React 18 + TypeScript + Vite + Tailwind + shadcn/ui ile yeniden yazılır.
+  Build çıktısı (statik HTML/CSS/JS) `src/ui/web/`'e üretilir, FastAPI servis eder ve
+  PyInstaller paketine girer. Geçiş kademeli; eski vanilla UI parite sağlanana kadar `/legacy`'de tutulur.
+- **Gerekçe:** Mevcut UI "student project" seviyesinde (tek dosya inline CSS + vanilla state machine);
+  ürün gösterime hazırlanıyor. Stack özellikle **agentic kodlama** için seçildi (kullanıcı talebi,
+  proje vibecoding ile ilerleyecek): React en büyük LLM korpusu; shadcn/ui bileşenleri repoya
+  kopyalanır (agent okuyup düzenler); TS tip geri-bildirim döngüsü; Tailwind tek-dosya stil.
+- **Forensic uyum (M7 "build tool yok" gerekçesini geçersiz kılan nokta):** Node/npm **yalnızca
+  geliştirme zamanı**; runtime'da Node yok, çıktı statik dosya. Harici CDN kullanılmaz (fontlar
+  dahil tüm asset self-host); uygulama internetsiz adli makinede çalışır (§0a korunur). Veri
+  makineden çıkmaz. Yani build adımı forensic çalışma-zamanı kısıtını ihlal etmez.
+- **Alternatifler:** Svelte (daha hafif ama LLM korpusu/hazır bileşen ekosistemi daha küçük);
+  build'siz vanilla+Tailwind+Alpine (en küçük supply-chain ama bileşen mimarisi/tip güvenliği
+  zayıf, agentic iterasyon için elverişsiz). Detay: `tasks/M8.md`.
+
 ## [2026-06-13] M1 kollinearite kontrolü: 2D çarpım, np.cross değil
 - **Karar:** `_check_collinear` fonksiyonunda numpy'ın `np.cross` yerine açık `v1[0]*v2[1] - v1[1]*v2[0]` formülü kullanıldı.
 - **Gerekçe:** NumPy 2.0'da 2D vektörlere `np.cross` DeprecationWarning veriyor; açık formül uyarısız ve

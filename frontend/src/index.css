@@ -1,0 +1,12 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Tasarım token'ları (renk değişkenleri, koyu canvas tonu, fontlar) Step 1'de gelecek. */
+:root {
+  color-scheme: light;
+}
+
+body {
+  margin: 0;
+}
