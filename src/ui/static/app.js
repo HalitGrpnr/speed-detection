@@ -224,6 +224,22 @@ function initStep3() {
     CalibrationCanvas.setPoints(updated);
     onPointsChanged(updated);
   });
+
+  $('btn-preset-rect').addEventListener('click', () => {
+    const pts = CalibrationCanvas.getPoints();
+    if (pts.length < 4) {
+      alert('En az 4 nokta gerekli.\nTıklama sırası: (1) yakın-sol  (2) yakın-sağ  (3) uzak-sol  (4) uzak-sağ');
+      return;
+    }
+    const laneWidth = parseFloat($('autoref-lane-width').value) || 3.5;
+    const yDist     = parseFloat($('autoref-dash-length').value) || 3.0;
+    // Son 4 noktaya sırayla koordinat ata
+    const n = pts.length;
+    const coords = [[0, 0], [laneWidth, 0], [0, yDist], [laneWidth, yDist]];
+    coords.forEach(([x, y], i) => { pts[n - 4 + i].world_m = [x, y]; });
+    CalibrationCanvas.setPoints(pts);
+    onPointsChanged(pts);
+  });
 }
 
 async function enterStep3() {
@@ -323,8 +339,15 @@ function updateRmsDisplay(cal) {
   }
   const rms_cm = (cal.rms_m * 100).toFixed(1);
   const cls = cal.rms_m < 0.05 ? 'rms-good' : cal.rms_m < 0.20 ? 'rms-medium' : 'rms-bad';
-  box.textContent = `RMS: ${rms_cm} cm — ${cal.confidence_layer}` +
-    (cal.planarity_warning ? ' ⚠ Düzlemsellik uyarısı' : '');
+  let msg = `RMS: ${rms_cm} cm — ${cal.confidence_layer}`;
+  if (cal.loo_rms_m != null) {
+    msg += `  |  LOO: ${(cal.loo_rms_m * 100).toFixed(1)} cm`;
+  }
+  if ((cal.point_count || 0) < 6) {
+    msg += '  ⚠ Redundancy yok (< 6 nokta) — RMS yanıltıcı olabilir';
+  }
+  if (cal.planarity_warning) msg += '  ⚠ Düzlemsellik uyarısı';
+  box.textContent = msg;
   box.className = `rms-box ${cls}`;
 }
 
@@ -366,6 +389,24 @@ async function enterStep4() {
     $('cal-summary-inliers').textContent   = `${cal.inlier_count} / ${pts.length}`;
     $('cal-summary-layer').textContent     = cal.confidence_layer;
     $('cal-summary-planarity').textContent = cal.planarity_warning ? '⚠ Evet' : 'Hayır';
+
+    const looEl = $('cal-summary-loo');
+    if (looEl) {
+      if (cal.loo_rms_m != null) {
+        looEl.textContent = `${(cal.loo_rms_m * 100).toFixed(1)} cm`;
+        looEl.className = cal.loo_rms_m < 0.05 ? 'val-good' : cal.loo_rms_m < 0.20 ? 'val-medium' : 'val-bad';
+      } else {
+        looEl.textContent = `— (${pts.length < 5 ? '< 5 nokta' : 'hesaplanamadı'})`;
+        looEl.className = '';
+      }
+    }
+    const redEl = $('cal-summary-redundancy');
+    if (redEl) {
+      const n = cal.point_count || pts.length;
+      redEl.textContent = n >= 6 ? `✓ ${n} nokta` : `⚠ ${n} nokta — redundancy yetersiz`;
+      redEl.className = n >= 6 ? 'val-good' : 'val-warn';
+    }
+
     $('step4-status').textContent = '✓ Kalibrasyon hazır.';
     $('step4-status').className = 'status ok';
     $('btn-to-step5').disabled = false;

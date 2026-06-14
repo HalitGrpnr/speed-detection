@@ -164,6 +164,71 @@ def test_report_no_low_frame_warning_for_normal_tracks():
 
 # ── Test 9: Pipeline uçtan uca (mock tracker) ─────────────────────────────────
 
+# ── R3: LOO RMS ve redundancy raporlanır ─────────────────────────────────────
+
+def test_report_shows_loo_rms_when_present():
+    """LOO RMS CalibrationResult'da varsa raporda yer almalı."""
+    cal = _make_cal()
+    cal.loo_rms_m = 0.032
+    result = _make_result(calibration_result=cal)
+    texts = collect_report_texts(result)
+    combined = " ".join(texts)
+    assert "loo_rms:" in combined, "LOO RMS collect_report_texts'te görünmeli"
+
+
+def test_report_shows_redundancy_warning_for_few_points():
+    """< 6 kontrol noktası → redundancy uyarısı collect_report_texts'te olmalı."""
+    cal = _make_cal()  # varsayılan: 4 nokta (used_point_ids=['p1','p2','p3','p4'])
+    result = _make_result(calibration_result=cal)
+    texts = collect_report_texts(result)
+    combined = " ".join(texts)
+    assert "redundancy_uyari" in combined, "4-nokta kalibrasyon redundancy uyarısı vermeli"
+
+
+def test_report_no_redundancy_warning_for_six_plus_points():
+    """≥6 nokta → redundancy ok."""
+    cal = CalibrationResult(
+        homography=np.eye(3),
+        used_point_ids=[f"p{i}" for i in range(6)],
+        excluded_point_ids=[],
+        reprojection_rms_m=0.03,
+        confidence_layer="site_measurement",
+        planarity_warning=False,
+    )
+    result = _make_result(calibration_result=cal)
+    texts = collect_report_texts(result)
+    combined = " ".join(texts)
+    assert "redundancy_ok" in combined
+    assert "redundancy_uyari" not in combined
+
+
+def test_report_story_includes_loo_rms_row():
+    """_build_story LOO RMS satırını tablo olarak üretmeli."""
+    cal = _make_cal()
+    cal.loo_rms_m = 0.045
+    result = _make_result(calibration_result=cal)
+    text = _story_text(result)
+    assert "LOO" in text or "loo" in text.lower(), "LOO RMS satırı rapor tablosunda olmalı"
+
+
+def test_report_story_includes_redundancy_warning():
+    """4 nokta → rapor tablosunda redundancy UYARI içermeli."""
+    result = _make_result(calibration_result=_make_cal())
+    text = _story_text(result)
+    assert "UYARI" in text or "uyari" in text.lower(), "Redundancy uyarısı rapor tablosunda olmalı"
+
+
+def test_report_story_shows_holdout_table_when_present():
+    """holdout_rows varsa raporda held-out tablo yer almalı."""
+    cal = _make_cal()
+    cal.holdout_rows = [
+        {"id": "p5", "measured_m": (5.0, 4.0), "predicted_m": (5.01, 4.01), "error_m": 0.014},
+    ]
+    result = _make_result(calibration_result=cal)
+    text = _story_text(result)
+    assert "p5" in text, "Held-out nokta ID'si raporda görünmeli"
+
+
 def test_run_pipeline_returns_result(tmp_path, monkeypatch):
     """Gerçek YOLO olmadan pipeline PipelineResult döndürür."""
     import cv2

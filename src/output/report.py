@@ -73,6 +73,7 @@ def collect_report_texts(result: PipelineResult) -> list[str]:
     """Raporda yer alacak tüm metin bloklarını döndür (test ve audit için)."""
     meta = result.video_meta
     cal = result.calibration_result
+    point_count = len(cal.used_point_ids)
     texts = [
         "Araç Hız Tespit Raporu",
         "Kalibrasyon",
@@ -81,7 +82,10 @@ def collect_report_texts(result: PipelineResult) -> list[str]:
         _LAYER_TR.get(cal.confidence_layer, cal.confidence_layer),
         f"{cal.reprojection_rms_m * 100:.1f} cm",
         "UYARI" if cal.planarity_warning else "Yok",
+        "redundancy_uyari" if point_count < 6 else "redundancy_ok",
     ]
+    if cal.loo_rms_m is not None:
+        texts.append(f"loo_rms:{cal.loo_rms_m * 100:.1f}cm")
     for est in result.speed_estimates:
         texts.append(f"{est.value_kmh:.1f}")
         texts.append(f"±{est.ci_kmh:.1f}")
@@ -127,15 +131,50 @@ def _build_story(result: PipelineResult) -> list:
         if cal.planarity_warning else "Yok"
     )
 
+    point_count = len(cal.used_point_ids)
+    redundancy_ok = point_count >= 6
+
+    loo_str = (
+        f"{cal.loo_rms_m * 100:.1f} cm  ({cal.loo_rms_m:.4f} m)"
+        if cal.loo_rms_m is not None
+        else ("Yetersiz nokta (< 5)" if not redundancy_ok else "—")
+    )
+    redundancy_str = (
+        "Yeterli (>= 6 nokta)"
+        if redundancy_ok
+        else f"UYARI — yalnizca {point_count} nokta. 4-nokta cozumunde RMS ≈ 0 anlamsizdir."
+    )
+
     cal_rows = [
         ["Guven Katmani", _LAYER_TR.get(cal.confidence_layer, cal.confidence_layer)],
         ["Re-projeksiyon RMS", f"{rms_m * 100:.1f} cm  ({rms_m:.4f} m)"],
+        ["LOO Capraz Dogrulama RMS", loo_str],
+        ["Kalibrasyon Redundancy", redundancy_str],
         ["Duzlemsellik Uyarisi", planarity_str],
-        ["Kullanilan Nokta Sayisi", str(len(cal.used_point_ids))],
+        ["Kullanilan Nokta Sayisi", str(point_count)],
     ]
     t2 = Table(cal_rows, colWidths=[5 * cm, 11 * cm])
     t2.setStyle(_kv_table_style())
     story.append(t2)
+
+    if cal.holdout_rows:
+        story.append(Spacer(1, 0.2 * cm))
+        story.append(Paragraph("Held-out Dogrulama Noktalari", S["Heading3"]))
+        ho_header = ["Nokta ID", "Olculen (m)", "Tahmin (m)", "Hata (m)"]
+        ho_rows = [ho_header]
+        for row in cal.holdout_rows:
+            meas = row.get("measured_m", (0, 0))
+            pred = row.get("predicted_m", (0, 0))
+            ho_rows.append([
+                row.get("id", "?"),
+                f"({meas[0]:.3f}, {meas[1]:.3f})",
+                f"({pred[0]:.3f}, {pred[1]:.3f})",
+                f"{row.get('error_m', 0.0):.4f} m",
+            ])
+        t_ho = Table(ho_rows, colWidths=[3 * cm, 4 * cm, 4 * cm, 5 * cm])
+        t_ho.setStyle(_header_table_style())
+        story.append(t_ho)
+
     story.append(Spacer(1, 0.3 * cm))
 
     story.append(Paragraph("Kontrol Noktalari", S["Heading3"]))

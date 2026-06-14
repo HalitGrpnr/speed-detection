@@ -59,6 +59,11 @@ def compute_confidence_level(
     # Oransal kontroller: v = 0 ise değerlendirme atlanır (bilinmiyor kabul et)
     rel_ci_ok = v <= 0 or signals.ci_kmh / v < _REL_CI_HIGH
     rel_smooth_ok = v <= 0 or signals.smoothness_residual_kmh / v < _REL_SMOOTH_LOW
+    # Redundancy: < 6 nokta → 4-nokta tam çözüm → RMS anlamsız
+    has_redundancy = (
+        signals.calibration_point_count == 0  # bilinmiyor → atla
+        or signals.calibration_point_count >= 6
+    )
 
     is_high = (
         signals.calibration_layer == "site_measurement"
@@ -67,6 +72,7 @@ def compute_confidence_level(
         and not signals.has_occlusion
         and rel_ci_ok
         and rel_smooth_ok
+        and has_redundancy
     )
     level: Literal["high", "medium", "low"] = "high" if is_high else "medium"
 

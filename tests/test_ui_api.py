@@ -243,3 +243,73 @@ def test_thumbnail_returns_jpeg(client):
     r = client.get(f'/api/video/{vid}/thumbnail')
     assert r.status_code == 200
     assert r.headers['content-type'] == 'image/jpeg'
+
+
+# ── R3: Kalibrasyon LOO ve holdout alanları ───────────────────────────────────
+
+def test_calibrate_returns_point_count(client):
+    """calibrate yanıtı point_count içermeli."""
+    vid = client._video_id
+    r = client.post('/api/calibrate', json={
+        'video_id': vid, 'frame_n': 0, 'control_points': _valid_points()
+    })
+    assert r.status_code == 200
+    data = r.json()
+    assert 'point_count' in data
+    assert data['point_count'] == 4
+
+
+def test_calibrate_loo_rms_none_for_four_points(client):
+    """4 nokta için LOO RMS None olmalı (< 5 nokta)."""
+    vid = client._video_id
+    r = client.post('/api/calibrate', json={
+        'video_id': vid, 'frame_n': 0, 'control_points': _valid_points()
+    })
+    assert r.status_code == 200
+    data = r.json()
+    assert 'loo_rms_m' in data
+    assert data['loo_rms_m'] is None
+
+
+def test_calibrate_holdout_rows_empty_when_none_held_out(client):
+    """held_out nokta yoksa holdout_rows boş liste olmalı."""
+    vid = client._video_id
+    r = client.post('/api/calibrate', json={
+        'video_id': vid, 'frame_n': 0, 'control_points': _valid_points()
+    })
+    assert r.status_code == 200
+    data = r.json()
+    assert data['holdout_rows'] == []
+
+
+def test_calibrate_five_points_gives_loo_rms(client):
+    """5 nokta → LOO RMS float döner."""
+    vid = client._video_id
+    five_points = _valid_points() + [
+        {'id': 'cp5', 'pixel': [160.0, 350.0], 'world_m': [1.75, 2.5], 'source': 'operator'},
+    ]
+    r = client.post('/api/calibrate', json={
+        'video_id': vid, 'frame_n': 0, 'control_points': five_points
+    })
+    assert r.status_code == 200
+    data = r.json()
+    assert data['loo_rms_m'] is not None
+    assert data['loo_rms_m'] >= 0.0
+
+
+def test_calibrate_holdout_validation_runs(client):
+    """held_out=True nokta varsa holdout_rows dolu döner."""
+    vid = client._video_id
+    pts = _valid_points() + [
+        {'id': 'cp5', 'pixel': [160.0, 350.0], 'world_m': [1.75, 2.5],
+         'source': 'operator', 'held_out': True},
+    ]
+    r = client.post('/api/calibrate', json={
+        'video_id': vid, 'frame_n': 0, 'control_points': pts
+    })
+    assert r.status_code == 200
+    data = r.json()
+    assert len(data['holdout_rows']) == 1
+    row = data['holdout_rows'][0]
+    assert row['id'] == 'cp5'
+    assert 'error_m' in row

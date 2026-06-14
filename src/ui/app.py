@@ -17,6 +17,7 @@ from fastapi.staticfiles import StaticFiles
 from src.autoref.proposer import AutoProposer
 from src.calibration.homography import compute_homography
 from src.calibration.io import save_calibration
+from src.calibration.metrics import holdout_validation, loo_rms
 from src.calibration.models import CalibrationError, CalibrationResult, ControlPoint
 from src.detection.video import read_video_meta
 from src.output.pipeline import run_pipeline
@@ -202,12 +203,27 @@ async def calibrate(req: CalibrateRequest) -> CalibrateResponse:
     except CalibrationError as e:
         raise HTTPException(status_code=422, detail=str(e))
 
+    # Leave-one-out doğrulama (≥5 nokta varsa otomatik)
+    loo_rms_val = loo_rms(points)
+
+    # Operatör held-out noktaları varsa holdout doğrulama
+    holdout_ids = [p.id for p in points if p.held_out]
+    h_rows: list[dict] = []
+    if holdout_ids:
+        try:
+            h_rows = holdout_validation(points, holdout_ids)
+        except CalibrationError:
+            pass  # eğitim noktaları yetersizse sessizce atla
+
     return CalibrateResponse(
         rms_m=result.reprojection_rms_m,
         inlier_count=len(result.used_point_ids),
         confidence_layer=result.confidence_layer,
         homography=result.homography.tolist(),
         planarity_warning=result.planarity_warning,
+        point_count=len(points),
+        loo_rms_m=loo_rms_val,
+        holdout_rows=h_rows,
     )
 
 
@@ -321,6 +337,8 @@ async def start_pipeline(req: PipelineRequest) -> dict:
         reprojection_rms_m=req.calibration.rms_m,
         confidence_layer=req.calibration.confidence_layer,
         planarity_warning=req.calibration.planarity_warning,
+        holdout_rows=req.calibration.holdout_rows,
+        loo_rms_m=req.calibration.loo_rms_m,
     )
     control_points = [
         ControlPoint(

@@ -23,6 +23,8 @@ class CalibrationResult:
     reprojection_rms_m: float
     confidence_layer: Literal["standard_assumption", "operator", "site_measurement"]
     planarity_warning: bool = False
+    holdout_rows: list[dict] = field(default_factory=list)  # operatör held-out doğrulama
+    loo_rms_m: float | None = None  # leave-one-out RMS (≥5 nokta varsa)
 
 
 class CalibrationError(Exception):

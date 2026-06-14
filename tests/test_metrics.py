@@ -10,7 +10,7 @@ import pytest
 
 from src.calibration.models import ControlPoint, CalibrationResult
 from src.calibration.homography import compute_homography, pixel_to_world
-from src.calibration.metrics import reprojection_rms, holdout_validation
+from src.calibration.metrics import reprojection_rms, holdout_validation, loo_rms
 from src.calibration.io import save_calibration, load_calibration
 
 
@@ -167,3 +167,88 @@ def test_reprojection_rms_perfect():
     result = compute_homography(points)
     rms = reprojection_rms(result.homography, points)
     assert rms < 1e-6
+
+
+# ── R3: LOO RMS testleri ─────────────────────────────────────────────────────
+
+def test_loo_rms_returns_none_for_four_points():
+    """4 nokta → tam çözüm, LOO anlamlı değil → None döner."""
+    H_true = _make_H_true()
+    points = _make_points(H_true, [(0.0, 0.0), (10.0, 0.0), (10.0, 8.0), (0.0, 8.0)])
+    assert loo_rms(points) is None
+
+
+def test_loo_rms_returns_float_for_five_plus_points():
+    """≥5 nokta → LOO RMS float döner."""
+    H_true = _make_H_true()
+    world_coords = [(0.0, 0.0), (10.0, 0.0), (10.0, 8.0), (0.0, 8.0), (5.0, 4.0)]
+    points = _make_points(H_true, world_coords)
+    result = loo_rms(points)
+    assert result is not None
+    assert isinstance(result, float)
+    assert result >= 0.0
+
+
+def test_loo_rms_low_on_clean_data():
+    """Gürültüsüz verilerle LOO RMS neredeyse sıfır olmalı."""
+    H_true = _make_H_true()
+    world_coords = [
+        (0.0, 0.0), (12.0, 0.0), (12.0, 8.0), (0.0, 8.0), (6.0, 4.0), (3.0, 7.0),
+    ]
+    points = _make_points(H_true, world_coords)
+    result = loo_rms(points)
+    assert result is not None
+    assert result < 0.05, f"Temiz verilerle LOO RMS çok yüksek: {result:.4f} m"
+
+
+def test_loo_rms_ignores_held_out_points():
+    """held_out noktalar LOO hesabına katılmamalı — < 5 aktif nokta → None."""
+    H_true = _make_H_true()
+    world_coords = [
+        (0.0, 0.0), (10.0, 0.0), (10.0, 8.0), (0.0, 8.0),
+        (5.0, 4.0),  # bu held_out
+    ]
+    points = _make_points(H_true, world_coords, held_out_ids={"cp5"})
+    # 4 aktif + 1 held-out → < 5 aktif → None
+    assert loo_rms(points) is None
+
+
+def test_loo_rms_json_roundtrip(tmp_path):
+    """LOO RMS JSON'a yazılıp geri okunabilmeli."""
+    H_true = _make_H_true()
+    world_coords = [
+        (0.0, 0.0), (10.0, 0.0), (10.0, 8.0), (0.0, 8.0), (5.0, 4.0),
+    ]
+    points = _make_points(H_true, world_coords)
+    result = compute_homography(points)
+    result.loo_rms_m = loo_rms(points)
+    assert result.loo_rms_m is not None
+
+    path = tmp_path / "cal.json"
+    save_calibration(path, result, points)
+    loaded, _, _ = load_calibration(path)
+
+    assert loaded.loo_rms_m is not None
+    assert abs(loaded.loo_rms_m - result.loo_rms_m) < 1e-10
+
+
+# ── R3: 4-nokta RMS ≈ 0 → confidence davranışı ───────────────────────────────
+
+def test_four_point_calibration_cannot_be_high(tmp_path):
+    """4-nokta kalibrasyonunda calibration_point_count=4 < 6 → high olamaz (review test boşluğu #6)."""
+    from src.reliability.confidence import ConfidenceSignals, compute_confidence_level
+    signals = ConfidenceSignals(
+        calibration_layer="site_measurement",
+        reprojection_rms_m=0.0001,   # 4-nokta tam çözüm → neredeyse sıfır
+        track_frame_count=50,
+        has_occlusion=False,
+        smoothness_residual_kmh=1.0,
+        planarity_warning=False,
+        value_kmh=80.0,
+        ci_kmh=3.0,
+        calibration_point_count=4,   # 4 < 6 → redundancy şartı sağlanmıyor
+    )
+    level = compute_confidence_level(signals)
+    assert level != "high", (
+        f"4-nokta kalibrasyon high olmamalı (RMS ≈ 0 trivial): level={level}"
+    )

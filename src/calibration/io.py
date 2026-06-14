@@ -38,7 +38,8 @@ def _result_to_dict(
         "homography": result.homography.tolist(),
         "metrics": {
             "reprojection_rms_m": result.reprojection_rms_m,
-            "holdout_validation": holdout_rows or [],
+            "holdout_validation": holdout_rows or result.holdout_rows or [],
+            "loo_rms_m": result.loo_rms_m,
             "planarity_warning": result.planarity_warning,
         },
         "confidence_layer": result.confidence_layer,
@@ -86,6 +87,8 @@ def load_calibration(
         reprojection_rms_m=data["metrics"]["reprojection_rms_m"],
         confidence_layer=data["confidence_layer"],
         planarity_warning=data["metrics"].get("planarity_warning", False),
+        holdout_rows=data["metrics"].get("holdout_validation") or [],
+        loo_rms_m=data["metrics"].get("loo_rms_m"),
     )
 
     fps_in_json: float | None = data.get("fps")

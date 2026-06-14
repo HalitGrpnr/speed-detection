@@ -35,6 +35,9 @@ class CalibrateResponse(BaseModel):
     confidence_layer: str
     homography: list[list[float]]
     planarity_warning: bool
+    point_count: int = 0              # toplam nokta sayısı (redundancy değerlendirmesi için)
+    loo_rms_m: float | None = None    # leave-one-out RMS (≥5 nokta varsa)
+    holdout_rows: list[dict] = []     # operatör held-out doğrulama satırları
 
 
 class AutoRefRequest(BaseModel):
