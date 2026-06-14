@@ -297,6 +297,66 @@ def test_calibrate_five_points_gives_loo_rms(client):
     assert data['loo_rms_m'] >= 0.0
 
 
+# ── R4: Sunucu-tarafı H yeniden hesaplama + SHA-256 ──────────────────────────
+
+def test_pipeline_server_recomputes_H_from_control_points(client):
+    """start_pipeline istemcinin gönderdiği H'yi değil, kontrol noktalarından
+    yeniden hesapladığı H'yi kullanmalı (sahte H gönderilse bile iş başlar)."""
+    vid = client._video_id
+    cal_r = client.post('/api/calibrate', json={
+        'video_id': vid, 'frame_n': 0, 'control_points': _valid_points()
+    })
+    calibration = cal_r.json()
+
+    # Sahte H — istemci manipüle ediyor
+    calibration['homography'] = [[9, 9, 9], [9, 9, 9], [9, 9, 9]]
+
+    with patch('src.ui.app._run_pipeline_thread') as mock_thread:
+        mock_thread.return_value = None
+        r = client.post('/api/pipeline', json={
+            'video_id': vid,
+            'calibration': calibration,
+            'control_points': _valid_points(),
+            'frame_step': 1,
+            'model_size': 'nano',
+        })
+
+    # Job kabul edilmeli (422 değil) — sunucu kendi H'sini kullanır
+    assert r.status_code == 202
+    assert 'job_id' in r.json()
+
+
+def test_pipeline_passes_sha256_to_thread(client):
+    """start_pipeline video SHA-256'yı thread args'larına geçirmeli."""
+    vid = client._video_id
+    cal_r = client.post('/api/calibrate', json={
+        'video_id': vid, 'frame_n': 0, 'control_points': _valid_points()
+    })
+    calibration = cal_r.json()
+
+    captured = {}
+
+    class _CapturingThread:
+        def __init__(self, target=None, args=(), daemon=False, **kw):
+            captured['args'] = args
+        def start(self):
+            pass
+
+    with patch('threading.Thread', _CapturingThread):
+        client.post('/api/pipeline', json={
+            'video_id': vid,
+            'calibration': calibration,
+            'control_points': _valid_points(),
+        })
+
+    thread_args = captured.get('args', ())
+    sha_found = any(
+        isinstance(a, str) and len(a) == 64 and all(c in '0123456789abcdef' for c in a)
+        for a in thread_args
+    )
+    assert sha_found, f"SHA-256 (64 hex) thread args içinde bulunamadı: {thread_args}"
+
+
 def test_calibrate_holdout_validation_runs(client):
     """held_out=True nokta varsa holdout_rows dolu döner."""
     vid = client._video_id

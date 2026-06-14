@@ -29,6 +29,7 @@ def run_pipeline(
     on_progress: Callable[[float], None] | None = None,
     fps: float | None = None,
     fps_source: str | None = None,
+    video_sha256: str = "",
 ) -> PipelineResult:
     """M1→M5 uçtan uca pipeline.
 
@@ -112,6 +113,7 @@ def run_pipeline(
         processed_at=datetime.now(timezone.utc).isoformat(),
         frame_step=frame_step,
         model_name=model_name,
+        video_sha256=video_sha256,
     )
 
     # 4. Çıktılar

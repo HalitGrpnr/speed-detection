@@ -229,6 +229,31 @@ def test_report_story_shows_holdout_table_when_present():
     assert "p5" in text, "Held-out nokta ID'si raporda görünmeli"
 
 
+# ── R4: Video SHA-256 raporda görünür ────────────────────────────────────────
+
+def test_report_collect_texts_includes_sha256():
+    """video_sha256 doluysa collect_report_texts içinde yer almalı."""
+    result = _make_result(video_sha256="abc123deadbeef")
+    texts = collect_report_texts(result)
+    combined = " ".join(texts)
+    assert "abc123deadbeef" in combined, "SHA-256 collect_report_texts'te görünmeli"
+
+
+def test_report_story_includes_sha256_row():
+    """_build_story meta tablosunda SHA-256 satırı olmalı."""
+    result = _make_result(video_sha256="abc123deadbeef")
+    text = _story_text(result)
+    assert "abc123deadbeef" in text, "SHA-256 rapor meta tablosunda görünmeli"
+
+
+def test_report_collect_texts_no_sha256_when_empty():
+    """video_sha256 boşsa collect_report_texts içinde SHA-256 yok."""
+    result = _make_result(video_sha256="")
+    texts = collect_report_texts(result)
+    combined = " ".join(texts)
+    assert "sha256:" not in combined.lower()
+
+
 def test_run_pipeline_returns_result(tmp_path, monkeypatch):
     """Gerçek YOLO olmadan pipeline PipelineResult döndürür."""
     import cv2

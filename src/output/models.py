@@ -19,3 +19,4 @@ class PipelineResult:
     processed_at: str                     # ISO 8601 datetime
     frame_step: int = 1
     model_name: str = "yolo11n.pt"
+    video_sha256: str = ""

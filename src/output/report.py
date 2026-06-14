@@ -84,6 +84,8 @@ def collect_report_texts(result: PipelineResult) -> list[str]:
         "UYARI" if cal.planarity_warning else "Yok",
         "redundancy_uyari" if point_count < 6 else "redundancy_ok",
     ]
+    if result.video_sha256:
+        texts.append(result.video_sha256)
     if cal.loo_rms_m is not None:
         texts.append(f"loo_rms:{cal.loo_rms_m * 100:.1f}cm")
     for est in result.speed_estimates:
@@ -117,6 +119,8 @@ def _build_story(result: PipelineResult) -> list:
         ["Isleme Adimi", f"frame_step = {result.frame_step}"],
         ["Model", result.model_name],
     ]
+    if result.video_sha256:
+        meta_rows.append(["Video SHA-256", result.video_sha256])
     t = Table(meta_rows, colWidths=[5 * cm, 11 * cm])
     t.setStyle(_kv_table_style())
     story.append(t)

@@ -263,6 +263,7 @@ def _run_pipeline_thread(
     model_name: str,
     fps: float | None = None,
     fps_source: str | None = None,
+    video_sha256: str = "",
 ) -> None:
     try:
         job.state = "running"
@@ -285,6 +286,7 @@ def _run_pipeline_thread(
             on_progress=_progress,
             fps=fps,
             fps_source=fps_source,
+            video_sha256=video_sha256,
         )
 
         track_class = {t.track_id: t.vehicle_class for t in result.tracks}
@@ -329,17 +331,6 @@ async def start_pipeline(req: PipelineRequest) -> dict:
     out_dir.mkdir(parents=True, exist_ok=True)
     cal_json_path = out_dir / "calibration.json"
 
-    H = np.array(req.calibration.homography, dtype=np.float64)
-    cal_result = CalibrationResult(
-        homography=H,
-        used_point_ids=[cp.id for cp in req.control_points if not cp.held_out],
-        excluded_point_ids=[],
-        reprojection_rms_m=req.calibration.rms_m,
-        confidence_layer=req.calibration.confidence_layer,
-        planarity_warning=req.calibration.planarity_warning,
-        holdout_rows=req.calibration.holdout_rows,
-        loo_rms_m=req.calibration.loo_rms_m,
-    )
     control_points = [
         ControlPoint(
             id=cp.id,
@@ -350,6 +341,34 @@ async def start_pipeline(req: PipelineRequest) -> dict:
         )
         for cp in req.control_points
     ]
+
+    # Sunucu-tarafı H yeniden hesaplama — istemcinin gönderdiği H kabul edilmez
+    try:
+        cal_result = compute_homography(control_points)
+    except CalibrationError as e:
+        raise HTTPException(status_code=422, detail=f"Sunucu-tarafı kalibrasyon başarısız: {e}")
+
+    # Audit: istemci H ile sunucu H karşılaştır; farklıysa logla
+    client_H = np.array(req.calibration.homography, dtype=np.float64)
+    max_diff = float(np.max(np.abs(client_H - cal_result.homography)))
+    if max_diff > 1e-4:
+        print(
+            f"[AUDIT UYARI] job={job_id}: istemci H sunucu H'den farklı "
+            f"(max_diff={max_diff:.2e}). Sunucu H kullanılıyor.",
+            flush=True,
+        )
+
+    # LOO ve holdout yeniden üret (adli tutarlılık)
+    loo_rms_val = loo_rms(control_points)
+    holdout_ids = [p.id for p in control_points if p.held_out]
+    h_rows: list[dict] = []
+    if holdout_ids:
+        try:
+            h_rows = holdout_validation(control_points, holdout_ids)
+        except CalibrationError:
+            pass
+    cal_result.holdout_rows = h_rows
+    cal_result.loo_rms_m = loo_rms_val
 
     meta = read_video_meta(video_path)
     fps = req.fps_override if req.fps_override is not None else meta.fps
@@ -363,11 +382,13 @@ async def start_pipeline(req: PipelineRequest) -> dict:
         fps_source=fps_source,
     )
 
+    video_sha256 = _sha256(video_path)
     model_name = _MODEL_MAP.get(req.model_size, "yolo11n.pt")
 
     thread = threading.Thread(
         target=_run_pipeline_thread,
-        args=(job, video_path, cal_json_path, out_dir, req.frame_step, model_name, fps, fps_source),
+        args=(job, video_path, cal_json_path, out_dir, req.frame_step, model_name,
+              fps, fps_source, video_sha256),
         daemon=True,
     )
     thread.start()
