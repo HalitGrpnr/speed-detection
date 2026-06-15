@@ -3,8 +3,8 @@
 > **Agent:** Bu dosyayı her oturumun **başında oku**, **sonunda güncelle.**
 > "Nerede kaldık" sorusunun cevabı burası + `git log`'tur.
 
-**Son güncelleme:** 2026-06-14
-**Aktif görev:** `tasks/M8/07-results.md` (M8 Step 7 — Adım 6: Sonuçlar)
+**Son güncelleme:** 2026-06-15
+**Aktif görev:** `tasks/M8/08-cleanup.md` (M8 Step 8 — Temizlik & cila + paketleme)
 
 ---
 
@@ -19,7 +19,7 @@
 | M5 | Çıktılar (overlay video + adli rapor) | ✅ Bitti | MVP tamamlandı — 104/104 test |
 | M6 | Otomatik referans tespiti (fast-follow) | ✅ Bitti | 129/129 test |
 | M7 | UI cilası + paketleme | ✅ Bitti | 15/15 test; FastAPI + wizard UI + PyInstaller paketi |
-| M8 | Frontend modernizasyonu (React+Vite+TS+Tailwind+shadcn) | 🟡 Devam ediyor | Step 0–6 ✅; sırada Step 7 (sonuçlar). `tasks/M8.md` + `tasks/M8/*` |
+| M8 | Frontend modernizasyonu (React+Vite+TS+Tailwind+shadcn) | 🟡 Devam ediyor | Step 0–7 ✅ (6 adım uçtan uca çalışır); sırada Step 8 (temizlik+paketleme). `tasks/M8.md` + `tasks/M8/*` |
 
 Durum işaretleri: ⬜ Başlanmadı · 🟡 Devam ediyor · ✅ Bitti · ⛔ Engellendi
 
@@ -254,10 +254,22 @@ _(Yok — tüm milestone'lar tamamlandı.)_
 - **Doğrulama:** `npm run build` temiz. E2E: `POST /api/pipeline` → 202 + job_id (PipelineRequest
   kabul, 422 yok); `GET status` → JobStatusOut alanları birebir. Backend değişmedi → pytest 197/197.
 
+## Son Oturum (2026-06-15 — M8 Step 7 tamamlandı)
+
+**Step 7 (Adım 6: Sonuçlar) — ✅:**
+- `ResultsStep.tsx`: `GET /api/job/{id}/results` (TanStack Query) → araç sayısı + hız tablosu
+  (takip #, sınıf, **hız km/h vurgulu**, ± CI, `ConfidenceBadge`, kare sayısı). CLAUDE.md kural 4:
+  her satır CI + güven seviyesi taşır, çıplak sayı yok. Boş tahmin/yükleme/hata/jobsuz guard durumları.
+- Overlay video oynatıcı (`<video controls src=/api/job/{id}/overlay>`, koyu canvas zemini).
+- İndirme: "PDF Raporu İndir" (`/report`) + "Overlay Video İndir" (`/overlay/download`) — `<a download>`
+  + `buttonVariants` (Button asChild yok; Slot'suz). "Yeni Analiz" → `reset()` → Adım 1; Geri navigasyonu.
+- **Doğrulama:** `npm run build` temiz (tsc+vite). Sonuç sözleşmesi schema + e2e thread testiyle kanıtlı
+  (`test_pipeline_e2e_thread_completes`). Backend değişmedi → **pytest 197/197 yeşil**.
+- Bu noktada **6 adımlı wizard uçtan uca çalışır** (upload → kare → noktalar → kalibrasyon → analiz → sonuç).
+
 ## Sıradaki Adım
-**M8 Step 7** — `tasks/M8/07-results.md`: Sonuç ekranı. `GET /api/job/{id}/results` → araç sayısı +
-hız tablosu (track, sınıf, hız, CI, güven rozeti, kare), overlay video oynatıcı, PDF/overlay indirme,
-"Yeni Analiz". ResultsStep placeholder'ı gerçek ekranla değişecek. (Step 7 bitince 6 adım uçtan uca çalışır.)
+**M8 Step 8** — `tasks/M8/08-cleanup.md`: Temizlik & cila + paketleme. Legacy UI (`/legacy`, `/static`)
+kaldırma değerlendirmesi, son cila, PyInstaller `SpeedDetection.spec` ile yeni SPA paketi doğrulama.
 
 **Açık (M8 dışı):** GPS referanslı doğrulama seti hazırlandığında güven eşikleri
 (`_REL_CI_LOW`, `_REL_CI_HIGH`) kalibre edilmeli (DECISIONS.md + teknik-analiz §15.2).
