@@ -4,7 +4,7 @@
 > "Nerede kaldık" sorusunun cevabı burası + `git log`'tur.
 
 **Son güncelleme:** 2026-06-15
-**Aktif görev:** `tasks/M8/08-cleanup.md` (M8 Step 8 — Temizlik & cila + paketleme)
+**Aktif görev:** _(Yok — M8 tamamlandı; tüm milestone'lar bitti.)_
 
 ---
 
@@ -19,7 +19,7 @@
 | M5 | Çıktılar (overlay video + adli rapor) | ✅ Bitti | MVP tamamlandı — 104/104 test |
 | M6 | Otomatik referans tespiti (fast-follow) | ✅ Bitti | 129/129 test |
 | M7 | UI cilası + paketleme | ✅ Bitti | 15/15 test; FastAPI + wizard UI + PyInstaller paketi |
-| M8 | Frontend modernizasyonu (React+Vite+TS+Tailwind+shadcn) | 🟡 Devam ediyor | Step 0–7 ✅ (6 adım uçtan uca çalışır); sırada Step 8 (temizlik+paketleme). `tasks/M8.md` + `tasks/M8/*` |
+| M8 | Frontend modernizasyonu (React+Vite+TS+Tailwind+shadcn) | ✅ Bitti | Step 0–8 ✅; tek UI React SPA, legacy kaldırıldı, PyInstaller paketi smoke test geçti. `tasks/M8.md` |
 
 Durum işaretleri: ⬜ Başlanmadı · 🟡 Devam ediyor · ✅ Bitti · ⛔ Engellendi
 
@@ -267,9 +267,26 @@ _(Yok — tüm milestone'lar tamamlandı.)_
   (`test_pipeline_e2e_thread_completes`). Backend değişmedi → **pytest 197/197 yeşil**.
 - Bu noktada **6 adımlı wizard uçtan uca çalışır** (upload → kare → noktalar → kalibrasyon → analiz → sonuç).
 
+## Son Oturum (2026-06-15 — M8 Step 8 tamamlandı, M8 KAPANDI)
+
+**Step 8 (Temizlik & cila + paketleme) — ✅:**
+- **Legacy kaldırıldı:** `src/ui/static/{index.html,app.js,calibration.js}` + boş `vendor/` silindi.
+  `app.py`'den `/legacy` rotası, `/static` mount ve "build yoksa legacy'ye düş" fallback'i çıkarıldı
+  (`_LEGACY_STATIC_DIR` kalktı; build yoksa `/` artık açıklayıcı 503 döner). `SpeedDetection.spec`
+  datas'tan `("src/ui/static", ...)` çıkarıldı. Tek UI = React SPA.
+- **Forensic doğrulama:** üretim bundle'ında harici ağ çağrısı yok (yalnız same-origin `/api`;
+  fontlar self-host @fontsource). Tek harici string React hata-çözücü URL'i (metin, çağrı değil).
+- **README** geliştirme bölümüyle güncellendi (pytest / uvicorn / npm dev+build+gen:types / pyinstaller);
+  "henüz kod yok" iskelet metni gerçek mimariyle değiştirildi.
+- **DECISIONS.md**'ye Step 8 kararı (legacy kaldırma + sonner eklenmedi gerekçesi) eklendi.
+- **Paketleme:** `npm run build` → `pyinstaller SpeedDetection.spec` → `dist/SpeedDetection/` (772 MB, arm64).
+  **Frozen smoke test geçti:** `/`→200 SPA, asset JS→200, `/legacy`+`/static`→404 (kalktı),
+  upload→200 (tam VideoMeta), frame→200 JPEG, calibrate→200 (rms 0.0, 4 inlier, 3×3 H, operator katmanı).
+- **pytest 197/197 yeşil** (legacy kaldırma sonrası). `npm run build` temiz.
+
 ## Sıradaki Adım
-**M8 Step 8** — `tasks/M8/08-cleanup.md`: Temizlik & cila + paketleme. Legacy UI (`/legacy`, `/static`)
-kaldırma değerlendirmesi, son cila, PyInstaller `SpeedDetection.spec` ile yeni SPA paketi doğrulama.
+**Yok — M1–M8 tamamlandı.** Ürün uçtan uca çalışıyor (React SPA + FastAPI + PyInstaller paketi).
+Sonraki iş geldiğinde yeni milestone/görev dosyası açılır.
 
 **Açık (M8 dışı):** GPS referanslı doğrulama seti hazırlandığında güven eşikleri
 (`_REL_CI_LOW`, `_REL_CI_HIGH`) kalibre edilmeli (DECISIONS.md + teknik-analiz §15.2).

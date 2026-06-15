@@ -156,3 +156,16 @@ Format:
 - **Sınırlama:** Eşikler GPS referanslı veri setiyle henüz kalibre edilmedi. Geçici değerler
   review tartışmasından türetildi. `docs/teknik-analiz.md §15.2` doğrulama seti hazır olunca
   bu kararın üzerine yeni karar yazılmalı.
+
+## [2026-06-15] M8 Step 8 — Legacy vanilla UI kaldırıldı; tek UI React SPA
+- **Karar:** `src/ui/static/{index.html,app.js,calibration.js}` (+ boş `vendor/`) silindi;
+  `app.py`'den `/legacy` rotası, `/static` mount ve "build yoksa legacy'ye düş" fallback'i kaldırıldı.
+  `SpeedDetection.spec` datas'tan `("src/ui/static", ...)` çıkarıldı. Build yoksa `/` artık
+  açıklayıcı bir 503 döner (legacy'ye düşmez).
+- **Gerekçe:** M8 ile React SPA 6 adımı uçtan uca karşılıyor (Step 0–7). İki paralel UI bakım yükü
+  ve adli yüzey alanı (audit edilecek iki kod yolu) demekti; parite sağlandığı için legacy artık
+  ölü kod. Tek UI = tek doğrulama yüzeyi.
+- **Forensic:** Üretim bundle'ında harici ağ çağrısı yok (yalnız same-origin `/api`; fontlar self-host
+  @fontsource). Tek harici string React'in hata-çözücü URL'i (`react.dev/errors/`) — çağrı değil, metin.
+- **Toast (sonner):** Eklenmedi. Önceki adımların "ekstra bağımlılık yok" kararıyla tutarlı; hata/durum
+  bildirimi `StatusBanner` + adım-içi state ile yapılıyor (yeterli ve audit'lenebilir).

@@ -41,9 +41,8 @@ if getattr(_sys, "frozen", False) and hasattr(_sys, "_MEIPASS"):
     _UI_DIR = Path(_sys._MEIPASS) / "src" / "ui"
 else:
     _UI_DIR = Path(__file__).parent
-# Yeni React/Vite SPA build çıktısı (M8). Legacy vanilla UI parite sağlanana kadar /legacy'de.
+# React/Vite SPA build çıktısı (M8). Tek UI budur; eski vanilla UI Step 8'de kaldırıldı.
 _WEB_DIR = _UI_DIR / "web"
-_LEGACY_STATIC_DIR = _UI_DIR / "static"
 _MODEL_MAP = {"nano": "yolo11n.pt", "small": "yolo11s.pt", "medium": "yolo11m.pt"}
 _MAX_UPLOAD_BYTES = 10 * 1024 * 1024 * 1024  # 10 GB
 
@@ -472,22 +471,19 @@ async def job_results(job_id: str) -> JobResultOut:
 
 
 # ── Static files ──────────────────────────────────────────────────────────────
-# Not: Bu mount'lar dosyanın SONUNDA kalmalı. "/" mount'u açgözlüdür; yukarıda
+# Not: Bu mount dosyanın SONUNDA kalmalı. "/" mount'u açgözlüdür; yukarıda
 # tanımlı /api/* rotaları daha önce kaydedildiği için onlar öncelik kazanır.
 
-# Legacy (eski vanilla UI) — yeni SPA parite sağlayana kadar erişilebilir (M8 geçişi).
-@app.get("/legacy", response_class=HTMLResponse)
-async def legacy_index() -> HTMLResponse:
-    return HTMLResponse((_LEGACY_STATIC_DIR / "index.html").read_text(encoding="utf-8"))
-
-
-app.mount("/static", StaticFiles(directory=str(_LEGACY_STATIC_DIR)), name="legacy-static")
-
-# Yeni React/Vite SPA. Build edilmişse "/"'te servis edilir; aksi halde (pytest /
-# build öncesi) legacy index'e düşülür ki uygulama yine de ayağa kalksın.
+# React/Vite SPA. Build edilmişse "/"'te servis edilir; aksi halde (build öncesi)
+# API yine ayağa kalkar ama "/" açıklayıcı bir 503 döner.
 if (_WEB_DIR / "index.html").exists():
     app.mount("/", StaticFiles(directory=str(_WEB_DIR), html=True), name="web")
 else:
     @app.get("/", response_class=HTMLResponse)
     async def _spa_not_built() -> HTMLResponse:
-        return HTMLResponse((_LEGACY_STATIC_DIR / "index.html").read_text(encoding="utf-8"))
+        return HTMLResponse(
+            "<!doctype html><meta charset='utf-8'>"
+            "<title>Araç Hız Tespit Sistemi</title>"
+            "<p>Arayüz henüz derlenmedi. <code>cd frontend &amp;&amp; npm run build</code> çalıştırın.</p>",
+            status_code=503,
+        )

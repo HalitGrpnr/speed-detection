@@ -14,11 +14,9 @@ _starlette = collect_all("starlette")
 _anyio     = collect_all("anyio")
 
 datas = [
-    # Yeni React/Vite SPA build çıktısı — app.py'de sys._MEIPASS/src/ui/web olarak aranır.
+    # React/Vite SPA build çıktısı — app.py'de sys._MEIPASS/src/ui/web olarak aranır.
     # ÖNEMLİ: paketlemeden önce `cd frontend && npm run build` çalıştırılmalı.
     ("src/ui/web", "src/ui/web"),
-    # Legacy vanilla UI — /legacy'de erişilebilir (M8 Step 8'de kaldırılacak).
-    ("src/ui/static", "src/ui/static"),
 ]
 datas += _uvicorn[0] + _fastapi[0] + _starlette[0] + _anyio[0]
 
