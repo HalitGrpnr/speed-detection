@@ -4,7 +4,7 @@
 > "Nerede kaldık" sorusunun cevabı burası + `git log`'tur.
 
 **Son güncelleme:** 2026-06-14
-**Aktif görev:** `tasks/M8/06-pipeline.md` (M8 Step 6 — Adım 5: Pipeline)
+**Aktif görev:** `tasks/M8/07-results.md` (M8 Step 7 — Adım 6: Sonuçlar)
 
 ---
 
@@ -19,7 +19,7 @@
 | M5 | Çıktılar (overlay video + adli rapor) | ✅ Bitti | MVP tamamlandı — 104/104 test |
 | M6 | Otomatik referans tespiti (fast-follow) | ✅ Bitti | 129/129 test |
 | M7 | UI cilası + paketleme | ✅ Bitti | 15/15 test; FastAPI + wizard UI + PyInstaller paketi |
-| M8 | Frontend modernizasyonu (React+Vite+TS+Tailwind+shadcn) | 🟡 Devam ediyor | Step 0–5 ✅; sırada Step 6 (pipeline). `tasks/M8.md` + `tasks/M8/*` |
+| M8 | Frontend modernizasyonu (React+Vite+TS+Tailwind+shadcn) | 🟡 Devam ediyor | Step 0–6 ✅; sırada Step 7 (sonuçlar). `tasks/M8.md` + `tasks/M8/*` |
 
 Durum işaretleri: ⬜ Başlanmadı · 🟡 Devam ediyor · ✅ Bitti · ⛔ Engellendi
 
@@ -244,10 +244,20 @@ _(Yok — tüm milestone'lar tamamlandı.)_
 - **Doğrulama:** `npm run build` temiz (holdout_rows tipi uyumlu). Yeni backend çağrısı yok; sözleşme
   Step 4'te doğrulanmıştı; backend değişmedi → pytest 197/197 geçerli.
 
+## Son Oturum (2026-06-15 — M8 Step 6 tamamlandı)
+
+**Step 6 (Adım 5: Pipeline) — ✅:**
+- `PipelineStep.tsx`: parametreler (model boyutu, kare adımı, FPS override checkbox+input),
+  "Analizi Başlat" → `POST /api/pipeline` (useMutation). Çalışırken parametreler kilitli.
+- TanStack Query **status polling** (refetchInterval 1.5 sn, done/error'da durur) → canlı Progress
+  bar + durum + ETA. done → otomatik Step 6'ya geç; error → banner + "Tekrar dene".
+- **Doğrulama:** `npm run build` temiz. E2E: `POST /api/pipeline` → 202 + job_id (PipelineRequest
+  kabul, 422 yok); `GET status` → JobStatusOut alanları birebir. Backend değişmedi → pytest 197/197.
+
 ## Sıradaki Adım
-**M8 Step 6** — `tasks/M8/06-pipeline.md`: Analiz başlatma. Parametreler (model boyutu, kare adımı,
-FPS override), `POST /api/pipeline` → job_id, TanStack Query ile status polling + canlı progress bar.
-PipelineStep placeholder'ı gerçek ekranla değişecek.
+**M8 Step 7** — `tasks/M8/07-results.md`: Sonuç ekranı. `GET /api/job/{id}/results` → araç sayısı +
+hız tablosu (track, sınıf, hız, CI, güven rozeti, kare), overlay video oynatıcı, PDF/overlay indirme,
+"Yeni Analiz". ResultsStep placeholder'ı gerçek ekranla değişecek. (Step 7 bitince 6 adım uçtan uca çalışır.)
 
 **Açık (M8 dışı):** GPS referanslı doğrulama seti hazırlandığında güven eşikleri
 (`_REL_CI_LOW`, `_REL_CI_HIGH`) kalibre edilmeli (DECISIONS.md + teknik-analiz §15.2).
