@@ -1,73 +1,28 @@
-# React + TypeScript + Vite
+# frontend/ — Araç Hız Tespit Sistemi arayüzü
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+React + Vite + TypeScript + Tailwind ile yazılmış, 6 adımlı kalibrasyon/analiz sihirbazı.
+Build çıktısı `../src/ui/web`'e gider ve FastAPI tarafından `/`'te servis edilir (ayrı sunucu yok).
 
-Currently, two official plugins are available:
+## Komutlar
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm install              # bağımlılıklar
+npm run dev              # geliştirme sunucusu (http://localhost:5173, /api → 127.0.0.1:8000 proxy)
+npm run gen:types        # backend /openapi.json → src/lib/types.ts (schemas.py tek doğruluk kaynağı)
+npm run build            # üretim derlemesi → ../src/ui/web
+npm run lint             # eslint
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+Geliştirme için backend'i ayrıca çalıştırın: `.venv/bin/python -m uvicorn src.ui.app:app --port 8000`.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## Yapı
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+- `src/features/*` — adım ekranları (upload, frame, calibration, review, pipeline, results)
+- `src/components/ui` — shadcn tarzı primitives (manuel, Tailwind v3); `components/common` — paylaşılan parçalar
+- `src/store/wizard.ts` — Zustand sihirbaz durumu + adım guard'ları
+- `src/lib/api.ts` — tip-güvenli API istemcisi (yalnız same-origin `/api`); `lib/models.ts` — üretilen tip alias'ları
+
+## Forensic kısıt
+
+Çalışma zamanında harici ağ çağrısı yapılmaz; fontlar self-host (`@fontsource/inter`), CDN yok.
+Node yalnızca derleme-zamanı aracıdır. Ayrıntı: kök `CLAUDE.md` + `DECISIONS.md`.

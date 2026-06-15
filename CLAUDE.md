@@ -24,8 +24,9 @@ doğrulanabilir** olmalıdır.
 - **Tespit:** Ultralytics YOLO (nano/small varyantları CPU için). Sürüm **pinlenir**.
 - **Takip:** ByteTrack / BoT-SORT (Ultralytics entegre).
 - **Analiz:** NumPy / SciPy.
-- **Rapor:** PDF (ReportLab / WeasyPrint).
-- **UI (sonraki faz):** Yerel servis (FastAPI) + tarayıcı, ya da masaüstü (PySide6/PyQt, Tauri).
+- **Rapor:** PDF (ReportLab).
+- **UI:** Yerel servis (FastAPI) + tarayıcı. Frontend React + Vite + TypeScript + Tailwind
+  (`frontend/`, build çıktısı `src/ui/web`); FastAPI `/`'te servis eder. PyInstaller ile tek dosya paketlenir.
 - **Donanım:** GPU opsiyonel (offline işlem, gerçek zaman gerekmez). Min 8 GB RAM, önerilen 16 GB.
   Düşük donanım için: kare örnekleme, çözünürlük ölçekleme, model boyutu seçimi yapılandırılabilir olmalı.
 
@@ -56,4 +57,8 @@ hareketinden hesaplanır (bbox merkezi KULLANILMAZ — paralaks hatası üretir)
 - `docs/teknik-analiz.md` — tam mimari ve gerekçeler (referans)
 - `PROGRESS.md` — anlık durum (session başı oku, sonu güncelle)
 - `DECISIONS.md` — karar günlüğü (append-only, audit trail)
+- `refactor.md` — review sonrası refactor planı (R1–R6, tamamlandı)
 - `tasks/M<n>.md` — milestone görev tanımları (aynı anda biri aktif)
+- `src/` — Python paketleri (calibration, detection, speed, reliability, output, autoref, ui)
+- `frontend/` — React/Vite arayüz kaynağı (build → `src/ui/web`, FastAPI servis eder)
+- `README.md` — proje özeti + geliştirme/paketleme komutları
