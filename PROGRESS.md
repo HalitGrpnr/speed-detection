@@ -4,7 +4,7 @@
 > "Nerede kaldık" sorusunun cevabı burası + `git log`'tur.
 
 **Son güncelleme:** 2026-06-14
-**Aktif görev:** `tasks/M8/05-review.md` (M8 Step 5 — Adım 4: Kalibrasyon İnceleme)
+**Aktif görev:** `tasks/M8/06-pipeline.md` (M8 Step 6 — Adım 5: Pipeline)
 
 ---
 
@@ -19,7 +19,7 @@
 | M5 | Çıktılar (overlay video + adli rapor) | ✅ Bitti | MVP tamamlandı — 104/104 test |
 | M6 | Otomatik referans tespiti (fast-follow) | ✅ Bitti | 129/129 test |
 | M7 | UI cilası + paketleme | ✅ Bitti | 15/15 test; FastAPI + wizard UI + PyInstaller paketi |
-| M8 | Frontend modernizasyonu (React+Vite+TS+Tailwind+shadcn) | 🟡 Devam ediyor | Step 0–4 ✅; sırada Step 5 (kalibrasyon inceleme). `tasks/M8.md` + `tasks/M8/*` |
+| M8 | Frontend modernizasyonu (React+Vite+TS+Tailwind+shadcn) | 🟡 Devam ediyor | Step 0–5 ✅; sırada Step 6 (pipeline). `tasks/M8.md` + `tasks/M8/*` |
 
 Durum işaretleri: ⬜ Başlanmadı · 🟡 Devam ediyor · ✅ Bitti · ⛔ Engellendi
 
@@ -235,10 +235,19 @@ _(Yok — tüm milestone'lar tamamlandı.)_
   `CalibrateResponse` alanlarını döndürdü (RMS≈0, homography 3×3, inlier/point_count, loo/holdout);
   `/autoref` liste döndürdü. Backend değişmedi → pytest 197/197 geçerli.
 
+## Son Oturum (2026-06-15 — M8 Step 5 tamamlandı)
+
+**Step 5 (Adım 4: Kalibrasyon İnceleme) — ✅:**
+- `ReviewStep.tsx`: store'daki `CalibrateResponse`'tan özet kartları — RMS (RmsBadge), kullanılan/toplam
+  nokta, güven katmanı (TR rozet), düzlemsellik, LOO RMS (null→"yetersiz"), redundancy (≥6).
+- RMS>5cm ve <6 nokta için uyarı bannerları; `holdout_rows` varsa dinamik tablo. Kalibrasyon yoksa guard bannerı.
+- **Doğrulama:** `npm run build` temiz (holdout_rows tipi uyumlu). Yeni backend çağrısı yok; sözleşme
+  Step 4'te doğrulanmıştı; backend değişmedi → pytest 197/197 geçerli.
+
 ## Sıradaki Adım
-**M8 Step 5** — `tasks/M8/05-review.md`: Kalibrasyon inceleme ekranı. Store'daki `CalibrateResponse`'tan
-özet kartları (RMS, inlier/toplam, güven katmanı, düzlemsellik, LOO RMS, redundancy uyarısı) + holdout tablosu.
-ReviewStep placeholder'ı (geçici demo butonu) gerçek ekranla değişecek.
+**M8 Step 6** — `tasks/M8/06-pipeline.md`: Analiz başlatma. Parametreler (model boyutu, kare adımı,
+FPS override), `POST /api/pipeline` → job_id, TanStack Query ile status polling + canlı progress bar.
+PipelineStep placeholder'ı gerçek ekranla değişecek.
 
 **Açık (M8 dışı):** GPS referanslı doğrulama seti hazırlandığında güven eşikleri
 (`_REL_CI_LOW`, `_REL_CI_HIGH`) kalibre edilmeli (DECISIONS.md + teknik-analiz §15.2).
