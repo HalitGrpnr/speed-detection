@@ -1,34 +1,46 @@
-import { ShieldCheck } from 'lucide-react'
-import { Badge } from '@/components/ui/badge'
-import { useWizard } from '@/store/wizard'
+import { Gauge, ShieldCheck } from 'lucide-react'
+import { STEPS, useWizard } from '@/store/wizard'
 
 export function Header() {
   const videoMeta = useWizard((s) => s.videoMeta)
+  const step = useWizard((s) => s.step)
+  const stepLabel = STEPS.find((s) => s.id === step)?.label
 
   return (
-    <header className="flex h-14 shrink-0 items-center gap-3 border-b bg-card px-5">
-      <div className="flex items-center gap-2">
-        <ShieldCheck className="size-5 text-primary" />
+    <header className="flex h-16 shrink-0 items-center gap-3 border-b bg-card/80 px-5 backdrop-blur-md">
+      <div className="flex shrink-0 items-center gap-3">
+        <div className="flex size-9 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-blue-700 text-primary-foreground shadow-pop">
+          <Gauge className="size-5" />
+        </div>
         <span className="font-semibold tracking-tight">Araç Hız Tespit Sistemi</span>
       </div>
 
-      <Badge variant="outline" className="text-muted-foreground">
-        <span className="size-1.5 rounded-full bg-emerald-500" />
+      <span className="ml-2 hidden shrink-0 items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-medium text-emerald-700 sm:inline-flex">
+        <span className="size-1.5 animate-pulse rounded-full bg-emerald-500" />
         Tamamen Yerel
-      </Badge>
+      </span>
 
-      <div className="ml-auto flex items-center gap-4 text-xs text-muted-foreground">
-        {videoMeta && (
-          <>
-            <span className="max-w-[14rem] truncate" title={videoMeta.video_id}>
-              {videoMeta.width}×{videoMeta.height} · {videoMeta.fps.toFixed(2)} fps
-            </span>
-            <span className="font-mono" title={`SHA-256: ${videoMeta.sha256}`}>
-              SHA-256 {videoMeta.sha256.slice(0, 12)}…
-            </span>
-          </>
+      <div className="flex flex-1 items-center justify-center">
+        {stepLabel && (
+          <span className="hidden text-sm text-muted-foreground md:inline-flex">
+            <span className="font-medium text-foreground">Adım {step}</span>
+            <span className="mx-1.5">/</span>
+            {STEPS.length}
+            <span className="mx-2 text-border">·</span>
+            <span className="text-foreground">{stepLabel}</span>
+          </span>
         )}
       </div>
+
+      {videoMeta && (
+        <span
+          className="flex shrink-0 items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700"
+          title={`Dosya bütünlüğü doğrulandı\n${videoMeta.width}×${videoMeta.height} · ${videoMeta.fps.toFixed(2)} fps\nSHA-256: ${videoMeta.sha256}`}
+        >
+          <ShieldCheck className="size-4" />
+          Dosya doğrulandı
+        </span>
+      )}
     </header>
   )
 }

@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { Maximize2, ZoomIn, ZoomOut } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { ControlPoint, ControlPointSource } from '@/lib/models'
 
 const RADIUS = 8
+const MIN_ZOOM = 1
+const MAX_ZOOM = 8
 const COLORS: Record<ControlPointSource, string> = {
   operator: '#f59e0b', // sarı
   auto: '#60a5fa', // mavi (M6)
@@ -21,32 +24,38 @@ interface Props {
 }
 
 /**
- * Kalibrasyon karesi üzerinde kontrol noktası tıklama/sürükleme.
- * (Legacy src/ui/static/calibration.js matematiğinin React portu.)
+ * Kalibrasyon karesi üzerinde kontrol noktası tıklama/sürükleme + zoom.
+ * scale = fitScale (kareyi alana sığdırır) × zoom (operatör yakınlaştırması).
  */
 export function CalibrationCanvas({ imageUrl, points, selectedId, onAdd, onMove, onSelect }: Props) {
   const wrapRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const imgRef = useRef<HTMLImageElement | null>(null)
   const dragRef = useRef<string | null>(null)
-  const [scale, setScale] = useState(1)
+  const [fitScale, setFitScale] = useState(1)
+  const [zoom, setZoom] = useState(1)
   const [ready, setReady] = useState(false)
+
+  const scale = fitScale * zoom
+  // Wheel/buton zoom handler'ı en güncel değerleri okusun diye ref'ler.
+  const fitRef = useRef(fitScale)
+  const zoomRef = useRef(zoom)
+  fitRef.current = fitScale
+  zoomRef.current = zoom
 
   const layout = useCallback(() => {
     const img = imgRef.current
     const wrap = wrapRef.current
-    const canvas = canvasRef.current
-    if (!img || !wrap || !canvas) return
+    if (!img || !wrap) return
     const maxW = wrap.clientWidth || 800
-    const maxH = window.innerHeight * 0.55
+    const maxH = window.innerHeight * 0.66
     const s = Math.min(maxW / img.naturalWidth, maxH / img.naturalHeight, 1)
-    canvas.width = img.naturalWidth * s
-    canvas.height = img.naturalHeight * s
-    setScale(s)
+    setFitScale(s)
   }, [])
 
   useEffect(() => {
     setReady(false)
+    setZoom(1)
     const img = new Image()
     img.onload = () => {
       imgRef.current = img
@@ -65,7 +74,7 @@ export function CalibrationCanvas({ imageUrl, points, selectedId, onAdd, onMove,
     return () => window.removeEventListener('resize', onResize)
   }, [layout])
 
-  // Çizim
+  // Çizim (+ canvas boyutunu scale'e göre ayarla)
   useEffect(() => {
     const canvas = canvasRef.current
     const img = imgRef.current
@@ -73,8 +82,10 @@ export function CalibrationCanvas({ imageUrl, points, selectedId, onAdd, onMove,
     const ctx = canvas.getContext('2d')
     if (!ctx) return
 
+    canvas.width = img.naturalWidth * scale
+    canvas.height = img.naturalHeight * scale
     ctx.clearRect(0, 0, canvas.width, canvas.height)
-    ctx.drawImage(img, 0, 0, img.naturalWidth * scale, img.naturalHeight * scale)
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
 
     points.forEach((pt, i) => {
       const cx = pt.pixel[0] * scale
@@ -108,6 +119,62 @@ export function CalibrationCanvas({ imageUrl, points, selectedId, onAdd, onMove,
       }
     })
   }, [points, selectedId, scale, ready])
+
+  // Cursor merkezli wheel zoom (passive:false gerekir → native listener)
+  useEffect(() => {
+    const wrap = wrapRef.current
+    if (!wrap) return
+    const onWheel = (e: WheelEvent) => {
+      const canvas = canvasRef.current
+      if (!canvas) return
+      e.preventDefault()
+      const oldScale = fitRef.current * zoomRef.current
+      const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15
+      const newZoom = clamp(zoomRef.current * factor, MIN_ZOOM, MAX_ZOOM)
+      if (newZoom === zoomRef.current) return
+
+      const wrapRect = wrap.getBoundingClientRect()
+      const canvasRect = canvas.getBoundingClientRect()
+      const imageX = (e.clientX - canvasRect.left) / oldScale
+      const imageY = (e.clientY - canvasRect.top) / oldScale
+      const cursorViewX = e.clientX - wrapRect.left
+      const cursorViewY = e.clientY - wrapRect.top
+
+      setZoom(newZoom)
+      requestAnimationFrame(() => {
+        const newScale = fitRef.current * newZoom
+        wrap.scrollLeft = imageX * newScale - cursorViewX
+        wrap.scrollTop = imageY * newScale - cursorViewY
+      })
+    }
+    wrap.addEventListener('wheel', onWheel, { passive: false })
+    return () => wrap.removeEventListener('wheel', onWheel)
+  }, [])
+
+  const zoomBy = (factor: number) => {
+    const wrap = wrapRef.current
+    const newZoom = clamp(zoomRef.current * factor, MIN_ZOOM, MAX_ZOOM)
+    if (!wrap) {
+      setZoom(newZoom)
+      return
+    }
+    // Görünür merkez sabit kalsın
+    const oldScale = fitRef.current * zoomRef.current
+    const centerX = (wrap.scrollLeft + wrap.clientWidth / 2) / oldScale
+    const centerY = (wrap.scrollTop + wrap.clientHeight / 2) / oldScale
+    setZoom(newZoom)
+    requestAnimationFrame(() => {
+      const newScale = fitRef.current * newZoom
+      wrap.scrollLeft = centerX * newScale - wrap.clientWidth / 2
+      wrap.scrollTop = centerY * newScale - wrap.clientHeight / 2
+    })
+  }
+
+  const resetZoom = () => {
+    setZoom(1)
+    const wrap = wrapRef.current
+    if (wrap) requestAnimationFrame(() => wrap.scrollTo({ left: 0, top: 0 }))
+  }
 
   const toImage = (e: React.MouseEvent<HTMLCanvasElement>): [number, number] => {
     const canvas = canvasRef.current!
@@ -152,20 +219,59 @@ export function CalibrationCanvas({ imageUrl, points, selectedId, onAdd, onMove,
   }
 
   return (
-    <div ref={wrapRef} className="overflow-hidden rounded-lg border bg-canvas">
-      {!ready && (
-        <div className="flex h-64 items-center justify-center text-sm text-white/60">
-          Kare yükleniyor…
+    <div className="relative">
+      <div
+        ref={wrapRef}
+        className="max-h-[68vh] overflow-auto rounded-xl border bg-canvas shadow-card"
+      >
+        {!ready && (
+          <div className="flex h-72 items-center justify-center text-sm text-white/60">
+            Kare yükleniyor…
+          </div>
+        )}
+        <canvas
+          ref={canvasRef}
+          onMouseDown={onMouseDown}
+          onMouseMove={onMouseMove}
+          onMouseUp={endDrag}
+          onMouseLeave={endDrag}
+          className={cn('mx-auto block cursor-crosshair', !ready && 'hidden')}
+        />
+      </div>
+
+      {ready && (
+        <div className="absolute right-3 top-3 flex items-center gap-1 rounded-lg border border-white/15 bg-slate-900/85 p-1 text-white shadow-pop backdrop-blur">
+          <button
+            type="button"
+            onClick={() => zoomBy(1 / 1.3)}
+            disabled={zoom <= MIN_ZOOM + 1e-6}
+            className="flex size-7 items-center justify-center rounded-md hover:bg-white/15 disabled:opacity-35"
+            title="Uzaklaş"
+          >
+            <ZoomOut className="size-4" />
+          </button>
+          <span className="min-w-[3rem] text-center text-xs tabular-nums">
+            {Math.round(zoom * 100)}%
+          </span>
+          <button
+            type="button"
+            onClick={() => zoomBy(1.3)}
+            disabled={zoom >= MAX_ZOOM - 1e-6}
+            className="flex size-7 items-center justify-center rounded-md hover:bg-white/15 disabled:opacity-35"
+            title="Yakınlaş"
+          >
+            <ZoomIn className="size-4" />
+          </button>
+          <button
+            type="button"
+            onClick={resetZoom}
+            className="flex size-7 items-center justify-center rounded-md hover:bg-white/15"
+            title="Sığdır (%100)"
+          >
+            <Maximize2 className="size-4" />
+          </button>
         </div>
       )}
-      <canvas
-        ref={canvasRef}
-        onMouseDown={onMouseDown}
-        onMouseMove={onMouseMove}
-        onMouseUp={endDrag}
-        onMouseLeave={endDrag}
-        className={cn('mx-auto block cursor-crosshair', !ready && 'hidden')}
-      />
     </div>
   )
 }

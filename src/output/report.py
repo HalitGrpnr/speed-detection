@@ -20,6 +20,25 @@ from .models import PipelineResult
 
 _MARGIN = 2 * cm
 
+# Bilirkişiye yönelik yüksek seviye yöntem anlatımı (PDF + audit metni ortak kaynak).
+# Gövde metni konvansiyonuna uyarak ASCII-Türkçe (font/encoding güvenli).
+_METHOD_SUMMARY = [
+    "Sistem once videodaki yolu bir referans duzlemi olarak kalibre eder: operator, "
+    "goruntude gercek dunya mesafesi bilinen noktalari (serit genisligi ~3.5 m, plaka "
+    "520x110 mm gibi) isaretler. Bu eslesmelerden, goruntudeki pikseller ile yoldaki "
+    "gercek metreler arasinda matematiksel bir donusum (homografi) kurulur; boylece "
+    "ekrandaki her noktanin yolda kac metreye karsilik geldigi bilinir.",
+    "Arac, kareler boyunca otomatik takip edilir; olcum icin aracin tekerlek-zemin temas "
+    "noktasi kullanilir (kutle merkezi degil, cunku kamera acisi nedeniyle paralaks hatasi "
+    "uretir). Bu nokta her karede gercek dunya koordinatina cevrilir; iki kare arasinda kat "
+    "edilen metre, videonun kare hizi (FPS) ile birlestirilerek hiza cevrilir ve km/h "
+    "cinsinden verilir.",
+    "Hicbir hiz ciplak tek sayi olarak sunulmaz: her sonuc bir guven araligi "
+    "(orn. 52 +/- 3 km/h) ve guven seviyesi tasir. Kalibrasyon kalitesi (hata payi) olculur "
+    "ve operator onayindan gecer; tum adimlar ile dosya butunlugu (SHA-256) loglanir, boylece "
+    "sonuc bagimsiz olarak dogrulanabilir.",
+]
+
 _CONFIDENCE_TR = {"high": "Yüksek", "medium": "Orta", "low": "Düşük"}
 _LAYER_TR = {
     "standard_assumption": "Standart Varsayım",
@@ -81,6 +100,7 @@ def collect_report_texts(result: PipelineResult) -> list[str]:
     point_count = len(cal.used_point_ids)
     texts = [
         "Araç Hız Tespit Raporu",
+        "Yontem Ozeti — Hiz Nasil Hesaplanir",
         "Kalibrasyon",
         "Hız Sonuçları",
         "Varsayımlar ve Sınırlamalar",
@@ -130,6 +150,13 @@ def _build_story(result: PipelineResult) -> list:
     t.setStyle(_kv_table_style())
     story.append(t)
     story.append(Spacer(1, 0.5 * cm))
+
+    # 1b. Yöntem Özeti (bilirkişi için yüksek seviye anlatım)
+    story.append(Paragraph("Yontem Ozeti — Hiz Nasil Hesaplanir", S["SectionTitle"]))
+    for para in _METHOD_SUMMARY:
+        story.append(Paragraph(para, S["Normal"]))
+        story.append(Spacer(1, 0.15 * cm))
+    story.append(Spacer(1, 0.35 * cm))
 
     # 2. Kalibrasyon
     story.append(Paragraph("Kalibrasyon", S["SectionTitle"]))

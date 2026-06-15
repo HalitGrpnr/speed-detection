@@ -169,3 +169,18 @@ Format:
   @fontsource). Tek harici string React'in hata-çözücü URL'i (`react.dev/errors/`) — çağrı değil, metin.
 - **Toast (sonner):** Eklenmedi. Önceki adımların "ekstra bağımlılık yok" kararıyla tutarlı; hata/durum
   bildirimi `StatusBanner` + adım-içi state ile yapılıyor (yeterli ve audit'lenebilir).
+
+## [2026-06-15] UX cilası — bilirkişi-dostu dil, premium tema, yöntem özeti
+- **Karar:** UI "premium açık SaaS" yönüne çekildi (zengin palet + yumuşak gölge, markalı header,
+  sade footer, geniş kalibrasyon tuvali + cursor-merkezli zoom). Teknik terimler operatör/bilirkişi
+  ekranlarında sade Türkçeye çevrildi: "re-projeksiyon RMS" → "kalibrasyon hata payı",
+  "düzlemsellik" → "noktalar aynı düzlemde değil", "leave-one-out RMS" → "bağımsız doğrulama",
+  "redundancy" → "nokta yeterliliği". Tam teknik terim ekranda `InfoHint` tooltip'inde + PDF raporda korunuyor.
+- **Gerekçe:** Çıktı bilirkişi raporuna girer; operatör ve bilirkişi CV/istatistik jargonunu anlamak
+  zorunda değil. Sade dil anlaşılırlığı artırır; teknik terim tooltip+PDF'te kaldığı için
+  "bağımsız doğrulanabilirlik" (anayasa kuralı) bozulmaz.
+- **SHA-256:** Header'da ham hex yerine "Dosya doğrulandı" rozeti; tam hash tooltip'te. Anayasa
+  "hash alınır ve **loglanır**" der — log + PDF tam hash'i tutar; ekranda gizlemek kuralı bozmaz.
+- **Yöntem özeti:** PDF raporun başına ("Yontem Ozeti") + sonuç ekranına açılır bilgi kartı eklendi.
+  Ortak kaynak: `report.py::_METHOD_SUMMARY` (PDF+audit), `MethodInfoCard.tsx` (UI). Bilirkişinin
+  "nasıl hesaplıyor?" sorusuna yüksek seviye cevap. Test: report 22/22 yeşil.

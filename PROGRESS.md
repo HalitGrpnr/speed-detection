@@ -6,6 +6,9 @@
 
 **Son güncelleme:** 2026-06-15
 **Aktif görev:** _(Yok — M1–M8 tamamlandı; tüm milestone'lar bitti.)_
+**Son oturumda:** UX cilası — premium açık SaaS tema, markalı header + sade footer, geniş
+kalibrasyon tuvali + cursor-merkezli zoom, teknik terimler bilirkişi-dostu Türkçeye çevrildi
+(tam terim `InfoHint` tooltip + PDF'te), PDF + sonuç ekranına "yöntem özeti". Bkz. `DECISIONS.md`.
 
 ---
 

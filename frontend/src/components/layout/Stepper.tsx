@@ -9,6 +9,9 @@ export function Stepper() {
 
   return (
     <nav className="flex flex-col gap-1 p-3">
+      <div className="px-3 pb-2 pt-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70">
+        Kalibrasyon Sihirbazı
+      </div>
       {STEPS.map((s) => {
         const id = s.id as StepId
         const active = id === step

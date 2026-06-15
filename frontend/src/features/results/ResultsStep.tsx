@@ -6,6 +6,7 @@ import { Button, buttonVariants } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 import { ConfidenceBadge } from '@/components/common/ConfidenceBadge'
+import { MethodInfoCard } from '@/components/common/MethodInfoCard'
 import { StatusBanner } from '@/components/common/StatusBanner'
 import { StepFooter } from '@/components/common/StepFooter'
 
@@ -123,6 +124,8 @@ export function ResultsStep() {
             </table>
           </div>
         )}
+
+        <MethodInfoCard />
 
         {/* Overlay video */}
         <div className="space-y-2">

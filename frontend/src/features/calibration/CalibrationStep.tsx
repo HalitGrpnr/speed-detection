@@ -119,13 +119,13 @@ export function CalibrationStep() {
         <CardTitle>Adım 3 — Kontrol Noktaları</CardTitle>
         <CardDescription>
           Koyu canvas'a tıklayarak nokta ekleyin, sürükleyerek taşıyın; gerçek dünya
-          koordinatlarını girin. RMS canlı hesaplanır.
+          koordinatlarını girin. Kalibrasyon kalitesi (hata payı) canlı hesaplanır.
         </CardDescription>
       </CardHeader>
 
       <CardContent className="space-y-4">
         <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
-          <div className="space-y-2">
+          <div className="min-w-0 space-y-2">
             <CalibrationCanvas
               imageUrl={api.frameUrl(videoMeta.video_id, selectedFrame)}
               points={points}
@@ -135,7 +135,7 @@ export function CalibrationStep() {
               onSelect={setSelectedId}
             />
             <p className="text-xs text-muted-foreground">
-              Tıkla = ekle · sürükle = taşı ·{' '}
+              Tıkla = ekle · sürükle = taşı · <span className="font-medium">fare tekeri = yakınlaş</span> (hassas işaretleme) ·{' '}
               <span className="text-amber-600">sarı operatör</span>,{' '}
               <span className="text-blue-500">mavi otomatik</span>,{' '}
               <span className="text-emerald-500">yeşil saha</span>.
@@ -146,7 +146,12 @@ export function CalibrationStep() {
             {/* Canlı RMS */}
             <div className="rounded-lg border p-3">
               <div className="mb-1 flex items-center justify-between">
-                <span className="text-sm font-medium">Re-projeksiyon RMS</span>
+                <span
+                  className="text-sm font-medium"
+                  title="Kalibrasyon hata payı: tıkladığınız noktaların girdiğiniz ölçümlerle ne kadar uyuştuğu. Küçük olması iyidir. (Teknik: re-projeksiyon RMS)"
+                >
+                  Kalibrasyon hata payı
+                </span>
                 {cal.status === 'loading' && <Loader2 className="size-4 animate-spin text-muted-foreground" />}
               </div>
               {cal.status === 'insufficient' && (
@@ -159,7 +164,11 @@ export function CalibrationStep() {
                   <RmsBadge rmsM={cal.data.rms_m} />
                   <p className="text-xs text-muted-foreground">
                     Kullanılan {cal.data.inlier_count}/{cal.data.point_count} nokta
-                    {cal.data.planarity_warning && ' · ⚠ düzlemsellik uyarısı'}
+                    {cal.data.planarity_warning && (
+                      <span title="Noktalar tek bir düz zemin oluşturmuyor; bazı noktalar zemin dışında (kaldırım, eğim vb.) olabilir. (Teknik: düzlemsellik uyarısı)">
+                        {' '}· ⚠ noktalar aynı düzlemde görünmüyor
+                      </span>
+                    )}
                   </p>
                 </div>
               )}
