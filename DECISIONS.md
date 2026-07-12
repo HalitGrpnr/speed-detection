@@ -322,3 +322,32 @@ Format:
 - **Test:** `pytest` 227/227 (10 axle_check birim testi [4 yeni], 2 pipeline testi [precomputed_tracks],
   3 recalibrate endpoint testi eklendi — yeni job oluşuyor, eski job değişmiyor, VehicleTracker
   çağrılmıyor). Tarayıcıda uçtan uca (gerçek video ile) henüz denenmedi.
+
+## [2026-07-12] Düzeltme: track başında yapay hız sıfırının yumuşatma penceresini kirletmesi
+
+- **Bağlam:** Kullanıcı kendi videosunu analiz ederken şunu gözlemledi: araç kareye girdiği an
+  overlay videoda ~25 km/h gösteriyor, birkaç kare sonra "aniden" gerçek hızına (~65 km/h)
+  sıçrıyor — oysa aracın kareye girdiği andan itibaren zaten en az 65 km/h olduğu biliniyordu.
+- **Kök neden (kanıtlandı, sentetik veriyle tekrar üretildi):** `src/speed/calculator.py::
+  track_to_world`, her track'in **ilk noktasına** `speed_kmh=0.0` atar (önceki nokta yok, hız
+  hesaplanamaz — bu doğru ve gerekli). Ama bu yapay 0.0, `src/speed/smoother.py::
+  sliding_window_smooth`'un kayan penceresine **gerçek bir ölçüm gibi** karışıyordu. Düşük
+  örnek yoğunluğunda (yüksek `frame_step`, düşük FPS) pencerede az örnek kalınca medyan/ortalama
+  bu sıfıra doğru çekiliyordu. Sabit 65 km/h ile giren, hiç gürültüsüz sentetik bir track'te bile
+  (frame_step=3, fps=20, window_s=0.4) ilk kare **32.5 km/h** olarak hesaplanıyordu — saf bir
+  algoritma artefaktı, ölçüm gürültüsü değil.
+- **Önemli:** Rapordaki tekil `value_kmh` (bilirkişiye giden asıl sayı) bu hatadan etkilenmiyordu
+  — `estimate_speed` zaten ilk örneği medyan hesabından hariç tutuyor. Sorun yalnızca **overlay
+  videodaki kare-kare canlı hız etiketinde** görünüyordu (`overlay.py::_instant_speed` →
+  `smoothed_series`). Ama bu, adli açıdan tam olarak en kritik an olabilir (aracın sahneye
+  girdiğindeki hızı).
+- **Karar:** `sliding_window_smooth`, `samples[0]`'ı (yapay yer tutucu) pencere istatistiklerinden
+  hariç tutacak şekilde düzeltildi (`valid` maskesi). Tek noktalı track kenar durumu (yalnızca
+  yapay 0.0 var) için orijinal davranış korunur (kendi ham değerini döndürür). Bu varsayım
+  (`samples[0]` her zaman yapay) yalnızca üretim yolunda geçerlidir (`track_to_world` →
+  `sliding_window_smooth`); fonksiyonun docstring'i bu bağımlılığı açıkça belirtir. Fonksiyonun
+  tek üretim çağıranı `calculator.py` olduğu doğrulandı (`grep`), bu yüzden genel-amaçlı bir
+  fonksiyona aşırı özel varsayım sızdırma riski düşük kabul edildi.
+- **Test:** `tests/test_speed_smoother.py`'ye 3 regresyon testi eklendi (sabit hızlı track'te
+  ilk örneğin bozulmaması — median ve mean için, + tek-noktalı track edge case).
+  `pytest` 230/230. Mevcut 227 testte hiçbir regresyon yok (tümü zaten geçiyordu).

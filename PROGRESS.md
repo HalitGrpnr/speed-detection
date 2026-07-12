@@ -5,7 +5,18 @@
 > geçmişine bakılır; bu dosya yalnızca **anlık durumun özetini** tutar (şişirmeyin).
 
 **Son güncelleme:** 2026-07-12
-**Aktif görev:** _(Yok — M1–M9 + kuş bakışı eki tamamlandı.)_
+**Aktif görev:** _(Yok — M1–M9 + kuş bakışı eki + hız yumuşatma düzeltmesi tamamlandı.)_
+
+**En son (önemli, forensic-etkili bir düzeltme):** Kullanıcı gerçek video analizinde şunu fark
+etti: araç kareye girdiği an overlay videoda ~25 km/h, birkaç kare sonra "aniden" ~65 km/h
+gösteriyordu. Kök neden bulundu ve kanıtlandı (sentetik, gürültüsüz veriyle tekrar üretildi):
+track'in ilk noktasına atanan yapay `speed_kmh=0.0` (önceki nokta yoktur, hız hesaplanamaz),
+`sliding_window_smooth`'un kayan penceresine gerçek ölçüm gibi karışıp düşük örnek yoğunluğunda
+(yüksek frame_step) medyanı aşağı çekiyordu — saf algoritma artefaktı, ölçüm gürültüsü değil.
+**Düzeltildi** (`src/speed/smoother.py`, ilk örnek pencere istatistiklerinden hariç tutuluyor).
+Rapordaki tekil `value_kmh` bundan hiç etkilenmiyordu (zaten ilk örneği hariç tutuyordu) — sorun
+yalnızca overlay videonun kare-kare canlı etiketindeydi, ama tam da aracın sahneye girdiği
+(adli açıdan en kritik) andaydı. Bkz. `DECISIONS.md`.
 **Son oturumda:** M9 — DTP-Expert karşılaştırmasından (`docs/dtp-expert-karsilastirma.md`) aks
 genişliği çapraz doğrulaması eklendi: `src/reliability/axle_check.py` (aday kare önerisi + iki
 nokta ile ölçüm + bilinen değerle karşılaştırma), yeni endpoint'ler
@@ -52,9 +63,9 @@ H ile kaba dünya konumuna oturtup bilinen genişliğe göre düzeltiyor. Yeni e
 
 Durum işaretleri: ⬜ Başlanmadı · 🟡 Devam ediyor · ✅ Bitti · ⛔ Engellendi
 
-**Test durumu:** `pytest` **227/227 yeşil**. `frontend/` `npm run build` temiz. PyInstaller paketi
-(`dist/SpeedDetection/`, ~772 MB arm64) M9 + kuş bakışı + recalibrate sonrası yeniden build
-edilmedi — bir sonraki paketleme öncesi kontrol edilmeli.
+**Test durumu:** `pytest` **230/230 yeşil**. `frontend/` `npm run build` temiz. PyInstaller paketi
+(`dist/SpeedDetection/`, ~772 MB arm64) M9 + kuş bakışı + recalibrate + smoother düzeltmesi
+sonrası yeniden build edilmedi — bir sonraki paketleme öncesi kontrol edilmeli.
 
 ---
 
@@ -75,8 +86,19 @@ edilmedi — bir sonraki paketleme öncesi kontrol edilmeli.
 - **Doğrulama veri seti yok (asıl açık iş).** GPS referanslı test çekimi hazırlanınca
   (`docs/teknik-analiz.md §15.2`) güven eşikleri (`_REL_CI_LOW`, `_REL_CI_HIGH`) ampirik
   kalibre edilmeli; geçici değerler review tartışmasından türetildi (bkz. `DECISIONS.md`).
-- **Gerçek trafik videosunda uçtan uca manuel test henüz yapılmadı** (sentetik video + mock YOLO ile
-  doğrulandı; `yolo11n.pt` ilk çalıştırmada indirilir).
+- **Gerçek trafik videosuyla kullanıcı testi başladı** (önceki not artık güncel değil — kullanıcı
+  gerçek bir CCTV-tarzı trafik videosu yükleyip Adım 3/4/6'yı fiilen denedi). Bu, iki gerçek sorun
+  buldu: M6 otomatik öneri şerit tespiti kırılganlığı (aşağıda) ve hız yumuşatma artefaktı
+  (düzeltildi, bkz. `DECISIONS.md`). Tam M1→M6 uçtan uca gerçek video ile henüz tamamlanmadı.
+- **M6 "Otomatik Öner" (Canny+Hough şerit tespiti) gerçek videoda yanlış nokta önerebiliyor —
+  diagnoze edildi, düzeltilmedi.** Kullanıcının videosunda sağ şerit çizgisi tespiti, görüntünün
+  sağ yarısındaki 52 karışık kenar parçasına (muhtemelen bina/korkuluk/gölge) ağırlıksız
+  `np.polyfit` (RANSAC/aykırı-değer eleme yok) uygulayınca çok sığ (yanlış) bir doğru üretti; bu
+  doğru uzak noktaya ekstrapole edilince görüntü sınırlarının (768px) dışına taşan bir nokta
+  (x=1329) önerildi. Kullanıcıya 3 seçenek sunuldu (RANSAC/aykırı-değer eleme, ekstrapolasyonu
+  görüntü sınırıyla sınırlama, sınır-dışı önerileri otomatik atma) — henüz karar verilmedi.
+  Bu M6'nın her zaman "kolaylık katmanı" (elle noktanın yerine değil) olarak tasarlanmasıyla
+  tutarlı ama gerçek görüntülerde beklenenden daha sık başarısız olabilir.
 - Frontend `npm run lint`, Node ≥20.19 isteyen bir transitive bağımlılık yüzünden uyarı verebilir;
   build'i etkilemez (Node 22 LTS'e geçilirse giderilir).
 - **Plaka tespiti (M9 kapsamından çıkarıldı).** Uygun üçüncü-parti model bulundu

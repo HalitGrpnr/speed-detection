@@ -120,3 +120,44 @@ def test_unknown_method_raises():
     samples = _make_samples([60.0] * 5)
     with pytest.raises(ValueError, match="Bilinmeyen method"):
         sliding_window_smooth(samples, 0.4, method="invalid")  # type: ignore
+
+
+# ── Regresyon: ilk örneğin yapay 0.0'ı pencereyi kirletmemeli ────────────────
+# track_to_world ilk noktaya her zaman speed_kmh=0.0 verir (önceki nokta yok — gerçek
+# bir ölçüm değil). Araç track'e sabit hızla girse bile bu yapay değer, düşük
+# örnek yoğunluğunda (ör. yüksek frame_step) medyanı/ortalamayı aşağı çekip
+# overlay videoda "araç 25 km/h ile giriyor, sonra 65'e sıçrıyor" izlenimi verirdi.
+
+def test_synthetic_first_zero_does_not_drag_down_median():
+    """Track sabit 65 km/h ile başlasa bile ilk örneğin yapay 0.0'ı medyanı bozmamalı."""
+    fps = 20.0
+    frame_step = 3
+    samples = [
+        SpeedSample(frame=i * frame_step, t_s=(i * frame_step) / fps,
+                    world_m=(float(i), 0.0), speed_kmh=0.0 if i == 0 else 65.0)
+        for i in range(10)
+    ]
+    smoothed = sliding_window_smooth(samples, window_s=0.4, method="median")
+    assert smoothed[0][1] == pytest.approx(65.0), (
+        f"İlk örnek yapay 0.0'dan etkilendi: {smoothed[0][1]}"
+    )
+
+
+def test_synthetic_first_zero_does_not_drag_down_mean():
+    fps = 20.0
+    frame_step = 3
+    samples = [
+        SpeedSample(frame=i * frame_step, t_s=(i * frame_step) / fps,
+                    world_m=(float(i), 0.0), speed_kmh=0.0 if i == 0 else 65.0)
+        for i in range(10)
+    ]
+    smoothed = sliding_window_smooth(samples, window_s=0.4, method="mean")
+    assert smoothed[0][1] == pytest.approx(65.0)
+
+
+def test_single_sample_track_still_uses_own_value():
+    """Track'te tek nokta varsa (yalnızca yapay 0.0) maskeleme sonucu boş pencereye
+    düşülmemeli — kendi ham değeri kullanılmalı."""
+    samples = [SpeedSample(frame=0, t_s=0.0, world_m=(0.0, 0.0), speed_kmh=0.0)]
+    smoothed = sliding_window_smooth(samples, window_s=0.4, method="median")
+    assert smoothed == [(0.0, 0.0)]
