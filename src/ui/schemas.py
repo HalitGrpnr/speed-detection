@@ -40,6 +40,11 @@ class CalibrateResponse(BaseModel):
     holdout_rows: list[dict] = []     # operatör held-out doğrulama satırları
 
 
+class PlanViewRequest(BaseModel):
+    frame_n: int
+    control_points: list[ControlPointIn]
+
+
 class AutoRefRequest(BaseModel):
     frame_n: int
     lane_width_m: float = 3.5

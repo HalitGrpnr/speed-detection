@@ -6,6 +6,7 @@ import { InfoHint } from '@/components/common/InfoHint'
 import { RmsBadge } from '@/components/common/RmsBadge'
 import { StatusBanner } from '@/components/common/StatusBanner'
 import { StepFooter } from '@/components/common/StepFooter'
+import { PlanViewPreview } from './PlanViewPreview'
 
 const LAYER_TR: Record<string, { text: string; variant: 'success' | 'warning' | 'secondary' }> = {
   operator: { text: 'Operatör onaylı', variant: 'success' },
@@ -15,6 +16,9 @@ const LAYER_TR: Record<string, { text: string; variant: 'success' | 'warning' | 
 
 export function ReviewStep() {
   const cal = useWizard((s) => s.calibration)
+  const videoMeta = useWizard((s) => s.videoMeta)
+  const selectedFrame = useWizard((s) => s.selectedFrame)
+  const controlPoints = useWizard((s) => s.controlPoints)
 
   if (!cal) {
     return (
@@ -117,6 +121,14 @@ export function ReviewStep() {
         )}
 
         {cal.holdout_rows.length > 0 && <HoldoutTable rows={cal.holdout_rows} />}
+
+        {videoMeta && (
+          <PlanViewPreview
+            videoId={videoMeta.video_id}
+            frame={selectedFrame}
+            controlPoints={controlPoints}
+          />
+        )}
 
         <StepFooter />
       </CardContent>

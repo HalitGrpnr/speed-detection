@@ -367,3 +367,41 @@ def test_e2e_run_pipeline_real_video(tmp_path):
     assert result.video_meta.fps == 30.0
     assert result.video_meta.fps_source == "operator_override"
     assert result.frame_step == 2
+    assert result.plan_view_png is not None
+    assert result.plan_view_png[:8] == b"\x89PNG\r\n\x1a\n"  # PNG dosya imzası
+
+
+def test_plan_view_failure_does_not_crash_pipeline(tmp_path):
+    """compute_plan_view hata verirse pipeline yine tamamlanmalı, plan_view_png=None kalmalı."""
+    import cv2
+    from src.output.pipeline import run_pipeline
+
+    video_path = tmp_path / "test.mp4"
+    fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+    writer = cv2.VideoWriter(str(video_path), fourcc, 25.0, (320, 240))
+    rng = np.random.default_rng(7)
+    for _ in range(10):
+        writer.write((rng.random((240, 320, 3)) * 255).astype(np.uint8))
+    writer.release()
+
+    cal_path = tmp_path / "cal.json"
+    save_calibration(cal_path, _make_cal_result(), _make_control_points(),
+                     fps=None, fps_source="container")
+    track = _straight_track(frames=8, dx_per_frame=0.5)
+
+    with (
+        patch("src.output.pipeline.VehicleTracker") as MockTracker,
+        patch("src.output.pipeline.write_overlay_video"),
+        patch("src.output.pipeline.generate_report"),
+        patch("src.output.pipeline.compute_plan_view", side_effect=RuntimeError("boom")),
+    ):
+        MockTracker.return_value.process_video.return_value = ([track], {})
+        result = run_pipeline(
+            video_path=video_path,
+            calibration_path=cal_path,
+            fps=30.0,
+            progress=False,
+        )
+
+    assert result.plan_view_png is None
+    assert len(result.speed_estimates) >= 1

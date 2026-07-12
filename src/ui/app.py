@@ -21,6 +21,7 @@ from src.calibration.homography import compute_homography
 from src.calibration.io import load_calibration, save_calibration
 from src.calibration.metrics import holdout_validation, loo_rms
 from src.calibration.models import CalibrationError, CalibrationResult, ControlPoint
+from src.calibration.planview import compute_plan_view
 from src.detection.models import load_tracks, save_tracks
 from src.detection.video import read_video_meta
 from src.output.pipeline import run_pipeline
@@ -37,6 +38,7 @@ from .schemas import (
     JobResultOut,
     JobStatusOut,
     PipelineRequest,
+    PlanViewRequest,
     ProposedPointOut,
     SpeedEstimateOut,
     VideoMetaOut,
@@ -234,6 +236,42 @@ async def calibrate(req: CalibrateRequest) -> CalibrateResponse:
         loo_rms_m=loo_rms_val,
         holdout_rows=h_rows,
     )
+
+
+@app.post("/api/video/{video_id}/plan-view")
+async def plan_view(video_id: str, req: PlanViewRequest) -> Response:
+    """Kuş bakışı (kalibre edilmiş yol düzleminin projeksiyonu) — Adım 4 canlı önizleme.
+
+    Gerçek bir havadan fotoğraf değildir; yalnızca kontrol noktalarının kapladığı
+    dünya bölgesi güvenilirdir (bkz. docs/dtp-expert-karsilastirma.md §5).
+    """
+    path = _get_video_path(video_id)
+    frame = _read_frame(path, req.frame_n)
+
+    if len(req.control_points) < 4:
+        raise HTTPException(
+            status_code=422,
+            detail=f"En az 4 kontrol noktası gereklidir (gönderilen: {len(req.control_points)}).",
+        )
+
+    points = [
+        ControlPoint(
+            id=cp.id, pixel=cp.pixel, world_m=cp.world_m, source=cp.source, held_out=cp.held_out
+        )
+        for cp in req.control_points
+    ]
+
+    # Sunucu-tarafı H yeniden hesaplanır — /api/calibrate ile aynı ilke (R4).
+    try:
+        cal_result = compute_homography(points)
+    except CalibrationError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+
+    img = compute_plan_view(frame, cal_result.homography, points)
+    ok, buf = cv2.imencode(".png", img)
+    if not ok:
+        raise HTTPException(status_code=500, detail="Görsel PNG'ye kodlanamadı.")
+    return Response(content=buf.tobytes(), media_type="image/png")
 
 
 # ── AutoRef endpoint ──────────────────────────────────────────────────────────

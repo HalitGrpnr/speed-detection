@@ -5,14 +5,20 @@
 > geçmişine bakılır; bu dosya yalnızca **anlık durumun özetini** tutar (şişirmeyin).
 
 **Son güncelleme:** 2026-07-12
-**Aktif görev:** _(Yok — M1–M9 tamamlandı.)_
+**Aktif görev:** _(Yok — M1–M9 + kuş bakışı eki tamamlandı.)_
 **Son oturumda:** M9 — DTP-Expert karşılaştırmasından (`docs/dtp-expert-karsilastirma.md`) aks
 genişliği çapraz doğrulaması eklendi: `src/reliability/axle_check.py` (aday kare önerisi + iki
 nokta ile ölçüm + bilinen değerle karşılaştırma), yeni endpoint'ler
 (`/api/job/{job_id}/track/{track_id}/axle-suggest-frame`, `.../axle-check`), sonuç ekranında
 operatör onaylı nokta-işaretleme paneli (`CalibrationCanvas` yeniden kullanıldı). Plaka-tespit
 tabanlı otomatik referans önerisi (aynı görevin başlangıç kapsamı) üçüncü-parti model RCE riski
-nedeniyle ertelendi. Bkz. `tasks/M9.md`, `DECISIONS.md`.
+nedeniyle ertelendi.
+
+Aynı oturumda ayrıca DTP karşılaştırması **öncelik #5 — kuş bakışı (plan-view) görünüm**
+eklendi: `src/calibration/planview.py::compute_plan_view` (H'yi kontrol noktalarının dünya
+bbox'ına göre warpPerspective ile kuş bakışına çıkarır, 1m ızgara + ölçek çubuğu), Adım 4'te
+canlı önizleme (`POST /api/video/{video_id}/plan-view`), PDF raporda **ilk gömülü görsel**
+olarak (videonun 0. karesi, forensic `calibration.json` şemasına dokunmadan). Bkz. `DECISIONS.md`.
 
 ---
 
@@ -30,12 +36,13 @@ nedeniyle ertelendi. Bkz. `tasks/M9.md`, `DECISIONS.md`.
 | R1–R6 | Review sonrası refactor (FPS wiring, oransal CI, LOO, adli bütünlük, drift, e2e test) | ✅ Bitti | `refactor.md` |
 | M8 | Frontend modernizasyonu (React+Vite+TS+Tailwind) | ✅ Bitti | tek UI React SPA; legacy kaldırıldı; `tasks/M8.md` |
 | M9 | DTP karşılaştırması — aks genişliği çapraz doğrulama | ✅ Bitti | plaka tespiti ertelendi (RCE); `tasks/M9.md` |
+| — | DTP karşılaştırması — kuş bakışı (plan-view) görünüm | ✅ Bitti | Adım 4 önizleme + PDF'te ilk görsel; görev dosyasız (küçük ek) |
 
 Durum işaretleri: ⬜ Başlanmadı · 🟡 Devam ediyor · ✅ Bitti · ⛔ Engellendi
 
-**Test durumu:** `pytest` **208/208 yeşil**. `frontend/` `npm run build` temiz. PyInstaller paketi
-(`dist/SpeedDetection/`, ~772 MB arm64) M9 sonrası yeniden build edilmedi — bir sonraki paketleme
-öncesi kontrol edilmeli.
+**Test durumu:** `pytest` **219/219 yeşil**. `frontend/` `npm run build` temiz. PyInstaller paketi
+(`dist/SpeedDetection/`, ~772 MB arm64) M9 + kuş bakışı sonrası yeniden build edilmedi — bir
+sonraki paketleme öncesi kontrol edilmeli.
 
 ---
 
@@ -75,6 +82,12 @@ Durum işaretleri: ⬜ Başlanmadı · 🟡 Devam ediyor · ✅ Bitti · ⛔ Eng
   hale getirilmeli — ayrı bir görev.
 - **M9 aks doğrulama UI'ı gerçek tarayıcıda uçtan uca denenmedi** (yalnızca API seviyesinde,
   mock pipeline ile doğrulandı — bkz. `tasks/M9.md`).
+- **Kuş bakışı görünüm de gerçek tarayıcıda denenmedi** (API seviyesinde + sentetik bir "yol"
+  karesiyle görsel olarak doğrulandı — warp'ın trapezoid→dikdörtgen dönüşümü ve ızgara/ölçek
+  çubuğu doğru render ediyor; Adım 4'teki canlı entegrasyon tarayıcıda kontrol edilmedi).
+  PDF'teki görsel her zaman videonun 0. karesini kullanır — kalibrasyon başka bir karede
+  yapıldıysa PDF'teki görsel operatörün gördüğü kalibrasyon karesiyle birebir aynı olmayabilir
+  (bkz. `DECISIONS.md` — bilinçli bir sadeleştirme, forensic JSON şeması değişmesin diye).
 
 ---
 

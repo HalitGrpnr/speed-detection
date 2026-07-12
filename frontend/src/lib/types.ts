@@ -89,6 +89,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/video/{video_id}/plan-view": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Plan View
+         * @description Kuş bakışı (kalibre edilmiş yol düzleminin projeksiyonu) — Adım 4 canlı önizleme.
+         *
+         *     Gerçek bir havadan fotoğraf değildir; yalnızca kontrol noktalarının kapladığı
+         *     dünya bölgesi güvenilirdir (bkz. docs/dtp-expert-karsilastirma.md §5).
+         */
+        post: operations["plan_view_api_video__video_id__plan_view_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/video/{video_id}/autoref": {
         parameters: {
             query?: never;
@@ -422,6 +445,13 @@ export interface components {
              */
             model_size: "nano" | "small" | "medium";
         };
+        /** PlanViewRequest */
+        PlanViewRequest: {
+            /** Frame N */
+            frame_n: number;
+            /** Control Points */
+            control_points: components["schemas"]["ControlPointIn"][];
+        };
         /** ProposedPointOut */
         ProposedPointOut: {
             /** Pixel */
@@ -636,6 +666,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CalibrateResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    plan_view_api_video__video_id__plan_view_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                video_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlanViewRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */

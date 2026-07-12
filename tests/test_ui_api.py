@@ -587,3 +587,30 @@ def test_axle_check_unknown_job_404(client):
         'known_width_m': 1.5,
     })
     assert r.status_code == 404
+
+
+# ── Kuş bakışı (plan-view) — DTP karşılaştırması öncelik #5 ──────────────────
+
+def test_plan_view_returns_png(client):
+    vid = client._video_id
+    r = client.post(f'/api/video/{vid}/plan-view', json={
+        'frame_n': 0, 'control_points': _valid_points(),
+    })
+    assert r.status_code == 200
+    assert r.headers['content-type'] == 'image/png'
+    assert len(r.content) > 0
+
+
+def test_plan_view_too_few_points_returns_422(client):
+    vid = client._video_id
+    r = client.post(f'/api/video/{vid}/plan-view', json={
+        'frame_n': 0, 'control_points': _valid_points()[:3],
+    })
+    assert r.status_code == 422
+
+
+def test_plan_view_unknown_video_404(client):
+    r = client.post('/api/video/does-not-exist/plan-view', json={
+        'frame_n': 0, 'control_points': _valid_points(),
+    })
+    assert r.status_code == 404

@@ -20,3 +20,4 @@ class PipelineResult:
     frame_step: int = 1
     model_name: str = "yolo11n.pt"
     video_sha256: str = ""
+    plan_view_png: bytes | None = None    # kuş bakışı projeksiyon — üretilemezse None (bkz. DECISIONS.md)

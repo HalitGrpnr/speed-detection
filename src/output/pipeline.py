@@ -6,11 +6,13 @@ from collections.abc import Callable
 from datetime import datetime, timezone
 from pathlib import Path
 
+import cv2
 import numpy as np
 
 from src.calibration.io import load_calibration
+from src.calibration.planview import compute_plan_view
 from src.detection.tracker import VehicleTracker
-from src.detection.video import read_video_meta
+from src.detection.video import iter_video_frames, read_video_meta
 from src.speed.calculator import estimate_speed
 from .models import PipelineResult
 from .overlay import write_overlay_video
@@ -50,6 +52,19 @@ def run_pipeline(
     if progress:
         rms_cm = cal_result.reprojection_rms_m * 100
         print(f"  RMS: {rms_cm:.1f} cm  [{cal_result.confidence_layer}]", flush=True)
+
+    # Kuş bakışı projeksiyon (DTP karşılaştırması §5) — ikincil bir sunum görseli;
+    # üretilemezse pipeline asla çökmez, rapor o bölümü atlar (bkz. DECISIONS.md).
+    plan_view_png: bytes | None = None
+    try:
+        _, frame0 = next(iter_video_frames(video_path, frame_step=1))
+        plan_img = compute_plan_view(frame0, H, control_points)
+        ok, buf = cv2.imencode(".png", plan_img)
+        if ok:
+            plan_view_png = buf.tobytes()
+    except Exception as exc:  # noqa: BLE001 — ikincil görsel, ana pipeline'ı bozmamalı
+        if progress:
+            print(f"  Uyarı: kuş bakışı görsel üretilemedi ({exc})", flush=True)
 
     # 2. Takip
     if progress:
@@ -114,6 +129,7 @@ def run_pipeline(
         frame_step=frame_step,
         model_name=model_name,
         video_sha256=video_sha256,
+        plan_view_png=plan_view_png,
     )
 
     # 4. Çıktılar

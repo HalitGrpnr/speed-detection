@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import io
 import os
 from pathlib import Path
 
@@ -7,8 +8,9 @@ from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import cm
+from reportlab.lib.utils import ImageReader
 from reportlab.platypus import (
-    SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle,
+    SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image,
 )
 
 from src.reliability.confidence import (
@@ -230,6 +232,24 @@ def _build_story(result: PipelineResult) -> list:
     t3.setStyle(_header_table_style())
     story.append(t3)
     story.append(Spacer(1, 0.5 * cm))
+
+    # 2c. Kus Bakisi Gorunum (DTP karsilastirmasi §5) — ikincil, ureilemezse atlanir.
+    if result.plan_view_png:
+        story.append(Paragraph("Kus Bakisi Gorunum (Plan View)", S["SectionTitle"]))
+        story.append(Paragraph(
+            "Asagidaki gorsel, kalibre edilen yol duzleminin tepeden bir projeksiyonudur "
+            "— gercek bir havadan fotograf degildir. Yalnizca kontrol noktalarinin kapsadigi "
+            "bolge guvenilir olcek tasir; ince gri cizgiler 1 metre araliklidir.",
+            S["Normal"],
+        ))
+        story.append(Spacer(1, 0.2 * cm))
+        img_reader = ImageReader(io.BytesIO(result.plan_view_png))
+        iw, ih = img_reader.getSize()
+        max_w = A4[0] - 2 * _MARGIN
+        max_h = 10 * cm
+        scale = min(max_w / iw, max_h / ih, 1.0)
+        story.append(Image(io.BytesIO(result.plan_view_png), width=iw * scale, height=ih * scale))
+        story.append(Spacer(1, 0.5 * cm))
 
     # 3. Hız Sonuçları
     story.append(Paragraph("Hiz Sonuclari", S["SectionTitle"]))

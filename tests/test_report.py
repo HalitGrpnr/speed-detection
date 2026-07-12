@@ -89,6 +89,34 @@ def _story_text(result: PipelineResult) -> str:
 
 # ── Test 5: PDF dosyası oluşur ────────────────────────────────────────────────
 
+def _tiny_png() -> bytes:
+    import cv2
+    img = np.zeros((40, 60, 3), dtype=np.uint8)
+    ok, buf = cv2.imencode(".png", img)
+    assert ok
+    return buf.tobytes()
+
+
+def test_report_includes_plan_view_section_when_present():
+    result = _make_result(plan_view_png=_tiny_png())
+    text = _story_text(result)
+    assert "Kus Bakisi Gorunum" in text
+
+
+def test_report_omits_plan_view_section_when_absent():
+    result = _make_result()  # plan_view_png=None (varsayılan)
+    text = _story_text(result)
+    assert "Kus Bakisi Gorunum" not in text
+
+
+def test_generate_report_with_plan_view_creates_pdf(tmp_path):
+    result = _make_result(plan_view_png=_tiny_png())
+    out = tmp_path / "report.pdf"
+    generate_report(result, out)
+    assert out.exists()
+    assert out.stat().st_size > 0
+
+
 def test_generate_report_creates_pdf(tmp_path):
     result = _make_result()
     out = tmp_path / "report.pdf"

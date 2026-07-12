@@ -19,6 +19,7 @@ export type JobResult = Schemas['JobResultOut']
 export type AxleSuggestFrameResponse = Schemas['AxleSuggestFrameResponse']
 export type AxleCheckRequest = Schemas['AxleCheckRequest']
 export type AxleCheckResponse = Schemas['AxleCheckResponse']
+export type PlanViewRequest = Schemas['PlanViewRequest']
 
 export type ControlPointSource = ControlPoint['source']
 export type ConfidenceLevel = 'high' | 'medium' | 'low'

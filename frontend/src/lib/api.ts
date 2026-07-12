@@ -12,6 +12,7 @@ import type {
   JobResult,
   JobStatus,
   PipelineRequest,
+  PlanViewRequest,
   ProposedPoint,
   VideoMeta,
 } from '@/lib/models'
@@ -28,6 +29,20 @@ async function unwrap<T>(res: Response): Promise<T> {
     throw new Error(detail || `İstek başarısız (${res.status})`)
   }
   return (await res.json()) as T
+}
+
+async function unwrapBlob(res: Response): Promise<Blob> {
+  if (!res.ok) {
+    let detail: string = res.statusText
+    try {
+      const body = (await res.json()) as { detail?: unknown }
+      if (typeof body.detail === 'string') detail = body.detail
+    } catch {
+      /* gövde JSON değil — statusText kullan */
+    }
+    throw new Error(detail || `İstek başarısız (${res.status})`)
+  }
+  return await res.blob()
 }
 
 const jsonHeaders = { 'Content-Type': 'application/json' }
@@ -121,6 +136,17 @@ export const api = {
   async axleCheck(jobId: string, trackId: number, req: AxleCheckRequest): Promise<AxleCheckResponse> {
     return unwrap(
       await fetch(`/api/job/${jobId}/track/${trackId}/axle-check`, {
+        method: 'POST',
+        headers: jsonHeaders,
+        body: JSON.stringify(req),
+      }),
+    )
+  },
+
+  /** Kuş bakışı (kalibre edilmiş yol düzleminin projeksiyonu) — PNG blob döner. */
+  async planView(videoId: string, req: PlanViewRequest): Promise<Blob> {
+    return unwrapBlob(
+      await fetch(`/api/video/${videoId}/plan-view`, {
         method: 'POST',
         headers: jsonHeaders,
         body: JSON.stringify(req),

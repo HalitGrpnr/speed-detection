@@ -247,3 +247,35 @@ Format:
 - **Test:** `pytest` 208/208 (6 birim + 5 endpoint testi eklendi). Uçtan uca API seviyesinde
   (mock pipeline → suggest-frame → axle-check → audit JSON dosyası) elle doğrulandı; gerçek
   tarayıcıda tıklama/sürükleme akışı denenmedi (bkz. `PROGRESS.md` açık işler).
+
+## [2026-07-12] Kuş bakışı (plan-view) görünüm — DTP karşılaştırması öncelik #5
+
+- **Karar:** `src/calibration/planview.py::compute_plan_view(frame, H, control_points, ...)`
+  eklendi: kontrol noktalarının dünya bounding box'ı + margin'e göre `S @ H` bileşik homografisi
+  (`S`: dünya metre → çıktı piksel ölçek+öteleme, Y ekseni ters çevrilir — yakın altta, uzak
+  üstte) ile `cv2.warpPerspective`, üzerine 1 m aralıklı gri ızgara + sol-altta 1 m ölçek çubuğu
+  (yarı-saydam beyaz zemin ile kontrast garantisi — ilk denemede siyah zemin üstünde siyah çubuk
+  görünmüyordu, düzeltildi). İki entegrasyon noktası: (1) Adım 4 "Kalibrasyon Sonucu" ekranında
+  canlı önizleme (`POST /api/video/{video_id}/plan-view`, sunucu-tarafı H yeniden hesaplanır,
+  R4 ilkesi), (2) PDF raporda **ilk gömülü görsel** (`report.py`, `reportlab.platypus.Image` +
+  `ImageReader` ile boyut hesabı, sayfa genişliğine sığdırılır).
+- **Dünya alanı:** yalnızca kontrol noktalarının bounding box'ı + 2 m kenar payı gösterilir —
+  kalibre edilmemiş bölgeyi ekstrapole etmiyoruz (bkz. `docs/dtp-expert-karsilastirma.md` §5
+  gerekçesi: "yalnızca kalibre edilmiş bölge güvenilir metrik anlam taşır").
+- **PDF'teki görsel, kalibrasyon karesi değil videonun 0. karesi:** Kalibrasyon karesinin
+  index'i şu an `calibration.json`'da tutulmuyor. Bunu şemaya eklemek forensic audit dosyasının
+  yapısını değiştiren ayrı bir mimari karar olurdu; onun yerine her zaman erişilebilir, basit bir
+  seçim yapıldı (video 0. kare). Adım 4'teki canlı önizleme gerçek seçili kareyi kullanıyor
+  (frontend zaten biliyor) — yalnızca PDF'teki statik görsel bu sadeleştirmeye tabi. Pratikte
+  operatörler genelde ilk berrak karede kalibre ettiği için çoğu durumda zaten aynı kare olacak.
+- **Görsel bir projeksiyondur, gerçek fotoğraf değildir:** Hem UI'da (`InfoHint`) hem PDF
+  metninde açıkça belirtiliyor — bilirkişiyi yanıltmamak için.
+- **Hata toleransı:** `pipeline.py`'de warp `try/except`'e sarılı; başarısız olursa
+  `plan_view_png=None` kalır, pipeline/rapor devam eder (ikincil bir sunum görseli, kritik hız
+  hesabını hiçbir şekilde etkilemez). Test: `test_plan_view_failure_does_not_crash_pipeline`.
+- **Görev dosyası yok:** M9 kapandıktan sonra gelen tek başına küçük bir ek olduğu için ayrı bir
+  `tasks/M10.md` açılmadı; bu karar kaydı + `PROGRESS.md` güncellemesi yeterli görüldü.
+- **Test:** `pytest` 219/219 (4 birim + 3 endpoint + 3 rapor + 2 pipeline testi eklendi). Warp
+  çıktısı sentetik bir "yol" karesiyle (trapezoid şerit + perspektif çizgiler) görsel olarak
+  doğrulandı — trapezoid doğru şekilde dikdörtgene warp oluyor, ızgara/ölçek çubuğu doğru
+  render ediyor. Adım 4'teki canlı entegrasyon gerçek tarayıcıda denenmedi (bkz. `PROGRESS.md`).
