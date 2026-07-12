@@ -23,6 +23,8 @@ export function AxleCheckPanel({ jobId, videoId, trackId, onClose }: Props) {
   const [points, setPoints] = useState<ControlPoint[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [knownWidth, setKnownWidth] = useState(1.8)
+  const [manualFrame, setManualFrame] = useState<number | null>(null)
+  const [frameInput, setFrameInput] = useState('')
 
   const frameQuery = useQuery({
     queryKey: ['axleSuggestFrame', jobId, trackId],
@@ -58,7 +60,13 @@ export function AxleCheckPanel({ jobId, videoId, trackId, onClose }: Props) {
     checkMutation.reset()
   }
 
-  const frameN = frameQuery.data?.frame_n
+  const goToFrame = (n: number) => {
+    if (n < 0) return
+    setManualFrame(n)
+    handleReset() // farklı karede eski piksel noktaları geçersiz
+  }
+
+  const frameN = manualFrame ?? frameQuery.data?.frame_n
 
   return (
     <div className="space-y-3 rounded-lg border bg-muted/30 p-4">
@@ -93,6 +101,58 @@ export function AxleCheckPanel({ jobId, videoId, trackId, onClose }: Props) {
 
       {frameN != null && (
         <>
+          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+            <span>
+              Kare: <span className="font-semibold tabular-nums text-foreground">{frameN}</span>
+              {manualFrame == null && ' (öneri)'}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 px-2"
+              onClick={() => goToFrame(Math.max(0, frameN - 1))}
+            >
+              ← Önceki
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 px-2"
+              onClick={() => goToFrame(frameN + 1)}
+            >
+              Sonraki →
+            </Button>
+            <Input
+              type="number"
+              placeholder="kare no"
+              value={frameInput}
+              onChange={(e) => setFrameInput(e.target.value)}
+              className="h-7 w-24"
+            />
+            <Button
+              variant="secondary"
+              size="sm"
+              className="h-7 px-2"
+              disabled={frameInput === ''}
+              onClick={() => {
+                const n = Number(frameInput)
+                if (Number.isFinite(n)) goToFrame(n)
+              }}
+            >
+              Git
+            </Button>
+            {manualFrame != null && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2"
+                onClick={() => goToFrame(frameQuery.data?.frame_n ?? 0)}
+              >
+                Öneriye dön
+              </Button>
+            )}
+          </div>
+
           <CalibrationCanvas
             imageUrl={api.frameUrl(videoId, frameN)}
             points={points}
