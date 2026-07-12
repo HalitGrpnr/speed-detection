@@ -271,6 +271,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/job/{job_id}/recalibrate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Recalibrate
+         * @description Aks doğrulamasını kalibrasyona ekleyip mevcut track'lerle (tespit tekrarlanmadan)
+         *     yeni bir job olarak hızlıca yeniden analiz eder. Eski job/rapor değişmeden kalır —
+         *     forensic bütünlük için her analiz sonucu kendi kalibrasyonuyla sabittir.
+         */
+        post: operations["recalibrate_api_job__job_id__recalibrate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -468,6 +490,27 @@ export interface components {
             detection_confidence: number;
             /** Description */
             description: string;
+        };
+        /** RecalibrateRequest */
+        RecalibrateRequest: {
+            /** Video Id */
+            video_id: string;
+            /** Control Points */
+            control_points: components["schemas"]["ControlPointIn"][];
+            /** Track Id */
+            track_id: number;
+            /** Pixel Left */
+            pixel_left: [
+                number,
+                number
+            ];
+            /** Pixel Right */
+            pixel_right: [
+                number,
+                number
+            ];
+            /** Known Width M */
+            known_width_m: number;
         };
         /** SpeedEstimateOut */
         SpeedEstimateOut: {
@@ -994,6 +1037,43 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AxleCheckResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    recalibrate_api_job__job_id__recalibrate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecalibrateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
                 };
             };
             /** @description Validation Error */

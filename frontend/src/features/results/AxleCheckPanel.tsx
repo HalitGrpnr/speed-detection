@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { Loader2, Ruler } from 'lucide-react'
+import { Loader2, Ruler, Sparkles } from 'lucide-react'
 import { api } from '@/lib/api'
 import type { ControlPoint } from '@/lib/models'
+import { useWizard } from '@/store/wizard'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { StatusBanner } from '@/components/common/StatusBanner'
@@ -12,14 +13,25 @@ interface Props {
   jobId: string
   videoId: string
   trackId: number
+  controlPoints: ControlPoint[]
   onClose: () => void
+}
+
+async function pollUntilDone(jobId: string): Promise<void> {
+  for (let i = 0; i < 120; i++) {
+    const s = await api.jobStatus(jobId)
+    if (s.state === 'done') return
+    if (s.state === 'error') throw new Error(s.error ?? 'Yeniden analiz başarısız.')
+    await new Promise((r) => setTimeout(r, 1000))
+  }
+  throw new Error('Yeniden analiz zaman aşımına uğradı.')
 }
 
 /**
  * M9 — aks genişliği çapraz doğrulama. Sistemin otomatik confidence_level hesabına
  * dahil edilmez; yalnızca operatörün rapora elle ekleyebileceği destekleyici kanıttır.
  */
-export function AxleCheckPanel({ jobId, videoId, trackId, onClose }: Props) {
+export function AxleCheckPanel({ jobId, videoId, trackId, controlPoints, onClose }: Props) {
   const [points, setPoints] = useState<ControlPoint[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [knownWidth, setKnownWidth] = useState(1.8)
@@ -39,6 +51,26 @@ export function AxleCheckPanel({ jobId, videoId, trackId, onClose }: Props) {
         pixel_right: right.pixel,
         known_width_m: knownWidth,
       })
+    },
+  })
+
+  const recalibrateMutation = useMutation({
+    mutationFn: async () => {
+      const [left, right] = points
+      const { job_id } = await api.recalibrate(jobId, {
+        video_id: videoId,
+        control_points: controlPoints,
+        track_id: trackId,
+        pixel_left: left.pixel,
+        pixel_right: right.pixel,
+        known_width_m: knownWidth,
+      })
+      await pollUntilDone(job_id)
+      return job_id
+    },
+    onSuccess: (newJobId) => {
+      useWizard.getState().setJobId(newJobId)
+      onClose()
     },
   })
 
@@ -217,6 +249,37 @@ export function AxleCheckPanel({ jobId, videoId, trackId, onClose }: Props) {
             ⚠ Bu sonuç PDF raporuna otomatik eklenmez (denetim kaydı olarak sunucuda saklanır) —
             bilirkişi gerekirse bu değerleri rapora elle ekleyebilir.
           </p>
+
+          <div className="mt-3 border-t pt-3">
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={recalibrateMutation.isPending}
+              onClick={() => recalibrateMutation.mutate()}
+            >
+              {recalibrateMutation.isPending ? (
+                <Loader2 className="animate-spin" />
+              ) : (
+                <Sparkles />
+              )}
+              Kalibrasyona Ekle ve Yeniden Analiz Et
+            </Button>
+            <p className="mt-1.5 text-[0.7rem] text-muted-foreground">
+              Bu ölçümü yeni bir kalibrasyon noktası çifti olarak ekler, aracı tekrar tespit
+              etmeden (mevcut takip kullanılır) hızları yeniden hesaplar. Sonuç <b>yeni bir
+              analiz</b> olarak oluşur — bu ekrandaki mevcut sonuç/rapor değişmez.
+            </p>
+            {recalibrateMutation.isPending && (
+              <p className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Loader2 className="size-3.5 animate-spin" /> Yeniden analiz ediliyor…
+              </p>
+            )}
+            {recalibrateMutation.isError && (
+              <StatusBanner tone="error">
+                {(recalibrateMutation.error as Error).message}
+              </StatusBanner>
+            )}
+          </div>
         </div>
       )}
     </div>

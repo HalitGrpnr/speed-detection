@@ -405,3 +405,39 @@ def test_plan_view_failure_does_not_crash_pipeline(tmp_path):
 
     assert result.plan_view_png is None
     assert len(result.speed_estimates) >= 1
+
+
+def test_precomputed_tracks_skips_detection(tmp_path):
+    """precomputed_tracks verilince VehicleTracker hiç oluşturulmamalı (tespit atlanır)."""
+    import cv2
+    from src.output.pipeline import run_pipeline
+
+    video_path = tmp_path / "test.mp4"
+    fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+    writer = cv2.VideoWriter(str(video_path), fourcc, 25.0, (320, 240))
+    rng = np.random.default_rng(3)
+    for _ in range(10):
+        writer.write((rng.random((240, 320, 3)) * 255).astype(np.uint8))
+    writer.release()
+
+    cal_path = tmp_path / "cal.json"
+    save_calibration(cal_path, _make_cal_result(), _make_control_points(),
+                     fps=None, fps_source="container")
+    track = _straight_track(frames=8, dx_per_frame=0.5)
+
+    with (
+        patch("src.output.pipeline.VehicleTracker") as MockTracker,
+        patch("src.output.pipeline.write_overlay_video"),
+        patch("src.output.pipeline.generate_report"),
+    ):
+        result = run_pipeline(
+            video_path=video_path,
+            calibration_path=cal_path,
+            fps=30.0,
+            progress=False,
+            precomputed_tracks=[track],
+        )
+
+    MockTracker.assert_not_called()
+    assert result.tracks == [track]
+    assert len(result.speed_estimates) >= 1

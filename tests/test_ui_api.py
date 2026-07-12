@@ -614,3 +614,81 @@ def test_plan_view_unknown_video_404(client):
         'frame_n': 0, 'control_points': _valid_points(),
     })
     assert r.status_code == 404
+
+
+# ── Recalibrate — aks doğrulamasını kalibrasyona ekle + yeniden analiz ───────
+
+def _poll_until_done(client, job_id: str) -> str:
+    import time
+    state = 'queued'
+    for _ in range(60):
+        time.sleep(0.1)
+        sr = client.get(f'/api/job/{job_id}/status')
+        state = sr.json()['state']
+        if state in ('done', 'error'):
+            break
+    return state
+
+
+def test_recalibrate_creates_new_job_and_completes(client):
+    job_id = _run_completed_job(client)
+
+    with (
+        patch('src.output.pipeline.VehicleTracker') as MockTracker,
+        patch('src.output.pipeline.write_overlay_video'),
+        patch('src.output.pipeline.generate_report'),
+    ):
+        r = client.post(f'/api/job/{job_id}/recalibrate', json={
+            'video_id': client._video_id,
+            'control_points': _valid_points(),
+            'track_id': 1,
+            'pixel_left': [100.0, 400.0],
+            'pixel_right': [220.0, 400.0],
+            'known_width_m': 1.8,
+        })
+        assert r.status_code == 202
+        new_job_id = r.json()['job_id']
+        assert new_job_id != job_id
+
+        state = _poll_until_done(client, new_job_id)
+        assert state == 'done'
+        MockTracker.assert_not_called()  # tespit tekrarlanmadı
+
+    rr = client.get(f'/api/job/{new_job_id}/results')
+    assert rr.status_code == 200
+    assert rr.json()['vehicle_count'] >= 0
+
+
+def test_recalibrate_does_not_mutate_old_job(client):
+    job_id = _run_completed_job(client)
+    old_results = client.get(f'/api/job/{job_id}/results').json()
+
+    with (
+        patch('src.output.pipeline.VehicleTracker'),
+        patch('src.output.pipeline.write_overlay_video'),
+        patch('src.output.pipeline.generate_report'),
+    ):
+        r = client.post(f'/api/job/{job_id}/recalibrate', json={
+            'video_id': client._video_id,
+            'control_points': _valid_points(),
+            'track_id': 1,
+            'pixel_left': [100.0, 400.0],
+            'pixel_right': [220.0, 400.0],
+            'known_width_m': 1.8,
+        })
+        new_job_id = r.json()['job_id']
+        _poll_until_done(client, new_job_id)
+
+    assert client.get(f'/api/job/{job_id}/results').json() == old_results
+
+
+def test_recalibrate_unknown_job_404(client):
+    r = client.post('/api/job/does-not-exist/recalibrate', json={
+        'video_id': client._video_id,
+        'control_points': _valid_points(),
+        'track_id': 1,
+        'pixel_left': [100.0, 400.0],
+        'pixel_right': [220.0, 400.0],
+        'known_width_m': 1.8,
+    })
+    assert r.status_code == 404

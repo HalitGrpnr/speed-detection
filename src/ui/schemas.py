@@ -105,3 +105,12 @@ class AxleCheckResponse(BaseModel):
     measured_m: float
     known_m: float
     error_pct: float
+
+
+class RecalibrateRequest(BaseModel):
+    video_id: str
+    control_points: list[ControlPointIn]
+    track_id: int
+    pixel_left: tuple[float, float]
+    pixel_right: tuple[float, float]
+    known_width_m: float

@@ -25,7 +25,11 @@ from src.calibration.planview import compute_plan_view
 from src.detection.models import load_tracks, save_tracks
 from src.detection.video import read_video_meta
 from src.output.pipeline import run_pipeline
-from src.reliability.axle_check import axle_cross_check, suggest_axle_frame
+from src.reliability.axle_check import (
+    axle_cross_check,
+    axle_points_to_control_points,
+    suggest_axle_frame,
+)
 
 from .job_store import JobState, JobStore
 from .schemas import (
@@ -40,6 +44,7 @@ from .schemas import (
     PipelineRequest,
     PlanViewRequest,
     ProposedPointOut,
+    RecalibrateRequest,
     SpeedEstimateOut,
     VideoMetaOut,
 )
@@ -301,6 +306,33 @@ async def autoref(video_id: str, req: AutoRefRequest) -> list[ProposedPointOut]:
 
 # ── Pipeline endpoints ────────────────────────────────────────────────────────
 
+def _finalize_job(job: JobState, result, out_video: Path, out_report: Path, out_dir: Path) -> None:
+    """PipelineResult'tan JobState'i doldur — pipeline ve recalibrate ortak kapanışı."""
+    track_class = {t.track_id: t.vehicle_class for t in result.tracks}
+
+    estimates = [
+        {
+            "track_id": est.track_id,
+            "vehicle_class": track_class.get(est.track_id, "vehicle"),
+            "speed_kmh": round(est.value_kmh, 1),
+            "ci_kmh": round(est.ci_kmh, 1),
+            "confidence_level": est.confidence_level,
+            "frame_count": est.track_quality.frame_count,
+        }
+        for est in result.speed_estimates
+    ]
+
+    # Track bbox verisi kalıcı diske yazılır — aks doğrulaması/recalibrate gibi rapor-sonrası
+    # işlemler için pipeline'ı yeniden çalıştırmadan erişilebilsin diye.
+    save_tracks(out_dir / "tracks.json", result.tracks)
+
+    job.overlay_path = out_video if out_video.exists() else None
+    job.report_path = out_report if out_report.exists() else None
+    job.result_json = {"vehicle_count": len(estimates), "estimates": estimates}
+    job.progress_pct = 100.0
+    job.state = "done"
+
+
 def _run_pipeline_thread(
     job: JobState,
     video_path: Path,
@@ -335,35 +367,49 @@ def _run_pipeline_thread(
             fps_source=fps_source,
             video_sha256=video_sha256,
         )
-
-        track_class = {t.track_id: t.vehicle_class for t in result.tracks}
-
-        estimates = [
-            {
-                "track_id": est.track_id,
-                "vehicle_class": track_class.get(est.track_id, "vehicle"),
-                "speed_kmh": round(est.value_kmh, 1),
-                "ci_kmh": round(est.ci_kmh, 1),
-                "confidence_level": est.confidence_level,
-                "frame_count": est.track_quality.frame_count,
-            }
-            for est in result.speed_estimates
-        ]
-
-        # Track bbox verisi kalıcı diske yazılır — aks doğrulaması gibi rapor-sonrası
-        # işlemler için pipeline'ı yeniden çalıştırmadan erişilebilsin diye.
-        save_tracks(out_dir / "tracks.json", result.tracks)
-
-        job.overlay_path = out_video if out_video.exists() else None
-        job.report_path = out_report if out_report.exists() else None
-        job.result_json = {"vehicle_count": len(estimates), "estimates": estimates}
-        job.progress_pct = 100.0
-        job.state = "done"
+        _finalize_job(job, result, out_video, out_report, out_dir)
 
     except Exception as exc:
         import traceback as _tb
         full = _tb.format_exc()
         print(f"\n[PIPELINE HATA] job={job.job_id}\n{full}", flush=True)
+        job.state = "error"
+        job.error = f"{type(exc).__name__}: {exc}"
+
+
+def _run_recalibrate_thread(
+    job: JobState,
+    video_path: Path,
+    cal_json_path: Path,
+    out_dir: Path,
+    tracks: list,
+    video_sha256: str,
+) -> None:
+    """Mevcut track'lerle (tespit atlanır) yeni kalibrasyona göre hız + çıktıları yeniden üret."""
+    try:
+        job.state = "running"
+        job.progress_pct = 20.0
+
+        out_video = out_dir / "overlay.mp4"
+        out_report = out_dir / "report.pdf"
+
+        result = run_pipeline(
+            video_path=video_path,
+            calibration_path=cal_json_path,
+            out_video=out_video,
+            out_report=out_report,
+            progress=True,
+            video_sha256=video_sha256,
+            precomputed_tracks=tracks,
+            model_name="(tekrar tespit edilmedi — yalnızca kalibrasyon güncellendi)",
+        )
+        job.progress_pct = 90.0
+        _finalize_job(job, result, out_video, out_report, out_dir)
+
+    except Exception as exc:
+        import traceback as _tb
+        full = _tb.format_exc()
+        print(f"\n[RECALIBRATE HATA] job={job.job_id}\n{full}", flush=True)
         job.state = "error"
         job.error = f"{type(exc).__name__}: {exc}"
 
@@ -538,12 +584,15 @@ def _get_done_job(job_id: str) -> JobState:
     return job
 
 
-def _get_track_or_404(job_id: str, track_id: int):
+def _load_all_tracks_or_404(job_id: str) -> list:
     tracks_path = _job_out_dir(job_id) / "tracks.json"
     if not tracks_path.exists():
         raise HTTPException(status_code=404, detail="Track verisi bulunamadı.")
-    tracks = load_tracks(tracks_path)
-    for t in tracks:
+    return load_tracks(tracks_path)
+
+
+def _get_track_or_404(job_id: str, track_id: int):
+    for t in _load_all_tracks_or_404(job_id):
         if t.track_id == track_id:
             return t
     raise HTTPException(status_code=404, detail=f"Track {track_id} bulunamadı.")
@@ -595,6 +644,71 @@ async def axle_check(job_id: str, track_id: int, req: AxleCheckRequest) -> AxleC
     )
 
     return AxleCheckResponse(**result)
+
+
+@app.post("/api/job/{job_id}/recalibrate", status_code=202)
+async def recalibrate(job_id: str, req: RecalibrateRequest) -> dict:
+    """Aks doğrulamasını kalibrasyona ekleyip mevcut track'lerle (tespit tekrarlanmadan)
+    yeni bir job olarak hızlıca yeniden analiz eder. Eski job/rapor değişmeden kalır —
+    forensic bütünlük için her analiz sonucu kendi kalibrasyonuyla sabittir."""
+    if _tmp_dir is None:
+        raise HTTPException(status_code=503, detail="Sunucu hazır değil.")
+
+    old_job = _get_done_job(job_id)
+    tracks = _load_all_tracks_or_404(job_id)
+    video_path = _get_video_path(req.video_id)
+
+    old_cal_path = _job_out_dir(job_id) / "calibration.json"
+    if not old_cal_path.exists():
+        raise HTTPException(status_code=404, detail="Kalibrasyon verisi bulunamadı.")
+    _, _, (cal_fps, cal_fps_source) = load_calibration(old_cal_path)
+
+    base_points = [
+        ControlPoint(
+            id=cp.id, pixel=cp.pixel, world_m=cp.world_m, source=cp.source, held_out=cp.held_out
+        )
+        for cp in req.control_points
+    ]
+    try:
+        base_result = compute_homography(base_points)
+    except CalibrationError as e:
+        raise HTTPException(status_code=422, detail=f"Mevcut kalibrasyon geçersiz: {e}")
+
+    try:
+        cp_left, cp_right = axle_points_to_control_points(
+            base_result.homography,
+            req.pixel_left,
+            req.pixel_right,
+            req.known_width_m,
+            id_prefix=f"axle_track{req.track_id}",
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+
+    new_points = base_points + [cp_left, cp_right]
+    try:
+        new_cal_result = compute_homography(new_points)
+    except CalibrationError as e:
+        raise HTTPException(
+            status_code=422, detail=f"Aks noktaları eklenince kalibrasyon başarısız: {e}"
+        )
+
+    new_job_id = str(uuid.uuid4())
+    new_job = _job_store.create(new_job_id)
+    new_out_dir = _tmp_dir / new_job_id
+    new_out_dir.mkdir(parents=True, exist_ok=True)
+    new_cal_path = new_out_dir / "calibration.json"
+    save_calibration(new_cal_path, new_cal_result, new_points, fps=cal_fps, fps_source=cal_fps_source)
+
+    video_sha256 = _sha256(video_path)
+    thread = threading.Thread(
+        target=_run_recalibrate_thread,
+        args=(new_job, video_path, new_cal_path, new_out_dir, tracks, video_sha256),
+        daemon=True,
+    )
+    thread.start()
+
+    return {"job_id": new_job_id, "source_job_id": old_job.job_id}
 
 
 # ── Static files ──────────────────────────────────────────────────────────────

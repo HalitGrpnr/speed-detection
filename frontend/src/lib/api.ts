@@ -14,6 +14,7 @@ import type {
   PipelineRequest,
   PlanViewRequest,
   ProposedPoint,
+  RecalibrateRequest,
   VideoMeta,
 } from '@/lib/models'
 
@@ -147,6 +148,17 @@ export const api = {
   async planView(videoId: string, req: PlanViewRequest): Promise<Blob> {
     return unwrapBlob(
       await fetch(`/api/video/${videoId}/plan-view`, {
+        method: 'POST',
+        headers: jsonHeaders,
+        body: JSON.stringify(req),
+      }),
+    )
+  },
+
+  /** Aks doğrulamasını kalibrasyona ekleyip yeni bir job olarak yeniden analiz başlatır. */
+  async recalibrate(jobId: string, req: RecalibrateRequest): Promise<{ job_id: string }> {
+    return unwrap(
+      await fetch(`/api/job/${jobId}/recalibrate`, {
         method: 'POST',
         headers: jsonHeaders,
         body: JSON.stringify(req),

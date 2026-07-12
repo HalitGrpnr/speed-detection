@@ -20,6 +20,17 @@ bbox'ına göre warpPerspective ile kuş bakışına çıkarır, 1m ızgara + ö
 canlı önizleme (`POST /api/video/{video_id}/plan-view`), PDF raporda **ilk gömülü görsel**
 olarak (videonun 0. karesi, forensic `calibration.json` şemasına dokunmadan). Bkz. `DECISIONS.md`.
 
+Kullanıcı özellikleri tarayıcıda gerçekten denedi ve iki gerçek eksik/soru çıktı: (1) aks
+doğrulama panelinde önerilen kareden başka kare seçilemiyordu — **düzeltildi** (önceki/sonraki +
+kare numarası girişi). (2) "aks doğrulaması sonucu hızı düzeltmeli değil mi?" sorusuna karşılık
+**"Kalibrasyona Ekle ve Yeniden Analiz Et"** özelliği eklendi: aks ölçümü yeni bir kontrol
+noktası çifti olarak kalibrasyona eklenir, mevcut `tracks.json` (YOLO tekrar çalıştırılmadan)
+ile hızlar yeniden hesaplanır, **yeni bir job** olarak sonuçlanır (eski job/rapor değişmeden
+kalır — forensic bütünlük). `src/output/pipeline.py::run_pipeline` artık `precomputed_tracks`
+alıyor; `src/reliability/axle_check.py::axle_points_to_control_points` aks noktalarını mevcut
+H ile kaba dünya konumuna oturtup bilinen genişliğe göre düzeltiyor. Yeni endpoint:
+`POST /api/job/{job_id}/recalibrate`.
+
 ---
 
 ## Milestone Durumu
@@ -37,12 +48,13 @@ olarak (videonun 0. karesi, forensic `calibration.json` şemasına dokunmadan). 
 | M8 | Frontend modernizasyonu (React+Vite+TS+Tailwind) | ✅ Bitti | tek UI React SPA; legacy kaldırıldı; `tasks/M8.md` |
 | M9 | DTP karşılaştırması — aks genişliği çapraz doğrulama | ✅ Bitti | plaka tespiti ertelendi (RCE); `tasks/M9.md` |
 | — | DTP karşılaştırması — kuş bakışı (plan-view) görünüm | ✅ Bitti | Adım 4 önizleme + PDF'te ilk görsel; görev dosyasız (küçük ek) |
+| — | Aks doğrulama — kare seçimi düzeltmesi + "kalibrasyona ekle ve yeniden analiz et" | ✅ Bitti | tracks.json yeniden kullanılır, detection tekrarlanmaz; görev dosyasız |
 
 Durum işaretleri: ⬜ Başlanmadı · 🟡 Devam ediyor · ✅ Bitti · ⛔ Engellendi
 
-**Test durumu:** `pytest` **219/219 yeşil**. `frontend/` `npm run build` temiz. PyInstaller paketi
-(`dist/SpeedDetection/`, ~772 MB arm64) M9 + kuş bakışı sonrası yeniden build edilmedi — bir
-sonraki paketleme öncesi kontrol edilmeli.
+**Test durumu:** `pytest` **227/227 yeşil**. `frontend/` `npm run build` temiz. PyInstaller paketi
+(`dist/SpeedDetection/`, ~772 MB arm64) M9 + kuş bakışı + recalibrate sonrası yeniden build
+edilmedi — bir sonraki paketleme öncesi kontrol edilmeli.
 
 ---
 
@@ -80,14 +92,20 @@ sonraki paketleme öncesi kontrol edilmeli.
   denetim kaydı olarak sunuluyor (bkz. `tasks/M9.md`). Tam çözüm: pipeline sonucu (tracks +
   speed_estimates + calibration) kalıcı JSON'a yazılıp rapor talep üzerine yeniden üretilebilir
   hale getirilmeli — ayrı bir görev.
-- **M9 aks doğrulama UI'ı gerçek tarayıcıda uçtan uca denenmedi** (yalnızca API seviyesinde,
-  mock pipeline ile doğrulandı — bkz. `tasks/M9.md`).
-- **Kuş bakışı görünüm de gerçek tarayıcıda denenmedi** (API seviyesinde + sentetik bir "yol"
+- **M9 aks doğrulama UI'ı kullanıcı tarafından tarayıcıda gerçekten denendi** — bu, kare
+  seçimi eksikliğini ortaya çıkardı (düzeltildi). "Kalibrasyona ekle ve yeniden analiz et"
+  özelliği henüz tarayıcıda uçtan uca denenmedi (yalnızca API/pytest seviyesinde doğrulandı).
+- **Kuş bakışı görünüm gerçek tarayıcıda henüz denenmedi** (API seviyesinde + sentetik bir "yol"
   karesiyle görsel olarak doğrulandı — warp'ın trapezoid→dikdörtgen dönüşümü ve ızgara/ölçek
   çubuğu doğru render ediyor; Adım 4'teki canlı entegrasyon tarayıcıda kontrol edilmedi).
   PDF'teki görsel her zaman videonun 0. karesini kullanır — kalibrasyon başka bir karede
   yapıldıysa PDF'teki görsel operatörün gördüğü kalibrasyon karesiyle birebir aynı olmayabilir
   (bkz. `DECISIONS.md` — bilinçli bir sadeleştirme, forensic JSON şeması değişmesin diye).
+- **Recalibrate sonrası model_name/frame_step raporda kozmetik olarak yanıltıcı olabilir.**
+  Yeni job'da tespit tekrarlanmadığı için `model_name` özel bir metinle işaretleniyor
+  ("tekrar tespit edilmedi") ama `frame_step` alanı orijinal değeri yansıtmıyor (varsayılan=1
+  görünür) — hız hesabını etkilemez (gerçek frame/t_s track noktalarında saklı), yalnızca
+  rapor metadata tablosunda kozmetik bir tutarsızlık.
 
 ---
 

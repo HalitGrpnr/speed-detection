@@ -11,6 +11,7 @@ import numpy as np
 
 from src.calibration.io import load_calibration
 from src.calibration.planview import compute_plan_view
+from src.detection.models import Track
 from src.detection.tracker import VehicleTracker
 from src.detection.video import iter_video_frames, read_video_meta
 from src.speed.calculator import estimate_speed
@@ -32,6 +33,7 @@ def run_pipeline(
     fps: float | None = None,
     fps_source: str | None = None,
     video_sha256: str = "",
+    precomputed_tracks: list[Track] | None = None,
 ) -> PipelineResult:
     """M1→M5 uçtan uca pipeline.
 
@@ -39,6 +41,11 @@ def run_pipeline(
 
     fps/fps_source: operator override değerleri. Verilmezse kalibrasyon JSON'u,
     sonra konteyner FPS'i denenir. Hız hesabı fps_used'u kullanır — Δt doğruluğu için kritik.
+
+    precomputed_tracks: verilirse YOLO tespiti tamamen atlanır, bu track'ler doğrudan
+    kullanılır (yalnızca kalibrasyon değiştiğinde hız/rapor hızlıca yeniden üretmek için —
+    bkz. /api/job/{job_id}/recalibrate). Araç konumları görüntü-uzayında sabit; yalnızca
+    kalibrasyon (H) değiştiğinde tespiti tekrarlamaya gerek yok.
     """
     video_path = Path(video_path)
     calibration_path = Path(calibration_path)
@@ -67,9 +74,6 @@ def run_pipeline(
             print(f"  Uyarı: kuş bakışı görsel üretilemedi ({exc})", flush=True)
 
     # 2. Takip
-    if progress:
-        print("Model yükleniyor...", flush=True)
-    tracker = VehicleTracker(model_name=model_name)
     meta = read_video_meta(video_path)
 
     # FPS öncelik sırası: explicit param → kalibrasyon JSON → konteyner
@@ -93,17 +97,33 @@ def run_pipeline(
             flush=True,
         )
         print("İşleniyor...", flush=True)
-    def _track_cb(done: int, total: int) -> None:
-        if on_progress is not None:
-            on_progress(15.0 + done / total * 70.0)
 
-    tracks, _ = tracker.process_video(
-        video_path, frame_step=frame_step, progress=progress, on_progress=_track_cb
-    )
-    if progress:
-        print(f"Takip: {len(tracks)} track", flush=True)
-    if on_progress:
-        on_progress(87.0)
+    if precomputed_tracks is not None:
+        tracks = precomputed_tracks
+        if progress:
+            print(
+                f"Onceden hesaplanmis {len(tracks)} track kullaniliyor "
+                "(kalibrasyon guncellendi, tespit tekrarlanmadi)",
+                flush=True,
+            )
+        if on_progress:
+            on_progress(87.0)
+    else:
+        if progress:
+            print("Model yükleniyor...", flush=True)
+        tracker = VehicleTracker(model_name=model_name)
+
+        def _track_cb(done: int, total: int) -> None:
+            if on_progress is not None:
+                on_progress(15.0 + done / total * 70.0)
+
+        tracks, _ = tracker.process_video(
+            video_path, frame_step=frame_step, progress=progress, on_progress=_track_cb
+        )
+        if progress:
+            print(f"Takip: {len(tracks)} track", flush=True)
+        if on_progress:
+            on_progress(87.0)
 
     # 3. Hız hesabı
     speed_estimates = []

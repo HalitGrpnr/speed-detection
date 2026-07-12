@@ -279,3 +279,46 @@ Format:
   çıktısı sentetik bir "yol" karesiyle (trapezoid şerit + perspektif çizgiler) görsel olarak
   doğrulandı — trapezoid doğru şekilde dikdörtgene warp oluyor, ızgara/ölçek çubuğu doğru
   render ediyor. Adım 4'teki canlı entegrasyon gerçek tarayıcıda denenmedi (bkz. `PROGRESS.md`).
+
+## [2026-07-12] Aks doğrulama: kare seçimi düzeltmesi + "kalibrasyona ekle ve yeniden analiz et"
+
+- **Bağlam:** Kullanıcı özellikleri tarayıcıda deneyip iki geri bildirim/soru getirdi: (1) önerilen
+  kareden başka kare seçilemiyor, (2) "%fark" ne anlama geliyor ve neden hıza otomatik yansımıyor.
+- **Karar 1 — kare seçimi:** `AxleCheckPanel.tsx`'e önceki/sonraki kare butonları + doğrudan kare
+  numarası girişi + "öneriye dön" eklendi. Kare değişince eski piksel noktaları otomatik sıfırlanır
+  (farklı karede geçersizler). Bu gerçek bir eksiklikti — tasarım metninde "gerekirse başka kare
+  seçebilirsiniz" yazıyordu ama bunu yapacak kontrol yoktu.
+- **Karar 2 — "%fark" hızın hata payı değildir, otomatik geri beslenmez:** Kullanıcıya açıklandı:
+  aks çapraz doğrulaması TEK bir aracın TEK bir karesindeki TEK ölçümüne dayanıyor; farkın kaynağı
+  (operatör tıklama hassasiyeti / spec-gerçek araç farkı / gerçek kalibrasyon zayıflığı) ayırt
+  edilemez, bu yüzden otomatik/sessiz düzeltme "kara kutu yok" kuralına aykırı olurdu.
+- **Karar 3 — "Kalibrasyona Ekle ve Yeniden Analiz Et" özelliği eklendi:** Kullanıcı bunu **bilinçli,
+  tek tıkla onaylanan bir aksiyon** olarak istedi (otomatik değil). Akış:
+  1. `src/reliability/axle_check.py::axle_points_to_control_points(H, pixel_left, pixel_right,
+     known_width_m, id_prefix)` — mevcut H ile iki noktanın kaba dünya konumunu (orta nokta + yön)
+     hesaplar, orta noktayı sabit tutup known_width_m'e göre iki noktayı yön vektörü boyunca kaydırır.
+     `source='operator'` (`'site_measurement'` değil — bu araca özgü bir spec değeri, confidence_layer'ı
+     sessizce en üst katmana yükseltmemeli).
+  2. `src/output/pipeline.py::run_pipeline` yeni `precomputed_tracks` parametresi aldı — verilirse
+     YOLO tespiti tamamen atlanır (araç konumları görüntü-uzayında zaten sabit; yalnızca kalibrasyon
+     değişti). Bu, M9'da eklenen `tracks.json` kalıcılığının doğal bir sonraki kullanımı.
+  3. `POST /api/job/{job_id}/recalibrate` — eski job'ın `tracks.json` + `calibration.json`'undan
+     fps/fps_source'u yeniden kullanır, yeni control_points ile H'yi yeniden hesaplar (server-side,
+     R4 ilkesi), **yeni bir job_id** olarak hızlı bir yeniden-analiz başlatır (`_run_recalibrate_thread`,
+     `_finalize_job` ortak kapanış fonksiyonuna `_run_pipeline_thread` ile birlikte çıkarıldı).
+  4. **Eski job/rapor asla değiştirilmez** — yeni job kendi `out_dir`'ında, kendi rapor/overlay'iyle
+     oluşur. Bu, önceki oturumda axle-check için alınan "forensic artifact sessizce mutasyona
+     uğramamalı" kararıyla aynı ilke.
+- **Bilinen kozmetik sınırlama:** Yeni job'da `model_name` alanı açıklayıcı bir metinle işaretleniyor
+  ("tekrar tespit edilmedi — yalnızca kalibrasyon güncellendi") ama `frame_step` orijinal değeri
+  yansıtmıyor (rapor metadata tablosunda varsayılan görünür). Hız hesabını etkilemez — gerçek
+  frame/t_s her `TrackPoint`'te zaten saklı; yalnızca rapordaki "İşleme Adımı" satırı kozmetik olarak
+  yanlış olabilir. Düzeltmek için orijinal `frame_step`'in job başına kalıcı tutulması gerekirdi;
+  kapsam dışı bırakıldı.
+- **Frontend:** `recalibrateMutation` (`AxleCheckPanel.tsx`) job'ı başlatıp `jobStatus`'u
+  saniyede bir `done`/`error` olana kadar poll'lar (max 120 sn), sonra `useWizard.setJobId(yeni_id)`
+  çağırır — `ResultsStep`'in `['jobResults', jobId]` query'si otomatik yeniler, operatör ekstra bir
+  şey yapmadan yeni sonuçları görür.
+- **Test:** `pytest` 227/227 (10 axle_check birim testi [4 yeni], 2 pipeline testi [precomputed_tracks],
+  3 recalibrate endpoint testi eklendi — yeni job oluşuyor, eski job değişmiyor, VehicleTracker
+  çağrılmıyor). Tarayıcıda uçtan uca (gerçek video ile) henüz denenmedi.

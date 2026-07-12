@@ -4,6 +4,7 @@ import math
 
 import numpy as np
 
+from src.calibration.models import ControlPoint
 from src.detection.models import Track
 
 
@@ -57,3 +58,55 @@ def axle_cross_check(
         "known_m": known_width_m,
         "error_pct": error_pct,
     }
+
+
+def axle_points_to_control_points(
+    H: np.ndarray,
+    pixel_left: tuple[float, float],
+    pixel_right: tuple[float, float],
+    known_width_m: float,
+    id_prefix: str,
+) -> tuple[ControlPoint, ControlPoint]:
+    """Aks noktalarını, operatörün girdiği kalibrasyona eklenebilecek iki ControlPoint'e çevir.
+
+    Mevcut H, iki noktanın kaba dünya konumunu (orta nokta + yön) verir — ama ölçülen
+    mesafe muhtemelen known_width_m'den farklıdır (zaten bu farkı düzeltmek için
+    kalibrasyona ekliyoruz). Orta nokta sabit tutulup iki nokta, aralarındaki yön
+    vektörü boyunca known_width_m/2 kadar kaydırılır; böylece mevcut koordinat
+    sistemiyle tutarlı ama doğru mesafeye sahip yeni bir referans çifti elde edilir.
+
+    source='operator' — 'site_measurement' değil, çünkü bu araca özgü bir spec değeri
+    (gerçek aksın kendisi ölçülmedi, operatör beyanı) ve confidence_layer'ı en üst
+    katmana sessizce yükseltmemesi gerekiyor.
+    """
+    from src.calibration.homography import pixel_to_world
+
+    left_w = np.array(pixel_to_world(H, pixel_left))
+    right_w = np.array(pixel_to_world(H, pixel_right))
+    direction = right_w - left_w
+    norm = float(np.linalg.norm(direction))
+    if norm < 1e-9:
+        raise ValueError(
+            "axle_points_to_control_points: sol/sağ nokta dünya düzleminde çakışıyor."
+        )
+    unit = direction / norm
+    half = known_width_m / 2.0
+    mid = (left_w + right_w) / 2.0
+
+    new_left = mid - unit * half
+    new_right = mid + unit * half
+
+    return (
+        ControlPoint(
+            id=f"{id_prefix}_left",
+            pixel=(float(pixel_left[0]), float(pixel_left[1])),
+            world_m=(float(new_left[0]), float(new_left[1])),
+            source="operator",
+        ),
+        ControlPoint(
+            id=f"{id_prefix}_right",
+            pixel=(float(pixel_right[0]), float(pixel_right[1])),
+            world_m=(float(new_right[0]), float(new_right[1])),
+            source="operator",
+        ),
+    )

@@ -15,6 +15,7 @@ import { AxleCheckPanel } from './AxleCheckPanel'
 export function ResultsStep() {
   const jobId = useWizard((s) => s.jobId)
   const videoMeta = useWizard((s) => s.videoMeta)
+  const controlPoints = useWizard((s) => s.controlPoints)
   const reset = useWizard((s) => s.reset)
   const [axleTrackId, setAxleTrackId] = useState<number | null>(null)
 
@@ -146,6 +147,7 @@ export function ResultsStep() {
             jobId={jobId}
             videoId={videoMeta.video_id}
             trackId={axleTrackId}
+            controlPoints={controlPoints}
             onClose={() => setAxleTrackId(null)}
           />
         )}
