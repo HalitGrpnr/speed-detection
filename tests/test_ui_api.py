@@ -500,3 +500,90 @@ def test_pipeline_e2e_thread_completes(client):
         p_tracker.stop()
         p_overlay.stop()
         p_report.stop()
+
+
+# ── M9 — Aks genişliği çapraz doğrulama ──────────────────────────────────────
+
+def _run_completed_job(client) -> str:
+    """Yardımcı: kalibre et, mock'lu pipeline'ı çalıştır, tamamlanmış job_id döndür."""
+    import time
+
+    vid = client._video_id
+    cal_r = client.post('/api/calibrate', json={
+        'video_id': vid, 'frame_n': 0, 'control_points': _valid_points()
+    })
+    calibration = cal_r.json()
+    track = _make_simple_track()
+
+    p_tracker = patch('src.output.pipeline.VehicleTracker')
+    p_overlay = patch('src.output.pipeline.write_overlay_video')
+    p_report = patch('src.output.pipeline.generate_report')
+    MockTracker = p_tracker.start()
+    p_overlay.start()
+    p_report.start()
+    MockTracker.return_value.process_video.return_value = ([track], {})
+
+    try:
+        r = client.post('/api/pipeline', json={
+            'video_id': vid,
+            'calibration': calibration,
+            'control_points': _valid_points(),
+            'frame_step': 1,
+            'model_size': 'nano',
+        })
+        job_id = r.json()['job_id']
+        state = 'queued'
+        for _ in range(60):
+            time.sleep(0.1)
+            sr = client.get(f'/api/job/{job_id}/status')
+            state = sr.json()['state']
+            if state in ('done', 'error'):
+                break
+        assert state == 'done'
+    finally:
+        p_tracker.stop()
+        p_overlay.stop()
+        p_report.stop()
+
+    return job_id
+
+
+def test_axle_suggest_frame_returns_frame(client):
+    job_id = _run_completed_job(client)
+    r = client.get(f'/api/job/{job_id}/track/1/axle-suggest-frame')
+    assert r.status_code == 200
+    assert r.json()['frame_n'] is not None
+
+
+def test_axle_suggest_frame_unknown_track_404(client):
+    job_id = _run_completed_job(client)
+    r = client.get(f'/api/job/{job_id}/track/999/axle-suggest-frame')
+    assert r.status_code == 404
+
+
+def test_axle_suggest_frame_unknown_job_404(client):
+    r = client.get('/api/job/does-not-exist/track/1/axle-suggest-frame')
+    assert r.status_code == 404
+
+
+def test_axle_check_returns_measurement(client):
+    job_id = _run_completed_job(client)
+    r = client.post(f'/api/job/{job_id}/track/1/axle-check', json={
+        'pixel_left': [100.0, 400.0],
+        'pixel_right': [220.0, 400.0],
+        'known_width_m': 1.5,
+    })
+    assert r.status_code == 200
+    data = r.json()
+    assert 'measured_m' in data
+    assert data['known_m'] == 1.5
+    assert data['error_pct'] >= 0.0
+
+
+def test_axle_check_unknown_job_404(client):
+    r = client.post('/api/job/does-not-exist/track/1/axle-check', json={
+        'pixel_left': [100.0, 400.0],
+        'pixel_right': [220.0, 400.0],
+        'known_width_m': 1.5,
+    })
+    assert r.status_code == 404

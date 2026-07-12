@@ -16,6 +16,9 @@ export type PipelineRequest = Schemas['PipelineRequest']
 export type JobStatus = Schemas['JobStatusOut']
 export type SpeedEstimate = Schemas['SpeedEstimateOut']
 export type JobResult = Schemas['JobResultOut']
+export type AxleSuggestFrameResponse = Schemas['AxleSuggestFrameResponse']
+export type AxleCheckRequest = Schemas['AxleCheckRequest']
+export type AxleCheckResponse = Schemas['AxleCheckResponse']
 
 export type ControlPointSource = ControlPoint['source']
 export type ConfidenceLevel = 'high' | 'medium' | 'low'

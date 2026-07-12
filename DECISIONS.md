@@ -184,3 +184,66 @@ Format:
 - **Yöntem özeti:** PDF raporun başına ("Yontem Ozeti") + sonuç ekranına açılır bilgi kartı eklendi.
   Ortak kaynak: `report.py::_METHOD_SUMMARY` (PDF+audit), `MethodInfoCard.tsx` (UI). Bilirkişinin
   "nasıl hesaplıyor?" sorusuna yüksek seviye cevap. Test: report 22/22 yeşil.
+
+## [2026-07-12] M9 kapsam daraltma — plaka tespiti RCE riski nedeniyle ertelendi
+
+- **Karar:** M9, `docs/dtp-expert-karsilastirma.md` öncelik #4'ten (aks genişliği çapraz
+  doğrulama) yola çıkıp iki özellik olarak planlandı: (A) plaka tespitiyle otomatik referans
+  önerisi, (B) aks genişliği çapraz doğrulaması. Uygulamaya geçmeden önce (A) için model
+  araştırması yapıldı: `NeuralNet-Hub/ultralytics-ollama-OCR` (AGPL-3.0, `alpr-yolo11s-aug.pt`,
+  ~19.2 MB, `https://github.com/NeuralNet-Hub/assets/releases/download/v0.0.1/alpr-yolo11s-aug.pt`)
+  lisans açısından uygun bir adaydı (projenin zaten AGPL-3.0 altında kullandığı Ultralytics YOLO
+  ile aynı rejim). Ancak dosyayı indirip `torch`/`YOLO` ile yüklemek girişimi sandbox güvenlik
+  sınıflandırıcısı tarafından engellendi: doğrulanmamış üçüncü-parti `.pt` dosyaları pickle
+  tabanlı deserializasyon üzerinden RCE (uzaktan kod çalıştırma) riski taşır. Kullanıcıya
+  soruldu; **plaka tespitini M9'dan çıkarıp ayrı bir göreve ertelemeyi seçti.** M9 yalnızca
+  Özellik B'yi (aks doğrulaması) kapsayacak şekilde daraltıldı.
+- **Gerekçe:** Adli bir araçta, kaynağı/imzası doğrulanmamış bir ikili dosyayı çalıştırılabilir
+  koda (pickle deserializasyonu = kod çalıştırma) yükleme kararı tek başına bir agent kararı
+  olamaz — hem güvenlik hem de "veri makineden çıkmaz" kuralının ruhuna aykırı bir tedarik
+  zinciri riski taşır.
+- **Gelecek için not (ayrı görev):** Eğer plaka tespiti tekrar ele alınırsa: (1) safetensors
+  formatlı (pickle değil) bir model tercih edilmeli, ya da (2) ağırlık dosyası hash'i önceden
+  yayıncı tarafından imzalanmış/doğrulanmış bir kaynaktan alınmalı, ya da (3) sandbox/air-gap
+  ortamda önceden indirilip incelenmeli. Ayrıca traffic-levhası (işaret) tespiti, boyutun işaret
+  tipine göre değişmesi ve doğrulanmış bir TR standart-boyut tablosu bulunmaması nedeniyle bu
+  görevin başından beri kapsam dışı bırakıldı — yanlış varsayılan boyut adli sonucu sessizce
+  bozar.
+
+## [2026-07-12] M9 — Aks genişliği çapraz doğrulama: tasarım kararları
+
+- **Karar:** `src/reliability/axle_check.py` eklendi: `suggest_axle_frame` (track içinde en
+  büyük bbox alanına sahip kareyi önerir — yalnızca sezgisel başlangıç noktası), `axle_width_m`
+  (iki piksel noktasını `pixel_to_world` ile dünya düzlemine taşıyıp öklid mesafesi döndürür),
+  `axle_cross_check` (ölçüleni operatörün girdiği bilinen değerle karşılaştırıp `error_pct`
+  üretir). Yeni endpoint'ler: `GET .../axle-suggest-frame`, `POST .../axle-check` — ikincisi
+  **sunucu-tarafı H'yi kalibrasyon JSON'ından yeniden hesaplar** (R4 ile aynı ilke, istemciden
+  H kabul etmez).
+- **"Broadside" sezgisi terk edildi:** İlk tartışmada aracın kameraya "yandan" göründüğü karenin
+  aks ölçümü için ideal olduğu varsayıldı; bu geometrik olarak yanlıştı (homografi zaten düzlem
+  üzerindeki noktalar için perspektifi düzeltir — asıl sorun eksen-hizalı bbox kenarlarının
+  tekerlek temas noktasına denk gelmemesidir, açı fark etmeksizin). Bunun yerine: sistem bir
+  aday kare + bbox köşelerinden ön-dolgulu iki nokta önerir, **operatör noktaları sürükleyip
+  gerçek tekerlek temas noktalarına oturtur.** DTP'nin elle-çizgi yaklaşımına daha yakın, "kara
+  kutu yok" kuralına (CLAUDE.md #5) daha sadık.
+- **`confidence_level` hesabına dahil edilmez:** GPS doğrulama seti gelene kadar (mevcut açık
+  iş) yalnızca rapora/operatöre **destekleyici kanıt** olarak sunulur, otomatik gating yapmaz.
+- **PDF raporuna otomatik eklenmiyor (uygulama sırasında ortaya çıkan kısıt):**
+  `generate_report()` tam `PipelineResult` gerektiriyor; bu nesne pipeline thread'i bitince
+  bellekten düşüyor (yalnızca özet `result_json` + `report.pdf`/`overlay.mp4` kalıcı). Aks
+  doğrulaması PDF üretildikten sonra, sonuç ekranında yapılıyor. PDF'i sessizce üzerine yazmak
+  da forensic açıdan tartışmalı (bir raporun operatör aksiyonuyla sessizce değişmesi audit
+  trail'i belirsizleştirir). **Karar:** sonuç yalnızca API yanıtında gösterilir ve
+  `out_dir/axle_check_<track_id>.json` olarak zaman damgalı, kalıcı bir denetim kaydı halinde
+  diske yazılır. Tam çözüm (pipeline sonucunun kalıcı JSON'a yazılıp rapor talep üzerine yeniden
+  üretilmesi) ayrı bir göreve bırakıldı (bkz. `PROGRESS.md`).
+- **Track bbox verisi kalıcı hale getirildi:** `src/detection/models.py::save_tracks/load_tracks`
+  eklendi; pipeline tamamlanınca `tracks.json` da `calibration.json` gibi job dizinine yazılıyor.
+  Bu olmadan aks doğrulaması, pipeline'ı yeniden çalıştırmadan track bbox verisine erişemezdi.
+- **Frontend:** Yeni bir sürükleme/canvas bileşeni yazmak yerine mevcut `CalibrationCanvas`
+  (M8) yeniden kullanıldı — iki aks noktası, geçici/gerçek olmayan `ControlPoint` nesneleri
+  olarak temsil edildi (yalnızca `pixel` alanı anlamlı; `world_m` görüntülenmez). Bu, tıklama +
+  sürükleme + zoom davranışını sıfırdan yazmadan elde etti.
+- **Test:** `pytest` 208/208 (6 birim + 5 endpoint testi eklendi). Uçtan uca API seviyesinde
+  (mock pipeline → suggest-frame → axle-check → audit JSON dosyası) elle doğrulandı; gerçek
+  tarayıcıda tıklama/sürükleme akışı denenmedi (bkz. `PROGRESS.md` açık işler).

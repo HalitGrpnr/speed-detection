@@ -4,6 +4,9 @@
  */
 import type {
   AutoRefRequest,
+  AxleCheckRequest,
+  AxleCheckResponse,
+  AxleSuggestFrameResponse,
   CalibrateRequest,
   CalibrateResponse,
   JobResult,
@@ -110,4 +113,18 @@ export const api = {
   reportUrl: (jobId: string) => `/api/job/${jobId}/report`,
   overlayUrl: (jobId: string) => `/api/job/${jobId}/overlay`,
   overlayDownloadUrl: (jobId: string) => `/api/job/${jobId}/overlay/download`,
+
+  async axleSuggestFrame(jobId: string, trackId: number): Promise<AxleSuggestFrameResponse> {
+    return unwrap(await fetch(`/api/job/${jobId}/track/${trackId}/axle-suggest-frame`))
+  },
+
+  async axleCheck(jobId: string, trackId: number, req: AxleCheckRequest): Promise<AxleCheckResponse> {
+    return unwrap(
+      await fetch(`/api/job/${jobId}/track/${trackId}/axle-check`, {
+        method: 'POST',
+        headers: jsonHeaders,
+        body: JSON.stringify(req),
+      }),
+    )
+  },
 }

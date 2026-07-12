@@ -84,3 +84,19 @@ class JobResultOut(BaseModel):
     job_id: str
     vehicle_count: int
     estimates: list[SpeedEstimateOut]
+
+
+class AxleSuggestFrameResponse(BaseModel):
+    frame_n: int | None = None
+
+
+class AxleCheckRequest(BaseModel):
+    pixel_left: tuple[float, float]
+    pixel_right: tuple[float, float]
+    known_width_m: float
+
+
+class AxleCheckResponse(BaseModel):
+    measured_m: float
+    known_m: float
+    error_pct: float

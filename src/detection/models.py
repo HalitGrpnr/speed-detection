@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Literal
 
 VEHICLE_CLASSES = {"car", "truck", "bus", "motorcycle"}
@@ -37,6 +39,49 @@ def contact_point(bbox: tuple[float, float, float, float]) -> tuple[float, float
     """Return wheel-ground contact point: bottom-center of bbox."""
     x1, y1, x2, y2 = bbox
     return ((x1 + x2) / 2.0, y2)
+
+
+def save_tracks(path: str | Path, tracks: list[Track]) -> None:
+    """Track listesini JSON dosyasına yaz (aks doğrulaması gibi rapor-sonrası
+    işlemlerin, pipeline'ı yeniden çalıştırmadan bbox verisine erişmesi için)."""
+    data = [
+        {
+            "track_id": t.track_id,
+            "vehicle_class": t.vehicle_class,
+            "points": [
+                {
+                    "frame": p.frame,
+                    "t_s": p.t_s,
+                    "contact_pixel": list(p.contact_pixel),
+                    "bbox": list(p.bbox),
+                }
+                for p in t.points
+            ],
+        }
+        for t in tracks
+    ]
+    Path(path).write_text(json.dumps(data, ensure_ascii=False))
+
+
+def load_tracks(path: str | Path) -> list[Track]:
+    """save_tracks ile yazılmış bir JSON dosyasından Track listesini oku."""
+    data = json.loads(Path(path).read_text())
+    return [
+        Track(
+            track_id=t["track_id"],
+            vehicle_class=t["vehicle_class"],
+            points=[
+                TrackPoint(
+                    frame=p["frame"],
+                    t_s=p["t_s"],
+                    contact_pixel=tuple(p["contact_pixel"]),
+                    bbox=tuple(p["bbox"]),
+                )
+                for p in t["points"]
+            ],
+        )
+        for t in data
+    ]
 
 
 def compute_occlusion_gaps(

@@ -214,17 +214,34 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/legacy": {
+    "/api/job/{job_id}/track/{track_id}/axle-suggest-frame": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Legacy Index */
-        get: operations["legacy_index_legacy_get"];
+        /** Axle Suggest Frame */
+        get: operations["axle_suggest_frame_api_job__job_id__track__track_id__axle_suggest_frame_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/job/{job_id}/track/{track_id}/axle-check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Axle Check */
+        post: operations["axle_check_api_job__job_id__track__track_id__axle_check_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -254,6 +271,35 @@ export interface components {
              * @default 5
              */
             d_near_m: number;
+        };
+        /** AxleCheckRequest */
+        AxleCheckRequest: {
+            /** Pixel Left */
+            pixel_left: [
+                number,
+                number
+            ];
+            /** Pixel Right */
+            pixel_right: [
+                number,
+                number
+            ];
+            /** Known Width M */
+            known_width_m: number;
+        };
+        /** AxleCheckResponse */
+        AxleCheckResponse: {
+            /** Measured M */
+            measured_m: number;
+            /** Known M */
+            known_m: number;
+            /** Error Pct */
+            error_pct: number;
+        };
+        /** AxleSuggestFrameResponse */
+        AxleSuggestFrameResponse: {
+            /** Frame N */
+            frame_n?: number | null;
         };
         /** Body_upload_video_api_video_upload_post */
         Body_upload_video_api_video_upload_post: {
@@ -828,11 +874,14 @@ export interface operations {
             };
         };
     };
-    legacy_index_legacy_get: {
+    axle_suggest_frame_api_job__job_id__track__track_id__axle_suggest_frame_get: {
         parameters: {
             query?: never;
             header?: never;
-            path?: never;
+            path: {
+                job_id: string;
+                track_id: number;
+            };
             cookie?: never;
         };
         requestBody?: never;
@@ -843,7 +892,52 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "text/html": string;
+                    "application/json": components["schemas"]["AxleSuggestFrameResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    axle_check_api_job__job_id__track__track_id__axle_check_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+                track_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AxleCheckRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AxleCheckResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

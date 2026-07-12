@@ -1,5 +1,6 @@
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Download, FileText, Loader2, RotateCcw } from 'lucide-react'
+import { Download, FileText, Loader2, Ruler, RotateCcw } from 'lucide-react'
 import { api } from '@/lib/api'
 import { useWizard } from '@/store/wizard'
 import { Button, buttonVariants } from '@/components/ui/button'
@@ -9,10 +10,13 @@ import { ConfidenceBadge } from '@/components/common/ConfidenceBadge'
 import { MethodInfoCard } from '@/components/common/MethodInfoCard'
 import { StatusBanner } from '@/components/common/StatusBanner'
 import { StepFooter } from '@/components/common/StepFooter'
+import { AxleCheckPanel } from './AxleCheckPanel'
 
 export function ResultsStep() {
   const jobId = useWizard((s) => s.jobId)
+  const videoMeta = useWizard((s) => s.videoMeta)
   const reset = useWizard((s) => s.reset)
+  const [axleTrackId, setAxleTrackId] = useState<number | null>(null)
 
   const resultsQuery = useQuery({
     queryKey: ['jobResults', jobId],
@@ -97,6 +101,7 @@ export function ResultsStep() {
                   <th className="px-3 py-2 text-right font-medium">Güven Aralığı</th>
                   <th className="px-3 py-2 font-medium">Güven</th>
                   <th className="px-3 py-2 text-right font-medium">Kare</th>
+                  <th className="px-3 py-2 text-right font-medium">Ek Doğrulama</th>
                 </tr>
               </thead>
               <tbody>
@@ -118,11 +123,31 @@ export function ResultsStep() {
                     <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">
                       {e.frame_count}
                     </td>
+                    <td className="px-3 py-2 text-right">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() =>
+                          setAxleTrackId(axleTrackId === e.track_id ? null : e.track_id)
+                        }
+                      >
+                        <Ruler className="size-3.5" /> Aks Doğrula
+                      </Button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
+        )}
+
+        {axleTrackId != null && jobId && videoMeta && (
+          <AxleCheckPanel
+            jobId={jobId}
+            videoId={videoMeta.video_id}
+            trackId={axleTrackId}
+            onClose={() => setAxleTrackId(null)}
+          />
         )}
 
         <MethodInfoCard />

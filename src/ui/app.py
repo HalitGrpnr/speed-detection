@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import datetime
 import hashlib
+import json
 import shutil
 import tempfile
 import threading
@@ -16,15 +18,20 @@ from fastapi.staticfiles import StaticFiles
 
 from src.autoref.proposer import AutoProposer
 from src.calibration.homography import compute_homography
-from src.calibration.io import save_calibration
+from src.calibration.io import load_calibration, save_calibration
 from src.calibration.metrics import holdout_validation, loo_rms
 from src.calibration.models import CalibrationError, CalibrationResult, ControlPoint
+from src.detection.models import load_tracks, save_tracks
 from src.detection.video import read_video_meta
 from src.output.pipeline import run_pipeline
+from src.reliability.axle_check import axle_cross_check, suggest_axle_frame
 
 from .job_store import JobState, JobStore
 from .schemas import (
     AutoRefRequest,
+    AxleCheckRequest,
+    AxleCheckResponse,
+    AxleSuggestFrameResponse,
     CalibrateRequest,
     CalibrateResponse,
     JobResultOut,
@@ -305,6 +312,10 @@ def _run_pipeline_thread(
             for est in result.speed_estimates
         ]
 
+        # Track bbox verisi kalıcı diske yazılır — aks doğrulaması gibi rapor-sonrası
+        # işlemler için pipeline'ı yeniden çalıştırmadan erişilebilsin diye.
+        save_tracks(out_dir / "tracks.json", result.tracks)
+
         job.overlay_path = out_video if out_video.exists() else None
         job.report_path = out_report if out_report.exists() else None
         job.result_json = {"vehicle_count": len(estimates), "estimates": estimates}
@@ -468,6 +479,84 @@ async def job_results(job_id: str) -> JobResultOut:
         vehicle_count=job.result_json["vehicle_count"],
         estimates=estimates,
     )
+
+
+# ── Aks genişliği çapraz doğrulama (M9) ─────────────────────────────────────────
+# Not: Yalnızca destekleyici kanıt üretir — bkz. tasks/M9.md, DECISIONS.md.
+# confidence_level hesabına dahil edilmez; PDF raporu değiştirmez (bkz. bilinen sınırlama).
+
+def _job_out_dir(job_id: str) -> Path:
+    if _tmp_dir is None:
+        raise HTTPException(status_code=503, detail="Sunucu hazır değil.")
+    return _tmp_dir / job_id
+
+
+def _get_done_job(job_id: str) -> JobState:
+    job = _job_store.get(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="İş bulunamadı.")
+    if job.state != "done":
+        raise HTTPException(status_code=404, detail="İş henüz tamamlanmadı.")
+    return job
+
+
+def _get_track_or_404(job_id: str, track_id: int):
+    tracks_path = _job_out_dir(job_id) / "tracks.json"
+    if not tracks_path.exists():
+        raise HTTPException(status_code=404, detail="Track verisi bulunamadı.")
+    tracks = load_tracks(tracks_path)
+    for t in tracks:
+        if t.track_id == track_id:
+            return t
+    raise HTTPException(status_code=404, detail=f"Track {track_id} bulunamadı.")
+
+
+@app.get(
+    "/api/job/{job_id}/track/{track_id}/axle-suggest-frame",
+    response_model=AxleSuggestFrameResponse,
+)
+async def axle_suggest_frame(job_id: str, track_id: int) -> AxleSuggestFrameResponse:
+    _get_done_job(job_id)
+    track = _get_track_or_404(job_id, track_id)
+    return AxleSuggestFrameResponse(frame_n=suggest_axle_frame(track))
+
+
+@app.post(
+    "/api/job/{job_id}/track/{track_id}/axle-check",
+    response_model=AxleCheckResponse,
+)
+async def axle_check(job_id: str, track_id: int, req: AxleCheckRequest) -> AxleCheckResponse:
+    _get_done_job(job_id)
+    _get_track_or_404(job_id, track_id)  # track var mı doğrula
+
+    cal_json_path = _job_out_dir(job_id) / "calibration.json"
+    if not cal_json_path.exists():
+        raise HTTPException(status_code=404, detail="Kalibrasyon verisi bulunamadı.")
+    _, control_points, _ = load_calibration(cal_json_path)
+
+    # Sunucu-tarafı H yeniden hesaplanır — /api/pipeline ile aynı ilke (R4).
+    try:
+        cal_result = compute_homography(control_points)
+    except CalibrationError as e:
+        raise HTTPException(status_code=422, detail=f"Kalibrasyon yeniden hesaplanamadı: {e}")
+
+    result = axle_cross_check(
+        cal_result.homography, req.pixel_left, req.pixel_right, req.known_width_m
+    )
+
+    # Audit kaydı: kalıcı, zaman damgalı — rapora otomatik eklenmez (bilinen sınırlama,
+    # bkz. PROGRESS.md), ama denetim izinde saklanır.
+    audit = {
+        **result,
+        "pixel_left": list(req.pixel_left),
+        "pixel_right": list(req.pixel_right),
+        "computed_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+    }
+    (_job_out_dir(job_id) / f"axle_check_{track_id}.json").write_text(
+        json.dumps(audit, ensure_ascii=False, indent=2)
+    )
+
+    return AxleCheckResponse(**result)
 
 
 # ── Static files ──────────────────────────────────────────────────────────────
