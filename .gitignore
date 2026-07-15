@@ -17,3 +17,6 @@ audit/
 frontend/node_modules/
 frontend/dist/
 src/ui/web/
+
+# IDE (JetBrains)
+.idea/
