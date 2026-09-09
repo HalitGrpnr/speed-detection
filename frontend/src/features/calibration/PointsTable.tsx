@@ -1,6 +1,6 @@
 import { Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import type { ControlPoint, ControlPointSource } from '@/lib/models'
+import type { CalibrateResponse, ControlPoint, ControlPointSource } from '@/lib/models'
 import { Button } from '@/components/ui/button'
 
 const SOURCE_DOT: Record<ControlPointSource, string> = {
@@ -9,9 +9,12 @@ const SOURCE_DOT: Record<ControlPointSource, string> = {
   site_measurement: 'bg-emerald-400',
 }
 
+type RejectedPoint = CalibrateResponse['rejected_points'][number]
+
 interface Props {
   points: ControlPoint[]
   selectedId: string | null
+  rejectedPoints?: RejectedPoint[]
   onSelect: (id: string) => void
   onUpdateWorld: (id: string, axis: 0 | 1, value: number) => void
   onUpdateSource: (id: string, source: ControlPointSource) => void
@@ -21,11 +24,13 @@ interface Props {
 export function PointsTable({
   points,
   selectedId,
+  rejectedPoints,
   onSelect,
   onUpdateWorld,
   onUpdateSource,
   onDelete,
 }: Props) {
+  const rejectedMap = new Map(rejectedPoints?.map((r) => [r.id, r]) ?? [])
   if (points.length === 0) {
     return (
       <p className="rounded-lg border border-dashed p-4 text-center text-sm text-muted-foreground">
@@ -50,6 +55,7 @@ export function PointsTable({
         <tbody>
           {points.map((pt, i) => {
             const selected = pt.id === selectedId
+            const rejected = rejectedMap.get(pt.id)
             return (
               <tr
                 key={pt.id}
@@ -57,12 +63,28 @@ export function PointsTable({
                 className={cn(
                   'cursor-pointer border-t transition-colors',
                   selected ? 'bg-primary/5' : 'hover:bg-muted/40',
+                  rejected && 'bg-orange-950/20',
                 )}
               >
                 <td className="px-3 py-1.5">
                   <span className="inline-flex items-center gap-2">
-                    <span className={cn('size-2 rounded-full', SOURCE_DOT[pt.source])} />
+                    {rejected ? (
+                      <span
+                        className="size-2 rounded-full bg-orange-500"
+                        title={`Dışlandı — yeniden proj. hatası: ${rejected.error_cm} cm (eşik: ${rejected.threshold_cm} cm)`}
+                      />
+                    ) : (
+                      <span className={cn('size-2 rounded-full', SOURCE_DOT[pt.source])} />
+                    )}
                     {i + 1}
+                    {rejected && (
+                      <span
+                        className="text-orange-400 text-xs"
+                        title={`Yeniden projeksiyon hatası: ${rejected.error_cm} cm (eşik: ${rejected.threshold_cm} cm)`}
+                      >
+                        ✕
+                      </span>
+                    )}
                   </span>
                 </td>
                 <td className="px-3 py-1.5 font-mono text-xs text-muted-foreground">

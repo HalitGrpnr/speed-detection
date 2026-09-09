@@ -389,6 +389,15 @@ export interface components {
             holdout_rows: {
                 [key: string]: unknown;
             }[];
+            /**
+             * Rejected Points
+             * @default []
+             */
+            rejected_points: {
+                id: string;
+                error_cm: number;
+                threshold_cm: number;
+            }[];
         };
         /** ControlPointIn */
         ControlPointIn: {

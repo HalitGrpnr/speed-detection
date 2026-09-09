@@ -113,6 +113,10 @@ export function CalibrationStep() {
     setControlPoints([...points, ...auto])
   }
 
+  const rejectedIds = new Set(
+    cal.status === 'ok' ? cal.data.rejected_points.map((r) => r.id) : [],
+  )
+
   return (
     <Card>
       <CardHeader>
@@ -130,15 +134,17 @@ export function CalibrationStep() {
               imageUrl={api.frameUrl(videoMeta.video_id, selectedFrame)}
               points={points}
               selectedId={selectedId}
+              rejectedIds={rejectedIds}
               onAdd={addPoint}
               onMove={movePoint}
               onSelect={setSelectedId}
             />
             <p className="text-xs text-muted-foreground">
               Tıkla = ekle · sürükle = taşı · <span className="font-medium">fare tekeri = yakınlaş</span> (hassas işaretleme) ·{' '}
-              <span className="text-amber-600">sarı operatör</span>,{' '}
-              <span className="text-blue-500">mavi otomatik</span>,{' '}
-              <span className="text-emerald-500">yeşil saha</span>.
+              <span className="text-amber-500">sarı operatör</span>,{' '}
+              <span className="text-blue-400">mavi otomatik</span>,{' '}
+              <span className="text-emerald-400">yeşil saha</span>,{' '}
+              <span className="text-orange-500">turuncu ✕ = dışlanan (tablo'da hata görünür)</span>.
             </p>
           </div>
 
@@ -163,7 +169,13 @@ export function CalibrationStep() {
                 <div className="space-y-1">
                   <RmsBadge rmsM={cal.data.rms_m} />
                   <p className="text-xs text-muted-foreground">
-                    Kullanılan {cal.data.inlier_count}/{cal.data.point_count} nokta
+                    {cal.data.rejected_points.length > 0 ? (
+                      <span className="text-orange-500 font-medium">
+                        {cal.data.inlier_count} kabul, {cal.data.rejected_points.length} reddedildi
+                      </span>
+                    ) : (
+                      <span>{cal.data.inlier_count}/{cal.data.point_count} nokta kullanıldı</span>
+                    )}
                     {cal.data.planarity_warning && (
                       <span title="Noktalar tek bir düz zemin oluşturmuyor; bazı noktalar zemin dışında (kaldırım, eğim vb.) olabilir. (Teknik: düzlemsellik uyarısı)">
                         {' '}· ⚠ noktalar aynı düzlemde görünmüyor
@@ -195,6 +207,7 @@ export function CalibrationStep() {
         <PointsTable
           points={points}
           selectedId={selectedId}
+          rejectedPoints={cal.status === 'ok' ? cal.data.rejected_points : undefined}
           onSelect={setSelectedId}
           onUpdateWorld={updateWorld}
           onUpdateSource={updateSource}

@@ -12,12 +12,14 @@ const COLORS: Record<ControlPointSource, string> = {
   site_measurement: '#34d399', // yeşil (saha)
 }
 const SELECT = '#ef4444'
+const REJECTED = '#f97316' // turuncu — RANSAC tarafından dışlanan noktalar
 const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n))
 
 interface Props {
   imageUrl: string
   points: ControlPoint[]
   selectedId: string | null
+  rejectedIds?: Set<string>
   onAdd: (pixel: [number, number]) => void
   onMove: (id: string, pixel: [number, number]) => void
   onSelect: (id: string | null) => void
@@ -27,7 +29,7 @@ interface Props {
  * Kalibrasyon karesi üzerinde kontrol noktası tıklama/sürükleme + zoom.
  * scale = fitScale (kareyi alana sığdırır) × zoom (operatör yakınlaştırması).
  */
-export function CalibrationCanvas({ imageUrl, points, selectedId, onAdd, onMove, onSelect }: Props) {
+export function CalibrationCanvas({ imageUrl, points, selectedId, rejectedIds, onAdd, onMove, onSelect }: Props) {
   const wrapRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const imgRef = useRef<HTMLImageElement | null>(null)
@@ -91,21 +93,35 @@ export function CalibrationCanvas({ imageUrl, points, selectedId, onAdd, onMove,
       const cx = pt.pixel[0] * scale
       const cy = pt.pixel[1] * scale
       const selected = pt.id === selectedId
-      const color = selected ? SELECT : COLORS[pt.source] ?? COLORS.operator
+      const rejected = rejectedIds?.has(pt.id) ?? false
+      const color = selected ? SELECT : rejected ? REJECTED : (COLORS[pt.source] ?? COLORS.operator)
 
       ctx.beginPath()
       ctx.arc(cx, cy, RADIUS, 0, Math.PI * 2)
       ctx.fillStyle = color + 'cc'
       ctx.fill()
-      ctx.strokeStyle = selected ? SELECT : '#fff'
-      ctx.lineWidth = selected ? 2.5 : 1.5
+      ctx.strokeStyle = selected ? SELECT : rejected ? REJECTED : '#fff'
+      ctx.lineWidth = selected ? 2.5 : rejected ? 2 : 1.5
       ctx.stroke()
 
-      ctx.fillStyle = '#fff'
-      ctx.font = 'bold 11px sans-serif'
-      ctx.textAlign = 'center'
-      ctx.textBaseline = 'middle'
-      ctx.fillText(String(i + 1), cx, cy)
+      if (rejected) {
+        // Reddedilen noktaya çarpı işareti çiz
+        const d = RADIUS * 0.55
+        ctx.strokeStyle = '#fff'
+        ctx.lineWidth = 1.5
+        ctx.beginPath()
+        ctx.moveTo(cx - d, cy - d)
+        ctx.lineTo(cx + d, cy + d)
+        ctx.moveTo(cx + d, cy - d)
+        ctx.lineTo(cx - d, cy + d)
+        ctx.stroke()
+      } else {
+        ctx.fillStyle = '#fff'
+        ctx.font = 'bold 11px sans-serif'
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'middle'
+        ctx.fillText(String(i + 1), cx, cy)
+      }
 
       if (selected) {
         const label = `(${pt.world_m[0].toFixed(2)}, ${pt.world_m[1].toFixed(2)}) m`
@@ -118,7 +134,7 @@ export function CalibrationCanvas({ imageUrl, points, selectedId, onAdd, onMove,
         ctx.fillText(label, cx + RADIUS + 7, cy)
       }
     })
-  }, [points, selectedId, scale, ready])
+  }, [points, selectedId, rejectedIds, scale, ready])
 
   // Cursor merkezli wheel zoom (passive:false gerekir → native listener)
   useEffect(() => {
