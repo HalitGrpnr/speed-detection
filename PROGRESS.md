@@ -4,8 +4,8 @@
 > "Nerede kaldık" sorusunun cevabı burası + `git log`'tur. Oturum-oturum detay için git
 > geçmişine bakılır; bu dosya yalnızca **anlık durumun özetini** tutar (şişirmeyin).
 
-**Son güncelleme:** 2026-07-12
-**Aktif görev:** _(Yok — M1–M9 + kuş bakışı eki + hız yumuşatma düzeltmesi tamamlandı.)_
+**Son güncelleme:** 2026-09-09
+**Aktif görev:** _(Yok — sıradaki: T1 + T2, bkz. `tasks/BACKLOG.md`)_
 
 **En son (önemli, forensic-etkili bir düzeltme):** Kullanıcı gerçek video analizinde şunu fark
 etti: araç kareye girdiği an overlay videoda ~25 km/h, birkaç kare sonra "aniden" ~65 km/h
@@ -80,6 +80,17 @@ sonrası yeniden build edilmedi — bir sonraki paketleme öncesi kontrol edilme
 - **Adli kurallar (CLAUDE.md):** orijinal dosyaya yazılmaz + SHA-256 loglanır; sunucu-tarafı H
   yeniden hesaplanır; her hız CI + güven seviyesi taşır (çıplak sayı yok); harici ağ çağrısı yok
   (fontlar self-host).
+
+## Son Oturum (2026-09-09)
+
+- Arkadaş kullanıcı testi bulguları değerlendirildi; dingil adımlama yöntemi teknik olarak doğrulandı.
+- `tasks/BACKLOG.md` oluşturuldu: T1–T11 görev kartları.
+- `docs/task-protocol.md` oluşturuldu: oturum/cihaz bağımsız AI çalışma protokolü.
+- `CLAUDE.md` güncellendi: yeni protokol referansları eklendi.
+- Commit: `df25da9`
+
+**Sıradaki:** T1 (reddedilen kalibrasyon noktaları görselleştirme) + T2 (recalibrate metadata).
+T8 (dingil adımlama) için arkadaşın fotoğrafları bekleniyor — tasarım onlarla netleşecek.
 
 ## Açık İşler
 
