@@ -251,7 +251,7 @@ export function AxleCheckPanel({ jobId, videoId, trackId, controlPoints, onClose
             bilirkişi gerekirse bu değerleri rapora elle ekleyebilir.
           </p>
 
-          <div className="mt-3 border-t pt-3">
+          <div className="mt-3 border-t pt-3 space-y-2">
             <Button
               variant="secondary"
               size="sm"
@@ -265,15 +265,21 @@ export function AxleCheckPanel({ jobId, videoId, trackId, controlPoints, onClose
               )}
               Kalibrasyona Ekle ve Yeniden Analiz Et
             </Button>
-            <p className="mt-1.5 text-[0.7rem] text-muted-foreground">
-              Bu ölçümü yeni bir kalibrasyon noktası çifti olarak ekler, aracı tekrar tespit
-              etmeden (mevcut takip kullanılır) hızları yeniden hesaplar. Sonuç <b>yeni bir
-              analiz</b> olarak oluşur — bu ekrandaki mevcut sonuç/rapor değişmez.
-            </p>
-            {recalibrateMutation.isPending && (
-              <p className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
-                <Loader2 className="size-3.5 animate-spin" /> Yeniden analiz ediliyor…
+            {!recalibrateMutation.isPending && (
+              <p className="text-[0.7rem] text-muted-foreground">
+                Bu ölçümü yeni bir kalibrasyon noktası çifti olarak ekler, aracı tekrar tespit
+                etmeden (mevcut takip kullanılır) hızları yeniden hesaplar. Sonuç <b>yeni bir
+                analiz</b> olarak oluşur — bu ekrandaki mevcut sonuç/rapor değişmez.
               </p>
+            )}
+            {recalibrateMutation.isPending && (
+              <div className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2.5 text-sm text-blue-800 flex items-center gap-2">
+                <Loader2 className="size-4 animate-spin shrink-0" />
+                <div>
+                  <p className="font-medium">Yeniden analiz çalışıyor…</p>
+                  <p className="text-xs text-blue-600 mt-0.5">Tespit tekrarlanmıyor — yalnızca hızlar yeniden hesaplanıyor. Birkaç saniye sürer.</p>
+                </div>
+              </div>
             )}
             {recalibrateMutation.isError && (
               <StatusBanner tone="error">
