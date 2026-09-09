@@ -167,4 +167,14 @@ export const api = {
       }),
     )
   },
+
+  /** Aks doğrulaması dahil güncellenmiş PDF raporu üretir. */
+  async regenerateReport(jobId: string): Promise<{ status: string; axle_check_count: number }> {
+    return unwrap(
+      await fetch(`/api/job/${jobId}/report/regenerate`, { method: 'POST' }),
+    )
+  },
+
+  /** Güncellenmiş raporu indirme URL'i. */
+  reportV2Url: (jobId: string) => `/api/job/${jobId}/report/v2`,
 }

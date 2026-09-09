@@ -124,7 +124,7 @@ def collect_report_texts(result: PipelineResult) -> list[str]:
     return texts
 
 
-def _build_story(result: PipelineResult) -> list:
+def _build_story(result: PipelineResult, axle_checks: list[dict] | None = None) -> list:
     S = _styles()
     meta = result.video_meta
     cal = result.calibration_result
@@ -335,6 +335,35 @@ def _build_story(result: PipelineResult) -> list:
     ))
     story.append(Spacer(1, 0.5 * cm))
 
+    # 4b. Aks Genişliği Doğrulama (isteğe bağlı — rapor regenerate edilince eklenir)
+    if axle_checks:
+        story.append(Paragraph("Aks Genisligi Capraz Dogrulama", S["SectionTitle"]))
+        story.append(Paragraph(
+            "Asagidaki sonuclar operatorun isgaret ettigi tekerlek piksel noktalarindan "
+            "hesaplanmis aks genisliginin bilinen referans degeriyle karsilastirilmasidir. "
+            "Bu deger guven seviyesi hesabina dahil edilmez; yalnizca destekleyici kanit "
+            "olarak sunulur.",
+            S["Normal"],
+        ))
+        story.append(Spacer(1, 0.2 * cm))
+        axle_header = ["Track ID", "Olculen (m)", "Bilinen (m)", "Fark (%)", "Hesaplama Tarihi"]
+        axle_rows = [axle_header]
+        for ac in axle_checks:
+            axle_rows.append([
+                f"#{ac.get('track_id', '?')}",
+                f"{ac.get('measured_m', 0):.3f}",
+                f"{ac.get('known_m', 0):.3f}",
+                f"%{ac.get('error_pct', 0):.1f}",
+                ac.get("computed_at", "")[:19].replace("T", " "),
+            ])
+        t_axle = Table(
+            axle_rows,
+            colWidths=[2 * cm, 3 * cm, 3 * cm, 3 * cm, 5 * cm],
+        )
+        t_axle.setStyle(_header_table_style())
+        story.append(t_axle)
+        story.append(Spacer(1, 0.5 * cm))
+
     # 5. Varsayımlar
     story.append(Paragraph("Varsayimlar ve Sinirlamalar", S["SectionTitle"]))
 
@@ -379,8 +408,13 @@ def _build_story(result: PipelineResult) -> list:
 def generate_report(
     result: PipelineResult,
     out_path: str | Path,
+    axle_checks: list[dict] | None = None,
 ) -> None:
-    """Adli raporu PDF olarak yaz (ReportLab)."""
+    """Adli raporu PDF olarak yaz (ReportLab).
+
+    axle_checks: aks genişliği doğrulama sonuçları listesi (her eleman bir track'e ait dict).
+    Verilirse rapora ayrı bir bölüm olarak eklenir.
+    """
     out_path = Path(out_path)
     doc = SimpleDocTemplate(
         str(out_path),
@@ -389,4 +423,4 @@ def generate_report(
         topMargin=_MARGIN, bottomMargin=_MARGIN,
         title="Arac Hiz Tespit Raporu",
     )
-    doc.build(_build_story(result))
+    doc.build(_build_story(result, axle_checks=axle_checks))

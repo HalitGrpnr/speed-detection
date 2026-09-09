@@ -18,6 +18,8 @@ class JobState:
     frame_step: int | None = None
     model_name_used: str | None = None
     video_path: str | None = None
+    result_data_path: Path | None = None
+    report_v2_path: Path | None = None
 
 
 class JobStore:

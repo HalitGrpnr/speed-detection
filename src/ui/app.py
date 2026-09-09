@@ -25,6 +25,7 @@ from src.calibration.planview import compute_plan_view
 from src.detection.models import load_tracks, save_tracks
 from src.detection.video import read_video_meta
 from src.output.pipeline import run_pipeline
+from src.output.serialization import write_result_data, read_result_data
 from src.reliability.axle_check import (
     axle_cross_check,
     axle_points_to_control_points,
@@ -342,6 +343,9 @@ def _finalize_job(job: JobState, result, out_video: Path, out_report: Path, out_
     # işlemler için pipeline'ı yeniden çalıştırmadan erişilebilsin diye.
     save_tracks(out_dir / "tracks.json", result.tracks)
 
+    # Tam PipelineResult kalıcı JSON'a yazılır — rapor yeniden üretimi (T7) için gerekli.
+    job.result_data_path = write_result_data(result, out_dir)
+
     job.overlay_path = out_video if out_video.exists() else None
     job.report_path = out_report if out_report.exists() else None
     job.result_json = {"vehicle_count": len(estimates), "estimates": estimates}
@@ -545,6 +549,62 @@ async def download_report(job_id: str) -> FileResponse:
         raise HTTPException(status_code=404, detail="Rapor henüz hazır değil.")
     return FileResponse(
         path=job.report_path, filename="rapor.pdf", media_type="application/pdf"
+    )
+
+
+@app.post("/api/job/{job_id}/report/regenerate", status_code=200)
+async def regenerate_report(job_id: str) -> dict:
+    """result_data.json + axle_check_*.json ile raporu yeniden üretir.
+
+    Orijinal report.pdf korunur — yeni rapor report_v2.pdf olarak yazılır.
+    Forensic kural: eski rapor değişmez; aks doğrulaması yeni versiyona eklenir.
+    """
+    job = _get_done_job(job_id)
+    out_dir = _job_out_dir(job_id)
+
+    if not (out_dir / "result_data.json").exists():
+        raise HTTPException(
+            status_code=404,
+            detail="result_data.json bulunamadı — bu analiz yeni format desteklemiyor.",
+        )
+
+    try:
+        result = read_result_data(out_dir)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Analiz verisi okunamadı: {exc}")
+
+    # Tüm axle_check_*.json dosyalarını topla
+    axle_checks = []
+    for p in sorted(out_dir.glob("axle_check_*.json")):
+        try:
+            data = json.loads(p.read_text())
+            track_id_str = p.stem.replace("axle_check_", "")
+            data["track_id"] = int(track_id_str) if track_id_str.isdigit() else track_id_str
+            axle_checks.append(data)
+        except Exception:
+            pass
+
+    report_v2_path = out_dir / "report_v2.pdf"
+    try:
+        from src.output.report import generate_report
+        generate_report(result, report_v2_path, axle_checks=axle_checks or None)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Rapor üretilemedi: {exc}")
+
+    job.report_v2_path = report_v2_path
+    return {"status": "ok", "axle_check_count": len(axle_checks)}
+
+
+@app.get("/api/job/{job_id}/report/v2")
+async def download_report_v2(job_id: str) -> FileResponse:
+    """Aks doğrulaması eklenmiş güncellenmiş raporu indir."""
+    job = _job_store.get(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="İş bulunamadı.")
+    if job.report_v2_path is None or not job.report_v2_path.exists():
+        raise HTTPException(status_code=404, detail="Güncellenmiş rapor henüz oluşturulmadı.")
+    return FileResponse(
+        path=job.report_v2_path, filename="rapor_v2.pdf", media_type="application/pdf"
     )
 
 

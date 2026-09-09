@@ -21,6 +21,7 @@ export function ResultsStep() {
   const reset = useWizard((s) => s.reset)
   const [axleTrackId, setAxleTrackId] = useState<number | null>(null)
   const [showPlanView, setShowPlanView] = useState(false)
+  const [hasV2Report, setHasV2Report] = useState(false)
 
   const resultsQuery = useQuery({
     queryKey: ['jobResults', jobId],
@@ -194,6 +195,7 @@ export function ResultsStep() {
             trackId={axleTrackId}
             controlPoints={controlPoints}
             onClose={() => setAxleTrackId(null)}
+            onReportRegenerated={() => setHasV2Report(true)}
           />
         )}
 
@@ -243,6 +245,11 @@ export function ResultsStep() {
           <a href={api.reportUrl(jobId)} download className={buttonVariants({ variant: 'outline' })}>
             <FileText /> PDF Raporu İndir
           </a>
+          {hasV2Report && jobId && (
+            <a href={api.reportV2Url(jobId)} download className={buttonVariants({ variant: 'default' })}>
+              <FileText /> Güncellenmiş Raporu İndir (v2)
+            </a>
+          )}
           <a
             href={api.overlayDownloadUrl(jobId)}
             download

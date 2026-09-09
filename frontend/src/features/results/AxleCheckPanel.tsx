@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { Loader2, Ruler, Sparkles } from 'lucide-react'
+import { FileText, Loader2, Ruler, Sparkles } from 'lucide-react'
 import { api } from '@/lib/api'
 import type { ControlPoint } from '@/lib/models'
 import { useWizard } from '@/store/wizard'
@@ -15,6 +15,7 @@ interface Props {
   trackId: number
   controlPoints: ControlPoint[]
   onClose: () => void
+  onReportRegenerated?: () => void
 }
 
 async function pollUntilDone(jobId: string): Promise<void> {
@@ -31,7 +32,7 @@ async function pollUntilDone(jobId: string): Promise<void> {
  * M9 — aks genişliği çapraz doğrulama. Sistemin otomatik confidence_level hesabına
  * dahil edilmez; yalnızca operatörün rapora elle ekleyebileceği destekleyici kanıttır.
  */
-export function AxleCheckPanel({ jobId, videoId, trackId, controlPoints, onClose }: Props) {
+export function AxleCheckPanel({ jobId, videoId, trackId, controlPoints, onClose, onReportRegenerated }: Props) {
   const [points, setPoints] = useState<ControlPoint[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [knownWidth, setKnownWidth] = useState(1.8)
@@ -52,6 +53,11 @@ export function AxleCheckPanel({ jobId, videoId, trackId, controlPoints, onClose
         known_width_m: knownWidth,
       })
     },
+  })
+
+  const regenerateMutation = useMutation({
+    mutationFn: () => api.regenerateReport(jobId),
+    onSuccess: () => onReportRegenerated?.(),
   })
 
   const recalibrateMutation = useMutation({
@@ -246,10 +252,30 @@ export function AxleCheckPanel({ jobId, videoId, trackId, controlPoints, onClose
               </div>
             </div>
           </div>
-          <p className="mt-2 text-[0.7rem] text-amber-700">
-            ⚠ Bu sonuç PDF raporuna otomatik eklenmez (denetim kaydı olarak sunucuda saklanır) —
-            bilirkişi gerekirse bu değerleri rapora elle ekleyebilir.
-          </p>
+          <div className="mt-2 flex flex-col gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={regenerateMutation.isPending || regenerateMutation.isSuccess}
+              onClick={() => regenerateMutation.mutate()}
+            >
+              {regenerateMutation.isPending ? (
+                <Loader2 className="animate-spin" />
+              ) : (
+                <FileText />
+              )}
+              {regenerateMutation.isSuccess ? 'Rapor güncellendi ✓' : 'Aks Sonucunu PDF Raporuna Ekle'}
+            </Button>
+            {!regenerateMutation.isSuccess && (
+              <p className="text-[0.7rem] text-amber-700">
+                ⚠ Bu sonuç PDF raporuna otomatik eklenmez. Yukarıdaki düğme ile orijinal rapor
+                korunarak aks doğrulaması dahil yeni bir rapor (rapor_v2.pdf) oluşturulabilir.
+              </p>
+            )}
+            {regenerateMutation.isError && (
+              <StatusBanner tone="error">{(regenerateMutation.error as Error).message}</StatusBanner>
+            )}
+          </div>
 
           <div className="mt-3 border-t pt-3 space-y-2">
             <Button
