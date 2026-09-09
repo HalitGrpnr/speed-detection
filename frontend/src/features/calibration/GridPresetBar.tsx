@@ -20,9 +20,11 @@ export function GridPresetBar({ pointCount, onApply }: Props) {
 
   const needed = cols * rows
   const hint =
-    pointCount < needed
-      ? `${cols}×${rows} = ${needed} nokta gerekli, ${pointCount} var (eksik noktalar atlanır)`
-      : `İlk ${needed} nokta sırayla atanır`
+    pointCount === 0
+      ? `Önce canvas'a ${needed} nokta işaretleyin, sonra Grid Uygula'ya basın.`
+      : pointCount < needed
+        ? `${cols}×${rows} = ${needed} nokta gerekli, ${pointCount} var — mevcut noktalar atanır.`
+        : `İlk ${needed} nokta grid koordinatlarıyla güncellenir.`
 
   return (
     <div className="space-y-2 rounded-lg border bg-muted/30 p-3">
@@ -86,6 +88,7 @@ export function GridPresetBar({ pointCount, onApply }: Props) {
         variant="secondary"
         size="sm"
         className="w-full"
+        disabled={pointCount === 0}
         onClick={() => onApply(cols, rows, laneWidth, rowSpacing)}
       >
         Grid Uygula
