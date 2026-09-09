@@ -23,7 +23,7 @@
 | T2 | Recalibrate sonrası rapor metadata tutarsızlığı | Rapor | Çok küçük | — | ✅ |
 | T3 | Plan-view (kuş bakışı) tarayıcıda uçtan uca test | Test | Küçük | — | ⬜ |
 | T4 | "Kalibrasyona Ekle & Yeniden Analiz" tarayıcı testi | Test | Küçük | — | ⬜ |
-| T5 | M6 şerit tespitinde aykırı değer eleme | Kalibrasyon | Orta | — | ⬜ |
+| T5 | M6 şerit tespitinde aykırı değer eleme | Kalibrasyon | Orta | — | ✅ |
 | T6 | Pipeline sonucunu kalıcı JSON'a yaz | Backend | Orta | — | ⬜ |
 | T7 | Aks doğrulama sonucunu PDF'e ekle | Rapor | Küçük | T6 | ⬜ |
 | T8 | Dingil adımlama yöntemi | Yeni özellik | Büyük | — | ⬜ |
@@ -171,10 +171,10 @@ dışına taşıma.
 **Tercih:** Seçenek B önce uygulanır (düşük risk, hızlı), yetmezse Seçenek A.
 
 **Kabul kriterleri:**
-- [ ] Gerçek videoda sınır dışı öneri üretilmiyor.
-- [ ] Öneri bulunamadığında UI bunu açıkça belirtiyor ("Otomatik öneri bulunamadı — elle işaretleyin").
-- [ ] `pytest` yeşil.
-- [ ] Elle işaretleme akışı bozulmamış.
+- [x] Gerçek videoda sınır dışı öneri üretilmiyor (proposer.py sınır kontrolü).
+- [x] Öneri bulunamadığında UI bunu açıkça belirtiyor ("Otomatik öneri bulunamadı — elle işaretleyin").
+- [x] `pytest` yeşil (231/231 — 1 invariant testi eklendi).
+- [x] Elle işaretleme akışı bozulmamış.
 
 ---
 
@@ -381,3 +381,4 @@ yüklemek RCE riski taşıyor (bkz. `DECISIONS.md`).
 |-------|-------|------|--------|
 | 2026-09-09 | T1 | rejected_points backend + canvas/tablo görselleştirme | `e207d32` |
 | 2026-09-09 | T2 | JobState frame_step/model_name_used + recalibrate thread düzeltmesi | `221b2b8` |
+| 2026-09-09 | T5 | proposer.py sınır-dışı öneri bastırma + UI uyarı + invariant testi | `c79e31a` |

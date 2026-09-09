@@ -5,7 +5,7 @@
 > geçmişine bakılır; bu dosya yalnızca **anlık durumun özetini** tutar (şişirmeyin).
 
 **Son güncelleme:** 2026-09-09
-**Aktif görev:** _(Yok — T1+T2 bitti, sıradaki: T3/T4/T5, bkz. `tasks/BACKLOG.md`)_
+**Aktif görev:** _(Yok — T1+T2+T5 bitti, sıradaki: T3/T4/T6, bkz. `tasks/BACKLOG.md`)_
 
 **En son (önemli, forensic-etkili bir düzeltme):** Kullanıcı gerçek video analizinde şunu fark
 etti: araç kareye girdiği an overlay videoda ~25 km/h, birkaç kare sonra "aniden" ~65 km/h
@@ -60,6 +60,7 @@ H ile kaba dünya konumuna oturtup bilinen genişliğe göre düzeltiyor. Yeni e
 | M9 | DTP karşılaştırması — aks genişliği çapraz doğrulama | ✅ Bitti | plaka tespiti ertelendi (RCE); `tasks/M9.md` |
 | T1 | Reddedilen kalibrasyon noktalarını görselleştir | ✅ Bitti | turuncu ✕ + tooltip + "X kabul Y reddedildi" |
 | T2 | Recalibrate sonrası rapor metadata tutarsızlığı | ✅ Bitti | frame_step ve model_name orijinalden aktarılıyor |
+| T5 | M6 şerit tespitinde aykırı değer eleme | ✅ Bitti | sınır-dışı öneri bastırma (Seçenek B) |
 | — | DTP karşılaştırması — kuş bakışı (plan-view) görünüm | ✅ Bitti | Adım 4 önizleme + PDF'te ilk görsel; görev dosyasız (küçük ek) |
 | — | Aks doğrulama — kare seçimi düzeltmesi + "kalibrasyona ekle ve yeniden analiz et" | ✅ Bitti | tracks.json yeniden kullanılır, detection tekrarlanmaz; görev dosyasız |
 
@@ -92,7 +93,11 @@ sonrası yeniden build edilmedi — bir sonraki paketleme öncesi kontrol edilme
   `_finalize_job` bunları doldurur, `_run_recalibrate_thread` orijinal job'dan alıp rapora yansıtır.
   Commit: `221b2b8`.
 
-**Sıradaki:** T3 (plan-view tarayıcı testi) veya T5 (M6 şerit RANSAC), kullanıcı kararı.
+- **T5 tamamlandı:** `proposer.py` propose() döngüsüne sınır kontrolü eklendi; `0 <= x < w` ve
+  `0 <= y < h` sağlanmazsa öneri atlanır. Sıfır-öneri durumunda `StatusBanner(warning)` gösterilir.
+  Invariant testi eklendi. Commit: `c79e31a`.
+
+**Sıradaki:** T3/T4 (tarayıcı testleri) veya T6 (pipeline sonucu kalıcı JSON).
 T8 (dingil adımlama) için arkadaşın fotoğrafları bekleniyor — tasarım onlarla netleşecek.
 
 ## Açık İşler
