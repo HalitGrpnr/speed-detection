@@ -13,23 +13,29 @@ const COLORS: Record<ControlPointSource, string> = {
 }
 const SELECT = '#ef4444'
 const REJECTED = '#f97316' // turuncu — RANSAC tarafından dışlanan noktalar
+const QUAD_COLOR = '#a78bfa' // mor — dörtgen çizim modu
 const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n))
+
+export type CanvasMode = 'point' | 'quad'
+type QuadCorners = [[number, number], [number, number], [number, number], [number, number]]
 
 interface Props {
   imageUrl: string
   points: ControlPoint[]
   selectedId: string | null
   rejectedIds?: Set<string>
+  mode?: CanvasMode
   onAdd: (pixel: [number, number]) => void
   onMove: (id: string, pixel: [number, number]) => void
   onSelect: (id: string | null) => void
+  onAddQuad?: (corners: QuadCorners) => void
 }
 
 /**
  * Kalibrasyon karesi üzerinde kontrol noktası tıklama/sürükleme + zoom.
  * scale = fitScale (kareyi alana sığdırır) × zoom (operatör yakınlaştırması).
  */
-export function CalibrationCanvas({ imageUrl, points, selectedId, rejectedIds, onAdd, onMove, onSelect }: Props) {
+export function CalibrationCanvas({ imageUrl, points, selectedId, rejectedIds, mode = 'point', onAdd, onMove, onSelect, onAddQuad }: Props) {
   const wrapRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const imgRef = useRef<HTMLImageElement | null>(null)
@@ -37,6 +43,7 @@ export function CalibrationCanvas({ imageUrl, points, selectedId, rejectedIds, o
   const [fitScale, setFitScale] = useState(1)
   const [zoom, setZoom] = useState(1)
   const [ready, setReady] = useState(false)
+  const [quadCorners, setQuadCorners] = useState<[number, number][]>([])
 
   const scale = fitScale * zoom
   // Wheel/buton zoom handler'ı en güncel değerleri okusun diye ref'ler.
@@ -76,6 +83,11 @@ export function CalibrationCanvas({ imageUrl, points, selectedId, rejectedIds, o
     return () => window.removeEventListener('resize', onResize)
   }, [layout])
 
+  // Quad modu değişince bekleyen köşeleri sıfırla
+  useEffect(() => {
+    if (mode === 'point') setQuadCorners([])
+  }, [mode])
+
   // Çizim (+ canvas boyutunu scale'e göre ayarla)
   useEffect(() => {
     const canvas = canvasRef.current
@@ -105,7 +117,6 @@ export function CalibrationCanvas({ imageUrl, points, selectedId, rejectedIds, o
       ctx.stroke()
 
       if (rejected) {
-        // Reddedilen noktaya çarpı işareti çiz
         const d = RADIUS * 0.55
         ctx.strokeStyle = '#fff'
         ctx.lineWidth = 1.5
@@ -134,7 +145,41 @@ export function CalibrationCanvas({ imageUrl, points, selectedId, rejectedIds, o
         ctx.fillText(label, cx + RADIUS + 7, cy)
       }
     })
-  }, [points, selectedId, rejectedIds, scale, ready])
+
+    // Dörtgen modu: bekleyen köşeleri ve kenarları çiz
+    if (mode === 'quad' && quadCorners.length > 0) {
+      ctx.strokeStyle = QUAD_COLOR
+      ctx.lineWidth = 2
+      ctx.setLineDash([6, 3])
+      ctx.beginPath()
+      ctx.moveTo(quadCorners[0][0] * scale, quadCorners[0][1] * scale)
+      for (let i = 1; i < quadCorners.length; i++) {
+        ctx.lineTo(quadCorners[i][0] * scale, quadCorners[i][1] * scale)
+      }
+      if (quadCorners.length === 3) {
+        ctx.lineTo(quadCorners[0][0] * scale, quadCorners[0][1] * scale)
+      }
+      ctx.stroke()
+      ctx.setLineDash([])
+
+      quadCorners.forEach((corner, i) => {
+        const cx = corner[0] * scale
+        const cy = corner[1] * scale
+        ctx.beginPath()
+        ctx.arc(cx, cy, RADIUS, 0, Math.PI * 2)
+        ctx.fillStyle = QUAD_COLOR + 'cc'
+        ctx.fill()
+        ctx.strokeStyle = '#fff'
+        ctx.lineWidth = 1.5
+        ctx.stroke()
+        ctx.fillStyle = '#fff'
+        ctx.font = 'bold 11px sans-serif'
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'middle'
+        ctx.fillText(String(i + 1), cx, cy)
+      })
+    }
+  }, [points, selectedId, rejectedIds, scale, ready, mode, quadCorners])
 
   // Cursor merkezli wheel zoom (passive:false gerekir → native listener)
   useEffect(() => {
@@ -211,6 +256,18 @@ export function CalibrationCanvas({ imageUrl, points, selectedId, rejectedIds, o
 
   const onMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const [ix, iy] = toImage(e)
+
+    if (mode === 'quad') {
+      const newCorners = [...quadCorners, [ix, iy] as [number, number]]
+      if (newCorners.length === 4) {
+        onAddQuad?.(newCorners as [[number,number],[number,number],[number,number],[number,number]])
+        setQuadCorners([])
+      } else {
+        setQuadCorners(newCorners)
+      }
+      return
+    }
+
     const hit = findNear(ix, iy)
     if (hit) {
       onSelect(hit)
@@ -251,7 +308,7 @@ export function CalibrationCanvas({ imageUrl, points, selectedId, rejectedIds, o
           onMouseMove={onMouseMove}
           onMouseUp={endDrag}
           onMouseLeave={endDrag}
-          className={cn('mx-auto block cursor-crosshair', !ready && 'hidden')}
+          className={cn('mx-auto block', !ready && 'hidden', mode === 'quad' ? 'cursor-cell' : 'cursor-crosshair')}
         />
       </div>
 
