@@ -81,7 +81,12 @@ sonrası yeniden build edilmedi — bir sonraki paketleme öncesi kontrol edilme
   yeniden hesaplanır; her hız CI + güven seviyesi taşır (çıplak sayı yok); harici ağ çağrısı yok
   (fontlar self-host).
 
-## Açık İşler / Bilinen Sorunlar
+## Açık İşler
+
+> Detaylı görev kartları ve oturum logu: **`tasks/BACKLOG.md`** (T1–T11).
+> Aşağısı özet; güncel durum için BACKLOG.md'ye bakılır.
+
+## Bilinen Sorunlar
 
 - **Doğrulama veri seti yok (asıl açık iş).** GPS referanslı test çekimi hazırlanınca
   (`docs/teknik-analiz.md §15.2`) güven eşikleri (`_REL_CI_LOW`, `_REL_CI_HIGH`) ampirik

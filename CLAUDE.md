@@ -42,23 +42,35 @@ hareketinden hesaplanır (bbox merkezi KULLANILMAZ — paralaks hatası üretir)
 - M1→M5 arası uçtan uca çalışan ürün. Detay `docs/teknik-analiz.md` §13.
 
 ## OTURUM PROTOKOLÜ (her session bunu izle)
-1. **Başta:** `PROGRESS.md`'yi oku → nerede kalındığını anla. `git log --oneline -10` ile son durumu gör.
-2. **Çalışırken:** Aynı anda yalnızca **tek aktif görev** (`tasks/M<n>.md`). Kapsam dışına çıkma.
-   Mimari bir karar gerekiyorsa `docs/teknik-analiz.md` ile çelişme; çelişiyorsa DUR ve sor.
-3. **Sonda:**
+
+> Tam görev protokolü (şablon, akış, "bitti" tanımı): **`docs/task-protocol.md`**
+> Kişisel AI belleği (~/.claude/ vb.) proje kararları için kullanılmaz; docs/ yeterlidir.
+
+1. **Başta:** Şu sırayla oku:
+   `CLAUDE.md` → `PROGRESS.md` → `tasks/BACKLOG.md` → aktif görev dosyası (varsa).
+   `git log --oneline -10` ile son durumu gör.
+2. **Yeni görev alınca:** Kodlamadan önce `docs/task-protocol.md §2` akışını izle.
+   Analiz → dosyala → kullanıcıya özetle → onaydan sonra başla.
+3. **Çalışırken:** Aynı anda yalnızca **tek aktif görev**. Kapsam dışına çıkma.
+   Mimari karar gerekiyorsa `docs/teknik-analiz.md` ile çelişme; çelişiyorsa DUR ve sor.
+4. **Sonda:**
    - Anlamlı commit at (görev/alt-adım başına). Açıklayıcı commit mesajı.
+   - Görev dosyası oturum logu güncelle (tarih + özet + commit).
+   - `tasks/BACKLOG.md` durum işaretini güncelle.
    - `PROGRESS.md`'yi güncelle (ne bitti, ne devam ediyor, sıradaki, bilinen sorun).
-   - Önemli bir teknik karar verdiysen `DECISIONS.md`'ye ekle (append-only).
-4. **Asla:** Birden fazla milestone'u aynı anda yapmaya çalışma. Gelecek milestone'ları
-   kendi kafana göre detaylandırma — sıradaki görev dosyası gelince çalışılır.
+   - Önemli teknik karar varsa `DECISIONS.md`'ye ekle (append-only).
+5. **Asla:** Birden fazla görevi aynı anda yapmaya çalışma. Sonraki görevi
+   kendi kafana göre detaylandırma — görev dosyası gelince çalışılır.
 
 ## Dosya Haritası
 - `CLAUDE.md` — bu dosya (anayasa, her session okunur)
+- `docs/task-protocol.md` — **proje belleği**: görev şablonu, AI akışı, "bitti" tanımı
 - `docs/teknik-analiz.md` — tam mimari ve gerekçeler (referans)
 - `PROGRESS.md` — anlık durum (session başı oku, sonu güncelle)
 - `DECISIONS.md` — karar günlüğü (append-only, audit trail)
-- `refactor.md` — review sonrası refactor planı (R1–R6, tamamlandı)
-- `tasks/M<n>.md` — milestone görev tanımları (aynı anda biri aktif)
+- `tasks/BACKLOG.md` — tüm açık görevlerin kanban tablosu
+- `tasks/T<n>.md` — bireysel görev kartları (orta/büyük efor, T12'den itibaren)
+- `tasks/M<n>.md` — eski milestone görev tanımları (korunur)
 - `src/` — Python paketleri (calibration, detection, speed, reliability, output, autoref, ui)
 - `frontend/` — React/Vite arayüz kaynağı (build → `src/ui/web`, FastAPI servis eder)
 - `README.md` — proje özeti + geliştirme/paketleme komutları
