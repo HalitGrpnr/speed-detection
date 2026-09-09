@@ -475,6 +475,8 @@ export interface components {
              * @enum {string}
              */
             model_size: "nano" | "small" | "medium";
+            /** Frame N */
+            frame_n?: number | null;
         };
         /** PlanViewRequest */
         PlanViewRequest: {

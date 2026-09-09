@@ -18,6 +18,7 @@ def _result_to_dict(
     fps: float | None = None,
     fps_source: str = "container",
     holdout_rows: list[dict] | None = None,
+    frame_n: int | None = None,
 ) -> dict[str, Any]:
     """Serialize CalibrationResult to the §8 schema dict."""
     return {
@@ -25,6 +26,7 @@ def _result_to_dict(
         "video_id": video_id or str(uuid.uuid4()),
         "fps": fps,
         "fps_source": fps_source,
+        "frame_n": frame_n,
         "control_points": [
             {
                 "id": p.id,

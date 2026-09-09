@@ -10,6 +10,7 @@ import { ConfidenceBadge } from '@/components/common/ConfidenceBadge'
 import { MethodInfoCard } from '@/components/common/MethodInfoCard'
 import { StatusBanner } from '@/components/common/StatusBanner'
 import { StepFooter } from '@/components/common/StepFooter'
+import { InfoHint } from '@/components/common/InfoHint'
 import { AxleCheckPanel } from './AxleCheckPanel'
 
 export function ResultsStep() {
@@ -105,13 +106,48 @@ export function ResultsStep() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b bg-muted/40 text-left text-xs uppercase text-muted-foreground">
-                  <th className="px-3 py-2 font-medium">Takip</th>
-                  <th className="px-3 py-2 font-medium">Sınıf</th>
-                  <th className="px-3 py-2 text-right font-medium">Hız (km/h)</th>
-                  <th className="px-3 py-2 text-right font-medium">Güven Aralığı</th>
-                  <th className="px-3 py-2 font-medium">Güven</th>
-                  <th className="px-3 py-2 text-right font-medium">Kare</th>
-                  <th className="px-3 py-2 text-right font-medium">Ek Doğrulama</th>
+                  <th className="px-3 py-2 font-medium">
+                    <span className="flex items-center gap-1">
+                      Takip
+                      <InfoHint text="ByteTrack tarafından aynı fiziksel araca atanan benzersiz kimlik numarası. Her analiz çalıştırmasında sıfırdan başlar." />
+                    </span>
+                  </th>
+                  <th className="px-3 py-2 font-medium">
+                    <span className="flex items-center gap-1">
+                      Sınıf
+                      <InfoHint text="YOLO modelinin tespit ettiği araç türü (car, truck, bus, motorcycle vb.)." />
+                    </span>
+                  </th>
+                  <th className="px-3 py-2 text-right font-medium">
+                    <span className="flex items-center justify-end gap-1">
+                      Hız (km/h)
+                      <InfoHint text="Aracın tekerlek-zemin temas noktasının homografi üzerinden dünya koordinatlarındaki ortalama hızı. Bbox merkezi değil temas noktası kullanılır — paralaks hatasını önler." />
+                    </span>
+                  </th>
+                  <th className="px-3 py-2 text-right font-medium">
+                    <span className="flex items-center justify-end gap-1">
+                      Güven Aralığı
+                      <InfoHint text="±değer: hız tahmininin %95 güven aralığı yarı genişliği. Takip boyunca ölçüm tutarsızlığından (kare-kare varyans) ve kalibrasyon belirsizliğinden hesaplanır. Daha dar = daha tutarlı ölçüm." />
+                    </span>
+                  </th>
+                  <th className="px-3 py-2 font-medium">
+                    <span className="flex items-center gap-1">
+                      Güven
+                      <InfoHint text="Tahminin genel güvenilirlik seviyesi: HIGH (kısa güven aralığı, uzun takip), MEDIUM veya LOW. Bilirkişi raporuna yansır." />
+                    </span>
+                  </th>
+                  <th className="px-3 py-2 text-right font-medium">
+                    <span className="flex items-center justify-end gap-1">
+                      Kare
+                      <InfoHint text="Bu aracın takip edildiği toplam kare sayısı. Daha fazla kare → daha güvenilir hız tahmini. Çok kısa takipler (genellikle &lt;5 kare) raporlanmaz." />
+                    </span>
+                  </th>
+                  <th className="px-3 py-2 text-right font-medium">
+                    <span className="flex items-center justify-end gap-1">
+                      Ek Doğrulama
+                      <InfoHint text="Aracın aks genişliğini ölçerek homografiyi çapraz doğrular. Bilinen araç genişliğiyle karşılaştırılır; büyük sapma kalibrasyon sorununa işaret eder." />
+                    </span>
+                  </th>
                 </tr>
               </thead>
               <tbody>

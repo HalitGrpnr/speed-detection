@@ -22,6 +22,7 @@ export function PipelineStep() {
   const videoMeta = useWizard((s) => s.videoMeta)
   const cal = useWizard((s) => s.calibration)
   const points = useWizard((s) => s.controlPoints)
+  const selectedFrame = useWizard((s) => s.selectedFrame)
   const jobId = useWizard((s) => s.jobId)
   const setJobId = useWizard((s) => s.setJobId)
   const goTo = useWizard((s) => s.goTo)
@@ -40,6 +41,7 @@ export function PipelineStep() {
         frame_step: frameStep,
         model_size: modelSize,
         fps_override: fpsEnabled ? fpsValue : null,
+        frame_n: selectedFrame,
       }),
     onSuccess: (r) => setJobId(r.job_id),
   })

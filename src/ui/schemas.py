@@ -73,6 +73,7 @@ class PipelineRequest(BaseModel):
     fps_override: float | None = None
     frame_step: int = 1
     model_size: Literal["nano", "small", "medium"] = "nano"
+    frame_n: int | None = None
 
 
 class JobStatusOut(BaseModel):

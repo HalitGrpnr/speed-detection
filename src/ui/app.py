@@ -505,6 +505,7 @@ async def start_pipeline(req: PipelineRequest) -> dict:
         control_points,
         fps=fps,
         fps_source=fps_source,
+        frame_n=req.frame_n,
     )
 
     video_sha256 = _sha256(video_path)
@@ -603,7 +604,8 @@ async def job_plan_view(job_id: str) -> Response:
     if not cal_json_path.exists():
         raise HTTPException(status_code=404, detail="Kalibrasyon verisi bulunamadı.")
     cal_result, points, _ = load_calibration(cal_json_path)
-    frame = _read_frame(Path(job.video_path), 0)
+    cal_frame_n = json.loads(cal_json_path.read_text()).get("frame_n") or 0
+    frame = _read_frame(Path(job.video_path), cal_frame_n)
     img = compute_plan_view(frame, cal_result.homography, points)
     ok, buf = cv2.imencode(".png", img)
     if not ok:
@@ -708,6 +710,7 @@ async def recalibrate(job_id: str, req: RecalibrateRequest) -> dict:
     if not old_cal_path.exists():
         raise HTTPException(status_code=404, detail="Kalibrasyon verisi bulunamadı.")
     _, _, (cal_fps, cal_fps_source) = load_calibration(old_cal_path)
+    cal_frame_n = json.loads(old_cal_path.read_text()).get("frame_n")
 
     base_points = [
         ControlPoint(
@@ -744,7 +747,7 @@ async def recalibrate(job_id: str, req: RecalibrateRequest) -> dict:
     new_out_dir = _tmp_dir / new_job_id
     new_out_dir.mkdir(parents=True, exist_ok=True)
     new_cal_path = new_out_dir / "calibration.json"
-    save_calibration(new_cal_path, new_cal_result, new_points, fps=cal_fps, fps_source=cal_fps_source)
+    save_calibration(new_cal_path, new_cal_result, new_points, fps=cal_fps, fps_source=cal_fps_source, frame_n=cal_frame_n)
 
     video_sha256 = _sha256(video_path)
     thread = threading.Thread(
