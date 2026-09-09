@@ -4,8 +4,8 @@
 > "Nerede kaldık" sorusunun cevabı burası + `git log`'tur. Oturum-oturum detay için git
 > geçmişine bakılır; bu dosya yalnızca **anlık durumun özetini** tutar (şişirmeyin).
 
-**Son güncelleme:** 2026-09-09
-**Aktif görev:** _(Yok — T1+T2+T5 bitti, sıradaki: T3/T4/T6, bkz. `tasks/BACKLOG.md`)_
+**Son güncelleme:** 2026-09-10
+**Aktif görev:** _(Yok — T1+T2+T5+T6+T7 bitti, sıradaki: T3/T4/T9, bkz. `tasks/BACKLOG.md`)_
 
 **En son (önemli, forensic-etkili bir düzeltme):** Kullanıcı gerçek video analizinde şunu fark
 etti: araç kareye girdiği an overlay videoda ~25 km/h, birkaç kare sonra "aniden" ~65 km/h
@@ -61,6 +61,8 @@ H ile kaba dünya konumuna oturtup bilinen genişliğe göre düzeltiyor. Yeni e
 | T1 | Reddedilen kalibrasyon noktalarını görselleştir | ✅ Bitti | turuncu ✕ + tooltip + "X kabul Y reddedildi" |
 | T2 | Recalibrate sonrası rapor metadata tutarsızlığı | ✅ Bitti | frame_step ve model_name orijinalden aktarılıyor |
 | T5 | M6 şerit tespitinde aykırı değer eleme | ✅ Bitti | sınır-dışı öneri bastırma (Seçenek B) |
+| T6 | Pipeline sonucunu kalıcı JSON'a yaz | ✅ Bitti | serialization.py round-trip + _finalize_job result_data.json |
+| T7 | Aks doğrulama sonucunu PDF'e ekle | ✅ Bitti | /report/regenerate + report_v2.pdf + frontend v2 indirme |
 | — | DTP karşılaştırması — kuş bakışı (plan-view) görünüm | ✅ Bitti | Adım 4 önizleme + PDF'te ilk görsel; görev dosyasız (küçük ek) |
 | — | Aks doğrulama — kare seçimi düzeltmesi + "kalibrasyona ekle ve yeniden analiz et" | ✅ Bitti | tracks.json yeniden kullanılır, detection tekrarlanmaz; görev dosyasız |
 
@@ -97,7 +99,7 @@ sonrası yeniden build edilmedi — bir sonraki paketleme öncesi kontrol edilme
   `0 <= y < h` sağlanmazsa öneri atlanır. Sıfır-öneri durumunda `StatusBanner(warning)` gösterilir.
   Invariant testi eklendi. Commit: `c79e31a`.
 
-**Sıradaki:** T3/T4 (tarayıcı testleri) veya T6 (pipeline sonucu kalıcı JSON).
+**Sıradaki:** T3/T4 (tarayıcı testleri) veya T9 (PyInstaller yeniden build).
 T8 (dingil adımlama) için arkadaşın fotoğrafları bekleniyor — tasarım onlarla netleşecek.
 
 ## Açık İşler
@@ -130,14 +132,9 @@ T8 (dingil adımlama) için arkadaşın fotoğrafları bekleniyor — tasarım o
   `torch`/`YOLO` ile yüklemek pickle-deserializasyon RCE riski taşıyor; kullanıcı ayrı bir göreve
   ertelemeyi seçti. İleride ele alınırsa: safetensors formatlı bir alternatif tercih edilmeli ya
   da indirilen ağırlık güvenli bir ortamda (sandbox/air-gap) önceden doğrulanmalı.
-- **Aks doğrulaması PDF raporuna otomatik eklenmiyor (M9 uygulama-sırası kısıtı).**
-  `generate_report()` tam `PipelineResult` gerektiriyor ama bu nesne pipeline thread'i bitince
-  bellekten düşüyor (yalnızca özet `result_json` + `report.pdf`/`overlay.mp4` kalıcı). Aks
-  doğrulaması sonuç ekranında, PDF üretildikten sonra yapılıyor; PDF'i sessizce üzerine yazmak da
-  forensic açıdan tartışmalı. Şimdilik sonuç yalnızca API yanıtı + `axle_check_<track_id>.json`
-  denetim kaydı olarak sunuluyor (bkz. `tasks/M9.md`). Tam çözüm: pipeline sonucu (tracks +
-  speed_estimates + calibration) kalıcı JSON'a yazılıp rapor talep üzerine yeniden üretilebilir
-  hale getirilmeli — ayrı bir görev.
+- **Aks doğrulaması PDF raporuna T6+T7 ile çözüldü.** Pipeline tamamlanınca `result_data.json`
+  diske yazılıyor; `POST /api/job/{id}/report/regenerate` ile aks doğrulaması dahil `report_v2.pdf`
+  üretilebiliyor. Orijinal `report.pdf` korunuyor (forensic bütünlük).
 - **M9 aks doğrulama UI'ı kullanıcı tarafından tarayıcıda gerçekten denendi** — bu, kare
   seçimi eksikliğini ortaya çıkardı (düzeltildi). "Kalibrasyona ekle ve yeniden analiz et"
   özelliği henüz tarayıcıda uçtan uca denenmedi (yalnızca API/pytest seviyesinde doğrulandı).

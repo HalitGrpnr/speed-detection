@@ -24,8 +24,8 @@
 | T3 | Plan-view (kuş bakışı) tarayıcıda uçtan uca test | Test | Küçük | — | ⬜ |
 | T4 | "Kalibrasyona Ekle & Yeniden Analiz" tarayıcı testi | Test | Küçük | — | ⬜ |
 | T5 | M6 şerit tespitinde aykırı değer eleme | Kalibrasyon | Orta | — | ✅ |
-| T6 | Pipeline sonucunu kalıcı JSON'a yaz | Backend | Orta | — | ⬜ |
-| T7 | Aks doğrulama sonucunu PDF'e ekle | Rapor | Küçük | T6 | ⬜ |
+| T6 | Pipeline sonucunu kalıcı JSON'a yaz | Backend | Orta | — | ✅ |
+| T7 | Aks doğrulama sonucunu PDF'e ekle | Rapor | Küçük | T6 | ✅ |
 | T8 | Dingil adımlama yöntemi | Yeni özellik | Büyük | — | ⬜ |
 | T9 | PyInstaller paketi yeniden build ve smoke test | Paketleme | Küçük | — | ⬜ |
 | T10 | GPS referanslı doğrulama veri seti | Doğrulama | Dış bağımlı | — | ⬜ |
@@ -206,11 +206,11 @@ out_dir/
 - Forensic kural: `result_data.json` sonradan değiştirilmez. Yeni analiz → yeni job.
 
 **Kabul kriterleri:**
-- [ ] Pipeline tamamlanınca `out_dir/result_data.json` oluşuyor.
-- [ ] JSON'dan `PipelineResult` geri yüklenebiliyor (`round-trip` testi).
-- [ ] `job_store`'dan `result_data.json` yolu okunabiliyor.
-- [ ] Mevcut `report.pdf` ve `overlay.mp4` akışı bozulmamış.
-- [ ] `pytest` yeşil (230+).
+- [x] Pipeline tamamlanınca `out_dir/result_data.json` oluşuyor.
+- [x] JSON'dan `PipelineResult` geri yüklenebiliyor (`round-trip` testi).
+- [x] `job_store`'dan `result_data.json` yolu okunabiliyor.
+- [x] Mevcut `report.pdf` ve `overlay.mp4` akışı bozulmamış.
+- [x] `pytest` yeşil (236/236).
 
 ---
 
@@ -232,10 +232,10 @@ Bu endpoint:
 3. Yeni `report_v2.pdf` üretir (orijinal `report.pdf` korunur — forensic bütünlük).
 
 **Kabul kriterleri:**
-- [ ] Aks doğrulama yapıldıktan sonra "Raporu Güncelle" aksiyonu sonuç ekranında görünüyor.
-- [ ] Yeni PDF'te aks doğrulama bölümü mevcut (ölçülen/bilinen genişlik, % hata).
-- [ ] Orijinal `report.pdf` değişmemiş.
-- [ ] `pytest` yeşil.
+- [x] Aks doğrulama yapıldıktan sonra "Aks Sonucunu PDF Raporuna Ekle" butonu görünüyor.
+- [x] Yeni PDF'te aks doğrulama bölümü mevcut (ölçülen/bilinen genişlik, % hata).
+- [x] Orijinal `report.pdf` değişmemiş (`report_v2.pdf` olarak üretilir).
+- [x] `pytest` yeşil (236/236).
 
 ---
 
@@ -382,3 +382,5 @@ yüklemek RCE riski taşıyor (bkz. `DECISIONS.md`).
 | 2026-09-09 | T1 | rejected_points backend + canvas/tablo görselleştirme | `e207d32` |
 | 2026-09-09 | T2 | JobState frame_step/model_name_used + recalibrate thread düzeltmesi | `221b2b8` |
 | 2026-09-09 | T5 | proposer.py sınır-dışı öneri bastırma + UI uyarı + invariant testi | `c79e31a` |
+| 2026-09-10 | T6 | serialization.py round-trip JSON + _finalize_job result_data.json yazımı | `924166b` |
+| 2026-09-10 | T7 | generate_report axle_checks param + /report/regenerate endpoint + frontend v2 rapor indirme | `924166b` |
