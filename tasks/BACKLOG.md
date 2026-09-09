@@ -19,8 +19,8 @@
 
 | # | Başlık | Grup | Efor | Bağımlılık | Durum |
 |---|--------|------|------|-----------|-------|
-| T1 | Reddedilen kalibrasyon noktalarını görselleştir | UI | Küçük | — | ⬜ |
-| T2 | Recalibrate sonrası rapor metadata tutarsızlığı | Rapor | Çok küçük | — | ⬜ |
+| T1 | Reddedilen kalibrasyon noktalarını görselleştir | UI | Küçük | — | ✅ |
+| T2 | Recalibrate sonrası rapor metadata tutarsızlığı | Rapor | Çok küçük | — | ✅ |
 | T3 | Plan-view (kuş bakışı) tarayıcıda uçtan uca test | Test | Küçük | — | ⬜ |
 | T4 | "Kalibrasyona Ekle & Yeniden Analiz" tarayıcı testi | Test | Küçük | — | ⬜ |
 | T5 | M6 şerit tespitinde aykırı değer eleme | Kalibrasyon | Orta | — | ⬜ |
@@ -59,10 +59,10 @@ gösterilsin. Hover/tooltip'te: "RMS katkısı: X px — eşik: Y px nedeniyle d
 - Frontend: `CalibrationCanvas` bileşeninde nokta renklendirme + tooltip.
 
 **Kabul kriterleri:**
-- [ ] Reddedilen noktalar görsel olarak ayrışıyor (renk/ikon).
-- [ ] Tooltip'te RMS katkısı ve eşik değeri gösteriliyor.
-- [ ] Kabul/red sayısı özet olarak panel başlığında belirtiliyor ("20 kabul, 5 reddedildi").
-- [ ] `pytest` yeşil, `npm run build` temiz.
+- [x] Reddedilen noktalar görsel olarak ayrışıyor (turuncu renk + ✕ ikonu).
+- [x] Tooltip'te RMS katkısı ve eşik değeri gösteriliyor (PointsTable'da title attribute).
+- [x] Kabul/red sayısı özet olarak panel başlığında belirtiliyor ("X kabul, Y reddedildi").
+- [x] `pytest` yeşil (230/230), `npm run build` temiz.
 
 ---
 
@@ -87,9 +87,9 @@ Rapor metadata tablosunda "tespitin tekrarlanmadığını" açıkça belirt:
   `recalibrated_from: <orijinal_job_id>` alanı yazsa, rapor bunu okuyabilir.
 
 **Kabul kriterleri:**
-- [ ] Recalibrate job raporunda `model_name` "yeniden hesaplandı" notunu taşıyor.
-- [ ] `frame_step` orijinal değeri yansıtıyor.
-- [ ] Orijinal job raporu değişmiyor (forensic bütünlük).
+- [x] Recalibrate job raporunda `model_name` "yeniden hesaplandı" notunu taşıyor (orijinal model adı önde).
+- [x] `frame_step` orijinal değeri yansıtıyor (JobState.frame_step → _run_recalibrate_thread'e aktarılır).
+- [x] Orijinal job raporu değişmiyor (forensic bütünlük).
 
 ---
 
@@ -379,4 +379,5 @@ yüklemek RCE riski taşıyor (bkz. `DECISIONS.md`).
 
 | Tarih | Görev | Özet | Commit |
 |-------|-------|------|--------|
-| — | — | — | — |
+| 2026-09-09 | T1 | rejected_points backend + canvas/tablo görselleştirme | `e207d32` |
+| 2026-09-09 | T2 | JobState frame_step/model_name_used + recalibrate thread düzeltmesi | `221b2b8` |
