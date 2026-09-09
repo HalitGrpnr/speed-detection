@@ -14,6 +14,7 @@ import { AxleCheckPanel } from './AxleCheckPanel'
 
 export function ResultsStep() {
   const jobId = useWizard((s) => s.jobId)
+  const sourceJobId = useWizard((s) => s.sourceJobId)
   const videoMeta = useWizard((s) => s.videoMeta)
   const controlPoints = useWizard((s) => s.controlPoints)
   const reset = useWizard((s) => s.reset)
@@ -85,6 +86,13 @@ export function ResultsStep() {
       </CardHeader>
 
       <CardContent className="space-y-6">
+        {sourceJobId && (
+          <StatusBanner tone="info">
+            Bu analiz aks doğrulaması eklenerek yeniden hesaplandı — tespit tekrarlanmadı, yalnızca
+            kalibrasyon güncellendi. Orijinal analiz: <code className="font-mono text-xs">{sourceJobId.slice(0, 8)}…</code>
+          </StatusBanner>
+        )}
+
         {/* Hız tablosu */}
         {result.estimates.length === 0 ? (
           <StatusBanner tone="warning">
@@ -158,6 +166,7 @@ export function ResultsStep() {
         <div className="space-y-2">
           <h3 className="text-sm font-medium">Overlay Video</h3>
           <video
+            key={jobId}
             controls
             src={api.overlayUrl(jobId)}
             className="w-full rounded-lg border bg-canvas"

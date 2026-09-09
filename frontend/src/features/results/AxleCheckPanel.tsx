@@ -69,6 +69,7 @@ export function AxleCheckPanel({ jobId, videoId, trackId, controlPoints, onClose
       return job_id
     },
     onSuccess: (newJobId) => {
+      useWizard.getState().setSourceJobId(jobId)
       useWizard.getState().setJobId(newJobId)
       onClose()
     },

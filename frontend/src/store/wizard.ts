@@ -19,6 +19,7 @@ interface WizardState {
   controlPoints: ControlPoint[]
   calibration: CalibrateResponse | null
   jobId: string | null
+  sourceJobId: string | null  // recalibrate ile oluşturulduysa orijinal job_id
 
   /** Bir adıma girmek için ön koşullar sağlanmış mı? (kara-kutu/atlama engeli) */
   canEnter: (step: StepId) => boolean
@@ -31,6 +32,7 @@ interface WizardState {
   setControlPoints: (p: ControlPoint[]) => void
   setCalibration: (c: CalibrateResponse | null) => void
   setJobId: (id: string | null) => void
+  setSourceJobId: (id: string | null) => void
   reset: () => void
 }
 
@@ -41,6 +43,7 @@ const INITIAL = {
   controlPoints: [] as ControlPoint[],
   calibration: null,
   jobId: null,
+  sourceJobId: null,
 }
 
 export const useWizard = create<WizardState>((set, get) => ({
@@ -79,5 +82,6 @@ export const useWizard = create<WizardState>((set, get) => ({
   setControlPoints: (controlPoints) => set({ controlPoints }),
   setCalibration: (calibration) => set({ calibration }),
   setJobId: (jobId) => set({ jobId }),
+  setSourceJobId: (sourceJobId) => set({ sourceJobId }),
   reset: () => set({ ...INITIAL }),
 }))
