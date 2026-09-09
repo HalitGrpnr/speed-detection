@@ -4,20 +4,21 @@ import { cn } from '@/lib/utils'
 import type { ControlPoint, ControlPointSource } from '@/lib/models'
 
 const RADIUS = 8
+const QUAD_RADIUS = 10
 const MIN_ZOOM = 1
 const MAX_ZOOM = 8
 const COLORS: Record<ControlPointSource, string> = {
-  operator: '#f59e0b', // sarı
-  auto: '#60a5fa', // mavi (M6)
-  site_measurement: '#34d399', // yeşil (saha)
+  operator: '#f59e0b',
+  auto: '#60a5fa',
+  site_measurement: '#34d399',
 }
 const SELECT = '#ef4444'
-const REJECTED = '#f97316' // turuncu — RANSAC tarafından dışlanan noktalar
-const QUAD_COLOR = '#a78bfa' // mor — dörtgen çizim modu
+const REJECTED = '#f97316'
+const QUAD_COLOR = '#a78bfa'
 const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n))
 
 export type CanvasMode = 'point' | 'quad'
-type QuadCorners = [[number, number], [number, number], [number, number], [number, number]]
+export type QuadCorners = [[number,number],[number,number],[number,number],[number,number]]
 
 interface Props {
   imageUrl: string
@@ -25,28 +26,28 @@ interface Props {
   selectedId: string | null
   rejectedIds?: Set<string>
   mode?: CanvasMode
+  quadCorners?: QuadCorners | null
   onAdd: (pixel: [number, number]) => void
   onMove: (id: string, pixel: [number, number]) => void
   onSelect: (id: string | null) => void
-  onAddQuad?: (corners: QuadCorners) => void
+  onMoveQuadCorner?: (index: number, pixel: [number, number]) => void
 }
 
-/**
- * Kalibrasyon karesi üzerinde kontrol noktası tıklama/sürükleme + zoom.
- * scale = fitScale (kareyi alana sığdırır) × zoom (operatör yakınlaştırması).
- */
-export function CalibrationCanvas({ imageUrl, points, selectedId, rejectedIds, mode = 'point', onAdd, onMove, onSelect, onAddQuad }: Props) {
+export function CalibrationCanvas({
+  imageUrl, points, selectedId, rejectedIds,
+  mode = 'point', quadCorners,
+  onAdd, onMove, onSelect, onMoveQuadCorner,
+}: Props) {
   const wrapRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const imgRef = useRef<HTMLImageElement | null>(null)
   const dragRef = useRef<string | null>(null)
+  const quadDragRef = useRef<number | null>(null)
   const [fitScale, setFitScale] = useState(1)
   const [zoom, setZoom] = useState(1)
   const [ready, setReady] = useState(false)
-  const [quadCorners, setQuadCorners] = useState<[number, number][]>([])
 
   const scale = fitScale * zoom
-  // Wheel/buton zoom handler'ı en güncel değerleri okusun diye ref'ler.
   const fitRef = useRef(fitScale)
   const zoomRef = useRef(zoom)
   fitRef.current = fitScale
@@ -72,9 +73,7 @@ export function CalibrationCanvas({ imageUrl, points, selectedId, rejectedIds, m
       setReady(true)
     }
     img.src = imageUrl
-    return () => {
-      img.onload = null
-    }
+    return () => { img.onload = null }
   }, [imageUrl, layout])
 
   useEffect(() => {
@@ -83,12 +82,6 @@ export function CalibrationCanvas({ imageUrl, points, selectedId, rejectedIds, m
     return () => window.removeEventListener('resize', onResize)
   }, [layout])
 
-  // Quad modu değişince bekleyen köşeleri sıfırla
-  useEffect(() => {
-    if (mode === 'point') setQuadCorners([])
-  }, [mode])
-
-  // Çizim (+ canvas boyutunu scale'e göre ayarla)
   useEffect(() => {
     const canvas = canvasRef.current
     const img = imgRef.current
@@ -101,6 +94,7 @@ export function CalibrationCanvas({ imageUrl, points, selectedId, rejectedIds, m
     ctx.clearRect(0, 0, canvas.width, canvas.height)
     ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
 
+    // Kontrol noktaları
     points.forEach((pt, i) => {
       const cx = pt.pixel[0] * scale
       const cy = pt.pixel[1] * scale
@@ -121,10 +115,8 @@ export function CalibrationCanvas({ imageUrl, points, selectedId, rejectedIds, m
         ctx.strokeStyle = '#fff'
         ctx.lineWidth = 1.5
         ctx.beginPath()
-        ctx.moveTo(cx - d, cy - d)
-        ctx.lineTo(cx + d, cy + d)
-        ctx.moveTo(cx + d, cy - d)
-        ctx.lineTo(cx - d, cy + d)
+        ctx.moveTo(cx - d, cy - d); ctx.lineTo(cx + d, cy + d)
+        ctx.moveTo(cx + d, cy - d); ctx.lineTo(cx - d, cy + d)
         ctx.stroke()
       } else {
         ctx.fillStyle = '#fff'
@@ -146,42 +138,52 @@ export function CalibrationCanvas({ imageUrl, points, selectedId, rejectedIds, m
       }
     })
 
-    // Dörtgen modu: bekleyen köşeleri ve kenarları çiz
-    if (mode === 'quad' && quadCorners.length > 0) {
+    // Dörtgen overlay
+    if (quadCorners) {
+      const sc = (p: [number,number]) => [p[0] * scale, p[1] * scale] as [number,number]
+      const [a, b, c, d] = quadCorners.map(sc)
+
+      // Yarı saydam dolgu
+      ctx.beginPath()
+      ctx.moveTo(a[0], a[1])
+      ctx.lineTo(b[0], b[1])
+      ctx.lineTo(c[0], c[1])
+      ctx.lineTo(d[0], d[1])
+      ctx.closePath()
+      ctx.fillStyle = QUAD_COLOR + '22'
+      ctx.fill()
+
+      // Kenarlar
       ctx.strokeStyle = QUAD_COLOR
       ctx.lineWidth = 2
-      ctx.setLineDash([6, 3])
-      ctx.beginPath()
-      ctx.moveTo(quadCorners[0][0] * scale, quadCorners[0][1] * scale)
-      for (let i = 1; i < quadCorners.length; i++) {
-        ctx.lineTo(quadCorners[i][0] * scale, quadCorners[i][1] * scale)
-      }
-      if (quadCorners.length === 3) {
-        ctx.lineTo(quadCorners[0][0] * scale, quadCorners[0][1] * scale)
-      }
-      ctx.stroke()
       ctx.setLineDash([])
+      ctx.beginPath()
+      ctx.moveTo(a[0], a[1])
+      ctx.lineTo(b[0], b[1])
+      ctx.lineTo(c[0], c[1])
+      ctx.lineTo(d[0], d[1])
+      ctx.closePath()
+      ctx.stroke()
 
-      quadCorners.forEach((corner, i) => {
-        const cx = corner[0] * scale
-        const cy = corner[1] * scale
+      // Köşe tutamaçları
+      const labels = ['1', '2', '3', '4']
+      ;[a, b, c, d].forEach(([cx, cy], i) => {
         ctx.beginPath()
-        ctx.arc(cx, cy, RADIUS, 0, Math.PI * 2)
-        ctx.fillStyle = QUAD_COLOR + 'cc'
+        ctx.arc(cx, cy, QUAD_RADIUS, 0, Math.PI * 2)
+        ctx.fillStyle = QUAD_COLOR
         ctx.fill()
         ctx.strokeStyle = '#fff'
-        ctx.lineWidth = 1.5
+        ctx.lineWidth = 2
         ctx.stroke()
         ctx.fillStyle = '#fff'
         ctx.font = 'bold 11px sans-serif'
         ctx.textAlign = 'center'
         ctx.textBaseline = 'middle'
-        ctx.fillText(String(i + 1), cx, cy)
+        ctx.fillText(labels[i], cx, cy)
       })
     }
-  }, [points, selectedId, rejectedIds, scale, ready, mode, quadCorners])
+  }, [points, selectedId, rejectedIds, scale, ready, quadCorners])
 
-  // Cursor merkezli wheel zoom (passive:false gerekir → native listener)
   useEffect(() => {
     const wrap = wrapRef.current
     if (!wrap) return
@@ -193,14 +195,12 @@ export function CalibrationCanvas({ imageUrl, points, selectedId, rejectedIds, m
       const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15
       const newZoom = clamp(zoomRef.current * factor, MIN_ZOOM, MAX_ZOOM)
       if (newZoom === zoomRef.current) return
-
       const wrapRect = wrap.getBoundingClientRect()
       const canvasRect = canvas.getBoundingClientRect()
       const imageX = (e.clientX - canvasRect.left) / oldScale
       const imageY = (e.clientY - canvasRect.top) / oldScale
       const cursorViewX = e.clientX - wrapRect.left
       const cursorViewY = e.clientY - wrapRect.top
-
       setZoom(newZoom)
       requestAnimationFrame(() => {
         const newScale = fitRef.current * newZoom
@@ -215,11 +215,7 @@ export function CalibrationCanvas({ imageUrl, points, selectedId, rejectedIds, m
   const zoomBy = (factor: number) => {
     const wrap = wrapRef.current
     const newZoom = clamp(zoomRef.current * factor, MIN_ZOOM, MAX_ZOOM)
-    if (!wrap) {
-      setZoom(newZoom)
-      return
-    }
-    // Görünür merkez sabit kalsın
+    if (!wrap) { setZoom(newZoom); return }
     const oldScale = fitRef.current * zoomRef.current
     const centerX = (wrap.scrollLeft + wrap.clientWidth / 2) / oldScale
     const centerY = (wrap.scrollTop + wrap.clientHeight / 2) / oldScale
@@ -254,17 +250,22 @@ export function CalibrationCanvas({ imageUrl, points, selectedId, rejectedIds, m
     return null
   }
 
+  const findNearQuadCorner = (ix: number, iy: number): number | null => {
+    if (!quadCorners) return null
+    for (let i = 0; i < quadCorners.length; i++) {
+      const dx = (quadCorners[i][0] - ix) * scale
+      const dy = (quadCorners[i][1] - iy) * scale
+      if (Math.hypot(dx, dy) <= QUAD_RADIUS + 4) return i
+    }
+    return null
+  }
+
   const onMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const [ix, iy] = toImage(e)
 
     if (mode === 'quad') {
-      const newCorners = [...quadCorners, [ix, iy] as [number, number]]
-      if (newCorners.length === 4) {
-        onAddQuad?.(newCorners as [[number,number],[number,number],[number,number],[number,number]])
-        setQuadCorners([])
-      } else {
-        setQuadCorners(newCorners)
-      }
+      const qi = findNearQuadCorner(ix, iy)
+      if (qi !== null) quadDragRef.current = qi
       return
     }
 
@@ -279,7 +280,18 @@ export function CalibrationCanvas({ imageUrl, points, selectedId, rejectedIds, m
 
   const onMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const img = imgRef.current
-    if (!dragRef.current || !img) return
+    if (!img) return
+
+    if (quadDragRef.current !== null) {
+      const [ix, iy] = toImage(e)
+      onMoveQuadCorner?.(quadDragRef.current, [
+        clamp(ix, 0, img.naturalWidth - 1),
+        clamp(iy, 0, img.naturalHeight - 1),
+      ])
+      return
+    }
+
+    if (!dragRef.current) return
     const [ix, iy] = toImage(e)
     onMove(dragRef.current, [
       clamp(ix, 0, img.naturalWidth - 1),
@@ -289,7 +301,21 @@ export function CalibrationCanvas({ imageUrl, points, selectedId, rejectedIds, m
 
   const endDrag = () => {
     dragRef.current = null
+    quadDragRef.current = null
   }
+
+  const isQuadCornerNear = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (mode !== 'quad' || !quadCorners) return false
+    const [ix, iy] = toImage(e)
+    return findNearQuadCorner(ix, iy) !== null
+  }
+
+  const getCursor = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (mode === 'quad') return isQuadCornerNear(e) ? 'grab' : 'default'
+    return 'crosshair'
+  }
+
+  const [cursor, setCursor] = useState<string>('crosshair')
 
   return (
     <div className="relative">
@@ -305,10 +331,11 @@ export function CalibrationCanvas({ imageUrl, points, selectedId, rejectedIds, m
         <canvas
           ref={canvasRef}
           onMouseDown={onMouseDown}
-          onMouseMove={onMouseMove}
+          onMouseMove={(e) => { onMouseMove(e); setCursor(getCursor(e)) }}
           onMouseUp={endDrag}
           onMouseLeave={endDrag}
-          className={cn('mx-auto block', !ready && 'hidden', mode === 'quad' ? 'cursor-cell' : 'cursor-crosshair')}
+          style={{ cursor }}
+          className={cn('mx-auto block', !ready && 'hidden')}
         />
       </div>
 

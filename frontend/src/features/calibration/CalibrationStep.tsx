@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Loader2, Square, Trash2 } from 'lucide-react'
+import { CheckSquare, Loader2, Square, Trash2 } from 'lucide-react'
 import { api } from '@/lib/api'
 import type { CalibrateResponse, ControlPoint, ControlPointSource, ProposedPoint } from '@/lib/models'
 import { useWizard } from '@/store/wizard'
@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { RmsBadge } from '@/components/common/RmsBadge'
 import { StatusBanner } from '@/components/common/StatusBanner'
 import { StepFooter } from '@/components/common/StepFooter'
-import { CalibrationCanvas, type CanvasMode } from './CalibrationCanvas'
+import { CalibrationCanvas, type CanvasMode, type QuadCorners } from './CalibrationCanvas'
 import { PointsTable } from './PointsTable'
 import { GridPresetBar } from './GridPresetBar'
 import { AutoRefPanel } from './AutoRefPanel'
@@ -32,13 +32,11 @@ export function CalibrationStep() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [cal, setCal] = useState<CalState>({ status: 'insufficient' })
   const [canvasMode, setCanvasMode] = useState<CanvasMode>('point')
-  const [quadDialog, setQuadDialog] = useState<{
-    corners: [[number,number],[number,number],[number,number],[number,number]]
-  } | null>(null)
+  const [quadCorners, setQuadCorners] = useState<QuadCorners | null>(null)
+  const [quadDimDialog, setQuadDimDialog] = useState(false)
   const widthRef = useRef<HTMLInputElement>(null)
   const heightRef = useRef<HTMLInputElement>(null)
 
-  // Canlı RMS: nokta/koordinat/kare değişiminde debounce'lu kalibrasyon.
   useEffect(() => {
     if (!videoMeta) return
     if (points.length < 4) {
@@ -120,23 +118,36 @@ export function CalibrationStep() {
     setControlPoints([...points, ...auto])
   }
 
-  const handleQuadCorners = (corners: [[number,number],[number,number],[number,number],[number,number]]) => {
+  // Dörtgen overlay başlat — görüntü ortasına oranlı dikdörtgen
+  const startQuad = () => {
+    const iw = videoMeta.width
+    const ih = videoMeta.height
+    const x1 = iw * 0.30, y1 = ih * 0.35
+    const x2 = iw * 0.70, y2 = ih * 0.35
+    const x3 = iw * 0.70, y3 = ih * 0.65
+    const x4 = iw * 0.30, y4 = ih * 0.65
+    setQuadCorners([[x1,y1],[x2,y2],[x3,y3],[x4,y4]])
+    setCanvasMode('quad')
+  }
+
+  const cancelQuad = () => {
+    setQuadCorners(null)
     setCanvasMode('point')
-    setQuadDialog({ corners })
+  }
+
+  const moveQuadCorner = (index: number, pixel: [number, number]) => {
+    if (!quadCorners) return
+    const next = quadCorners.map((c, i) => (i === index ? pixel : c)) as QuadCorners
+    setQuadCorners(next)
   }
 
   const confirmQuad = () => {
-    if (!quadDialog) return
+    if (!quadCorners) return
     const w = parseFloat(widthRef.current?.value ?? '0')
     const h = parseFloat(heightRef.current?.value ?? '0')
     if (!w || !h || w <= 0 || h <= 0) return
-    const worldCoords: [number, number][] = [
-      [0, 0],
-      [w, 0],
-      [w, h],
-      [0, h],
-    ]
-    const newPoints: ControlPoint[] = quadDialog.corners.map((pixel, i) => ({
+    const worldCoords: [number, number][] = [[0,0],[w,0],[w,h],[0,h]]
+    const newPoints: ControlPoint[] = quadCorners.map((pixel, i) => ({
       id: makeId('op'),
       pixel,
       world_m: worldCoords[i] as [number, number],
@@ -144,7 +155,8 @@ export function CalibrationStep() {
       held_out: false,
     }))
     setControlPoints([...points, ...newPoints])
-    setQuadDialog(null)
+    setQuadDimDialog(false)
+    cancelQuad()
   }
 
   const rejectedIds = new Set(
@@ -170,19 +182,24 @@ export function CalibrationStep() {
               selectedId={selectedId}
               rejectedIds={rejectedIds}
               mode={canvasMode}
+              quadCorners={quadCorners}
               onAdd={addPoint}
               onMove={movePoint}
               onSelect={setSelectedId}
-              onAddQuad={handleQuadCorners}
+              onMoveQuadCorner={moveQuadCorner}
             />
             <p className="text-xs text-muted-foreground">
               {canvasMode === 'quad'
-                ? <span className="text-violet-400 font-medium">Dörtgen modu: 4 köşeyi sırayla tıkla (sol-alt → sağ-alt → sağ-üst → sol-üst gibi tutarlı bir sıra seç)</span>
-                : <>Tıkla = ekle · sürükle = taşı · <span className="font-medium">fare tekeri = yakınlaş</span> (hassas işaretleme) ·{' '}
-                  <span className="text-amber-500">sarı operatör</span>,{' '}
-                  <span className="text-blue-400">mavi otomatik</span>,{' '}
-                  <span className="text-emerald-400">yeşil saha</span>,{' '}
-                  <span className="text-orange-500">turuncu ✕ = dışlanan (tablo'da hata görünür)</span>.</>
+                ? <span className="text-violet-400 font-medium">
+                    Dörtgen modu — 4 köşeyi sürükle, şerit/araç çizgilerine hizala. Hazır olunca sağdaki "Noktaları Ekle"ye bas.
+                  </span>
+                : <>
+                    Tıkla = ekle · sürükle = taşı · <span className="font-medium">fare tekeri = yakınlaş</span> (hassas işaretleme) ·{' '}
+                    <span className="text-amber-500">sarı operatör</span>,{' '}
+                    <span className="text-blue-400">mavi otomatik</span>,{' '}
+                    <span className="text-emerald-400">yeşil saha</span>,{' '}
+                    <span className="text-orange-500">turuncu ✕ = dışlanan</span>.
+                  </>
               }
             </p>
           </div>
@@ -231,15 +248,42 @@ export function CalibrationStep() {
               frame={selectedFrame}
               onProposals={addProposals}
             />
-            <Button
-              variant={canvasMode === 'quad' ? 'default' : 'outline'}
-              size="sm"
-              className="w-full"
-              onClick={() => setCanvasMode(canvasMode === 'quad' ? 'point' : 'quad')}
-            >
-              <Square className="size-3.5" />
-              {canvasMode === 'quad' ? 'Dörtgen modu — iptal' : 'Dörtgen Çiz'}
-            </Button>
+
+            {/* Dörtgen araçları */}
+            {canvasMode === 'point' ? (
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full"
+                onClick={startQuad}
+              >
+                <Square className="size-3.5" /> Dörtgen Çiz
+              </Button>
+            ) : (
+              <div className="space-y-2 rounded-lg border border-violet-500/40 bg-violet-500/5 p-3">
+                <p className="text-xs font-medium text-violet-400">Dörtgen modu aktif</p>
+                <p className="text-xs text-muted-foreground">
+                  Mor köşeleri sürükle → şerit/araç çizgilerine hizala.<br />
+                  Köşe 1→(0,0) · 2→(G,0) · 3→(G,U) · 4→(0,U)
+                </p>
+                <Button
+                  size="sm"
+                  className="w-full"
+                  onClick={() => setQuadDimDialog(true)}
+                >
+                  <CheckSquare className="size-3.5" /> Noktaları Ekle
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full text-muted-foreground"
+                  onClick={cancelQuad}
+                >
+                  İptal
+                </Button>
+              </div>
+            )}
+
             <Button
               variant="outline"
               size="sm"
@@ -266,30 +310,26 @@ export function CalibrationStep() {
       </CardContent>
 
       {/* Dörtgen boyut dialogu */}
-      {quadDialog && (
+      {quadDimDialog && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
           <div className="w-80 rounded-xl border bg-card p-5 shadow-pop">
             <h3 className="mb-1 text-sm font-semibold">Dörtgenin gerçek dünya boyutları</h3>
             <p className="mb-4 text-xs text-muted-foreground">
-              Köşe 1 → (0, 0), köşe 2 → (G, 0), köşe 3 → (G, U), köşe 4 → (0, U)
+              Köşe 1→(0,0) · 2→(G,0) · 3→(G,U) · 4→(0,U)
             </p>
             <div className="mb-4 grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <label className="text-xs font-medium">Genişlik (m)</label>
+                <label className="text-xs font-medium">Genişlik G (m)</label>
                 <Input ref={widthRef} type="number" min="0.1" step="0.1" defaultValue="3.5" />
               </div>
               <div className="space-y-1">
-                <label className="text-xs font-medium">Uzunluk (m)</label>
+                <label className="text-xs font-medium">Uzunluk U (m)</label>
                 <Input ref={heightRef} type="number" min="0.1" step="0.1" defaultValue="3.0" />
               </div>
             </div>
             <div className="flex gap-2">
-              <Button className="flex-1" onClick={confirmQuad}>
-                Noktaları Ekle
-              </Button>
-              <Button variant="outline" className="flex-1" onClick={() => setQuadDialog(null)}>
-                İptal
-              </Button>
+              <Button className="flex-1" onClick={confirmQuad}>Noktaları Ekle</Button>
+              <Button variant="outline" className="flex-1" onClick={() => setQuadDimDialog(false)}>İptal</Button>
             </div>
           </div>
         </div>
