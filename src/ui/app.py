@@ -347,6 +347,7 @@ def _finalize_job(job: JobState, result, out_video: Path, out_report: Path, out_
     job.result_json = {"vehicle_count": len(estimates), "estimates": estimates}
     job.frame_step = result.frame_step
     job.model_name_used = result.model_name
+    job.video_path = result.video_path
     job.progress_pct = 100.0
     job.state = "done"
 
@@ -590,6 +591,24 @@ async def job_results(job_id: str) -> JobResultOut:
         vehicle_count=job.result_json["vehicle_count"],
         estimates=estimates,
     )
+
+
+@app.get("/api/job/{job_id}/plan-view")
+async def job_plan_view(job_id: str) -> Response:
+    """Tamamlanmış analiz için kuş bakışı — homografi doğrulama amaçlı."""
+    job = _get_done_job(job_id)
+    if not job.video_path:
+        raise HTTPException(status_code=404, detail="Video yolu kaydedilmemiş.")
+    cal_json_path = _job_out_dir(job_id) / "calibration.json"
+    if not cal_json_path.exists():
+        raise HTTPException(status_code=404, detail="Kalibrasyon verisi bulunamadı.")
+    cal_result, points, _ = load_calibration(cal_json_path)
+    frame = _read_frame(Path(job.video_path), 0)
+    img = compute_plan_view(frame, cal_result.homography, points)
+    ok, buf = cv2.imencode(".png", img)
+    if not ok:
+        raise HTTPException(status_code=500, detail="Görsel PNG'ye kodlanamadı.")
+    return Response(content=buf.tobytes(), media_type="image/png")
 
 
 # ── Aks genişliği çapraz doğrulama (M9) ─────────────────────────────────────────

@@ -17,6 +17,7 @@ class JobState:
     result_json: dict | None = None
     frame_step: int | None = None
     model_name_used: str | None = None
+    video_path: str | None = None
 
 
 class JobStore:

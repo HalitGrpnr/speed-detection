@@ -155,6 +155,8 @@ export const api = {
     )
   },
 
+  jobPlanViewUrl: (jobId: string) => `/api/job/${jobId}/plan-view`,
+
   /** Aks doğrulamasını kalibrasyona ekleyip yeni bir job olarak yeniden analiz başlatır. */
   async recalibrate(jobId: string, req: RecalibrateRequest): Promise<{ job_id: string }> {
     return unwrap(

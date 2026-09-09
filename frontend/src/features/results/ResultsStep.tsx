@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Download, FileText, Loader2, Ruler, RotateCcw } from 'lucide-react'
+import { Download, FileText, Loader2, Map, Ruler, RotateCcw } from 'lucide-react'
 import { api } from '@/lib/api'
 import { useWizard } from '@/store/wizard'
 import { Button, buttonVariants } from '@/components/ui/button'
@@ -19,6 +19,7 @@ export function ResultsStep() {
   const controlPoints = useWizard((s) => s.controlPoints)
   const reset = useWizard((s) => s.reset)
   const [axleTrackId, setAxleTrackId] = useState<number | null>(null)
+  const [showPlanView, setShowPlanView] = useState(false)
 
   const resultsQuery = useQuery({
     queryKey: ['jobResults', jobId],
@@ -173,6 +174,32 @@ export function ResultsStep() {
           >
             Tarayıcınız video oynatmayı desteklemiyor.
           </video>
+        </div>
+
+        {/* Kuş bakışı */}
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowPlanView((v) => !v)}
+            >
+              <Map className="size-3.5" />
+              {showPlanView ? 'Kuş Bakışını Gizle' : 'Kuş Bakışını Göster'}
+            </Button>
+            {showPlanView && (
+              <span className="text-xs text-muted-foreground">
+                1 m'lik ızgara üzerinde araçları ölçerek homografiyi doğrulayabilirsiniz.
+              </span>
+            )}
+          </div>
+          {showPlanView && (
+            <img
+              src={api.jobPlanViewUrl(jobId)}
+              alt="Kuş bakışı (plan view)"
+              className="w-full rounded-lg border"
+            />
+          )}
         </div>
 
         {/* İndirmeler */}
