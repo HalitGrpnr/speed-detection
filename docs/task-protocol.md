@@ -70,6 +70,8 @@ Kullanıcı itiraz etmezse devam et. Büyük görevlerde onayı bekle.
 □ pytest yeşil, npm run build temiz (ilgili değişiklik varsa)
 ```
 
+**Commit mesajı kuralı:** `Co-Authored-By:` satırı eklenmez.
+
 ---
 
 ## 3. Görev Dosyası Şablonu (`tasks/T{n}.md`)

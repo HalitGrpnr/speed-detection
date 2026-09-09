@@ -55,6 +55,7 @@ hareketinden hesaplanır (bbox merkezi KULLANILMAZ — paralaks hatası üretir)
    Mimari karar gerekiyorsa `docs/teknik-analiz.md` ile çelişme; çelişiyorsa DUR ve sor.
 4. **Sonda:**
    - Anlamlı commit at (görev/alt-adım başına). Açıklayıcı commit mesajı.
+     Commit mesajlarına `Co-Authored-By:` satırı **eklenmez**.
    - Görev dosyası oturum logu güncelle (tarih + özet + commit).
    - `tasks/BACKLOG.md` durum işaretini güncelle.
    - `PROGRESS.md`'yi güncelle (ne bitti, ne devam ediyor, sıradaki, bilinen sorun).
