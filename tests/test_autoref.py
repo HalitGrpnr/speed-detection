@@ -275,6 +275,18 @@ def test_auto_proposer_right_world_x_lane_width():
         assert abs(p.world_m[0] - 3.5) < 1e-9, "Sağ şerit x_world=3.5 olmalı"
 
 
+def test_auto_proposer_proposals_always_within_image_bounds():
+    """Üretilen tüm öneriler görüntü sınırları içinde olmalıdır (T5 — Seçenek B)."""
+    proposer = AutoProposer(n_sample_depths=5)
+    for frame in [_lane_frame(), _blank_frame(), _dash_frame()]:
+        h, w = frame.shape[:2]
+        proposals = proposer.propose(frame)
+        for p in proposals:
+            x, y = p.pixel
+            assert 0 <= x < w, f"x={x:.1f} görüntü sınırı dışında (0..{w-1})"
+            assert 0 <= y < h, f"y={y:.1f} görüntü sınırı dışında (0..{h-1})"
+
+
 def test_auto_proposer_y_world_increases_with_distance():
     """Uzaktaki noktalar daha büyük y_world değeri taşımalı (derin = yüksek y_world)."""
     proposer = AutoProposer(n_sample_depths=3)

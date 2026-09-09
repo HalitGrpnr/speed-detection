@@ -113,6 +113,11 @@ class AutoProposer:
             samples = sample_line_at_depths(m, b, y_samples)
 
             for i, (x_px, y_px) in enumerate(samples):
+                # Seçenek B (T5): görüntü sınırı dışına çıkan önerileri bastır.
+                # Sığ polyfit + uzağa ekstrapolasyon gerçek görüntülerde sınır-dışı
+                # x koordinatları üretebilir; operatörü yanıltmamak için atlanır.
+                if not (0 <= x_px < w and 0 <= y_px < h):
+                    continue
                 y_world = self._y_world(y_px, y_near, px_per_m, px_per_m_lateral, i, y_vp)
                 depth_tag = _DEPTH_LABELS.get(i, f"d{i}")
                 conf = round(max(0.3, 0.90 - i * 0.12), 2)

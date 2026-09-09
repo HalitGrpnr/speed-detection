@@ -82,7 +82,13 @@ export function AutoRefPanel({ videoId, frame, onProposals }: Props) {
       {mutation.isError && (
         <StatusBanner tone="error">{(mutation.error as Error).message}</StatusBanner>
       )}
-      {mutation.isSuccess && (
+      {mutation.isSuccess && mutation.data.length === 0 && (
+        <StatusBanner tone="warning">
+          Otomatik öneri bulunamadı — şerit tespit edilemedi veya görüntü sınırı dışına taştı.
+          Elle işaretleyin.
+        </StatusBanner>
+      )}
+      {mutation.isSuccess && mutation.data.length > 0 && (
         <p className="text-[0.7rem] text-amber-700">
           {mutation.data.length} öneri eklendi. ⚠ Y koordinatları tahminidir — tabloda düzeltip
           doğrulayın.
