@@ -15,6 +15,8 @@ class JobState:
     overlay_path: Path | None = None
     report_path: Path | None = None
     result_json: dict | None = None
+    frame_step: int | None = None
+    model_name_used: str | None = None
 
 
 class JobStore:

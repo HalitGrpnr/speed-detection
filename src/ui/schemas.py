@@ -29,6 +29,12 @@ class CalibrateRequest(BaseModel):
     control_points: list[ControlPointIn]
 
 
+class RejectedPointOut(BaseModel):
+    id: str
+    error_cm: float    # yeniden projeksiyon hatası (santimetre)
+    threshold_cm: float
+
+
 class CalibrateResponse(BaseModel):
     rms_m: float
     inlier_count: int
@@ -38,6 +44,7 @@ class CalibrateResponse(BaseModel):
     point_count: int = 0              # toplam nokta sayısı (redundancy değerlendirmesi için)
     loo_rms_m: float | None = None    # leave-one-out RMS (≥5 nokta varsa)
     holdout_rows: list[dict] = []     # operatör held-out doğrulama satırları
+    rejected_points: list[RejectedPointOut] = []  # RANSAC tarafından dışlanan noktalar
 
 
 class PlanViewRequest(BaseModel):

@@ -17,7 +17,7 @@ from fastapi.responses import FileResponse, HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from src.autoref.proposer import AutoProposer
-from src.calibration.homography import compute_homography
+from src.calibration.homography import compute_homography, pixel_to_world
 from src.calibration.io import load_calibration, save_calibration
 from src.calibration.metrics import holdout_validation, loo_rms
 from src.calibration.models import CalibrationError, CalibrationResult, ControlPoint
@@ -45,6 +45,7 @@ from .schemas import (
     PlanViewRequest,
     ProposedPointOut,
     RecalibrateRequest,
+    RejectedPointOut,
     SpeedEstimateOut,
     VideoMetaOut,
 )
@@ -231,6 +232,20 @@ async def calibrate(req: CalibrateRequest) -> CalibrateResponse:
         except CalibrationError:
             pass  # eğitim noktaları yetersizse sessizce atla
 
+    # RANSAC_THRESHOLD ile eşleşmesi için homography.py'deki 0.5 m değerini kullan
+    _RANSAC_THRESHOLD_M = 0.5
+    excl_ids = set(result.excluded_point_ids)
+    rejected: list[RejectedPointOut] = []
+    for p in points:
+        if p.id in excl_ids:
+            pred = pixel_to_world(result.homography, p.pixel)
+            err_m = float(np.hypot(pred[0] - p.world_m[0], pred[1] - p.world_m[1]))
+            rejected.append(RejectedPointOut(
+                id=p.id,
+                error_cm=round(err_m * 100, 1),
+                threshold_cm=round(_RANSAC_THRESHOLD_M * 100, 1),
+            ))
+
     return CalibrateResponse(
         rms_m=result.reprojection_rms_m,
         inlier_count=len(result.used_point_ids),
@@ -240,6 +255,7 @@ async def calibrate(req: CalibrateRequest) -> CalibrateResponse:
         point_count=len(points),
         loo_rms_m=loo_rms_val,
         holdout_rows=h_rows,
+        rejected_points=rejected,
     )
 
 
@@ -329,6 +345,8 @@ def _finalize_job(job: JobState, result, out_video: Path, out_report: Path, out_
     job.overlay_path = out_video if out_video.exists() else None
     job.report_path = out_report if out_report.exists() else None
     job.result_json = {"vehicle_count": len(estimates), "estimates": estimates}
+    job.frame_step = result.frame_step
+    job.model_name_used = result.model_name
     job.progress_pct = 100.0
     job.state = "done"
 
@@ -384,6 +402,8 @@ def _run_recalibrate_thread(
     out_dir: Path,
     tracks: list,
     video_sha256: str,
+    original_frame_step: int = 1,
+    original_model_name: str = "",
 ) -> None:
     """Mevcut track'lerle (tespit atlanır) yeni kalibrasyona göre hız + çıktıları yeniden üret."""
     try:
@@ -393,15 +413,22 @@ def _run_recalibrate_thread(
         out_video = out_dir / "overlay.mp4"
         out_report = out_dir / "report.pdf"
 
+        display_model = (
+            f"{original_model_name} — hızlar yeniden hesaplandı, tespit tekrarlanmadı"
+            if original_model_name
+            else "(tekrar tespit edilmedi — yalnızca kalibrasyon güncellendi)"
+        )
+
         result = run_pipeline(
             video_path=video_path,
             calibration_path=cal_json_path,
             out_video=out_video,
             out_report=out_report,
+            frame_step=original_frame_step,
             progress=True,
             video_sha256=video_sha256,
             precomputed_tracks=tracks,
-            model_name="(tekrar tespit edilmedi — yalnızca kalibrasyon güncellendi)",
+            model_name=display_model,
         )
         job.progress_pct = 90.0
         _finalize_job(job, result, out_video, out_report, out_dir)
@@ -703,7 +730,8 @@ async def recalibrate(job_id: str, req: RecalibrateRequest) -> dict:
     video_sha256 = _sha256(video_path)
     thread = threading.Thread(
         target=_run_recalibrate_thread,
-        args=(new_job, video_path, new_cal_path, new_out_dir, tracks, video_sha256),
+        args=(new_job, video_path, new_cal_path, new_out_dir, tracks, video_sha256,
+              old_job.frame_step or 1, old_job.model_name_used or ""),
         daemon=True,
     )
     thread.start()
