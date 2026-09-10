@@ -5,7 +5,7 @@
 > geçmişine bakılır; bu dosya yalnızca **anlık durumun özetini** tutar (şişirmeyin).
 
 **Son güncelleme:** 2026-09-10
-**Aktif görev:** _(T8 tamamlandı — sıradaki: T3/T4/T9, bkz. `tasks/BACKLOG.md`)_
+**Aktif görev:** _(T12 tamamlandı — sıradaki: T13/T3/T4/T9, bkz. `tasks/BACKLOG.md`)_
 
 **En son (önemli, forensic-etkili bir düzeltme):** Kullanıcı gerçek video analizinde şunu fark
 etti: araç kareye girdiği an overlay videoda ~25 km/h, birkaç kare sonra "aniden" ~65 km/h
@@ -60,6 +60,7 @@ H ile kaba dünya konumuna oturtup bilinen genişliğe göre düzeltiyor. Yeni e
 | M9 | DTP karşılaştırması — aks genişliği çapraz doğrulama | ✅ Bitti | plaka tespiti ertelendi (RCE); `tasks/M9.md` |
 | T1 | Reddedilen kalibrasyon noktalarını görselleştir | ✅ Bitti | turuncu ✕ + tooltip + "X kabul Y reddedildi" |
 | T8 | Dingil adımlama yöntemi | ✅ Bitti | AxleStepper + endpoint + AxleSteppingPanel; `tasks/T8.md` |
+| T12 | Dingil karşılaştırmasında pencere H-hızı | ✅ Bitti | h_speed_window_kmh; `tasks/T12.md` |
 | T2 | Recalibrate sonrası rapor metadata tutarsızlığı | ✅ Bitti | frame_step ve model_name orijinalden aktarılıyor |
 | T5 | M6 şerit tespitinde aykırı değer eleme | ✅ Bitti | sınır-dışı öneri bastırma (Seçenek B) |
 | T6 | Pipeline sonucunu kalıcı JSON'a yaz | ✅ Bitti | serialization.py round-trip + _finalize_job result_data.json |
@@ -88,6 +89,12 @@ sonrası yeniden build edilmedi — bir sonraki paketleme öncesi kontrol edilme
   (fontlar self-host).
 
 ## Son Oturum (2026-09-10)
+
+- **T12 tamamlandı:** Dingil panelindeki H-tabanlı karşılaştırma kutusuna "pencere" hızı eklendi.
+  `AxleStepResponse.h_speed_window_kmh` → backend `result_data.json` → track'in `smoothed_series`
+  içinden `frame_n..son_adım_frame` aralığındaki örnekler → `np.median`. `result_data.json` yoksa
+  (eski iş) `None` döner, panel "Sonuç verisi mevcut değil" gösterir. `hSpeedKmh` prop kaldırıldı,
+  başlık "H-tabanlı (aynı pencere)" güncellendi. pytest 249/249, build temiz. Commit: `1930da3`.
 
 - **T8 tamamlandı:** Dingil adımlama yöntemi. `src/speed/axle_stepping.py` (AxleStepper —
   dünya-uzayı projeksiyon, alt-kare enterpolasyon, gap tespiti + AxleStepResult dataclass).

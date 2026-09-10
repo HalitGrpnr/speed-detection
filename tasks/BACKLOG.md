@@ -30,7 +30,7 @@
 | T9 | PyInstaller paketi yeniden build ve smoke test | Paketleme | Küçük | — | ⬜ |
 | T10 | GPS referanslı doğrulama veri seti | Doğrulama | Dış bağımlı | — | ⬜ |
 | T11 | Plaka OCR | Gelecek | Büyük | — | ⬜ |
-| T12 | Dingil karşılaştırmasında pencere H-hızı | UI/Backend | Küçük | T8 | ⬜ |
+| T12 | Dingil karşılaştırmasında pencere H-hızı | UI/Backend | Küçük | T8 | ✅ |
 | T13 | Track hız zaman serisi hover grafiği | UI | Orta | — | ⬜ |
 
 Durum: ⬜ Başlanmadı · 🟡 Devam ediyor · ✅ Bitti · ⛔ Engellendi
@@ -387,3 +387,4 @@ yüklemek RCE riski taşıyor (bkz. `DECISIONS.md`).
 | 2026-09-10 | T6 | serialization.py round-trip JSON + _finalize_job result_data.json yazımı | `924166b` |
 | 2026-09-10 | T7 | generate_report axle_checks param + /report/regenerate endpoint + frontend v2 rapor indirme | `924166b` |
 | 2026-09-10 | T8 | AxleStepper + 13 birim test + /axle-step endpoint + AxleSteppingPanel + ResultsStep entegrasyon | `d68a39b` |
+| 2026-09-10 | T12 | AxleStepResponse.h_speed_window_kmh + endpoint pencere medyanı + panel "aynı pencere" etiketi | `1930da3` |
