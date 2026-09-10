@@ -5,7 +5,7 @@
 > geçmişine bakılır; bu dosya yalnızca **anlık durumun özetini** tutar (şişirmeyin).
 
 **Son güncelleme:** 2026-09-10
-**Aktif görev:** _(Yok — T1+T2+T5+T6+T7 bitti, sıradaki: T3/T4/T9, bkz. `tasks/BACKLOG.md`)_
+**Aktif görev:** _(T8 tamamlandı — sıradaki: T3/T4/T9, bkz. `tasks/BACKLOG.md`)_
 
 **En son (önemli, forensic-etkili bir düzeltme):** Kullanıcı gerçek video analizinde şunu fark
 etti: araç kareye girdiği an overlay videoda ~25 km/h, birkaç kare sonra "aniden" ~65 km/h
@@ -59,6 +59,7 @@ H ile kaba dünya konumuna oturtup bilinen genişliğe göre düzeltiyor. Yeni e
 | M8 | Frontend modernizasyonu (React+Vite+TS+Tailwind) | ✅ Bitti | tek UI React SPA; legacy kaldırıldı; `tasks/M8.md` |
 | M9 | DTP karşılaştırması — aks genişliği çapraz doğrulama | ✅ Bitti | plaka tespiti ertelendi (RCE); `tasks/M9.md` |
 | T1 | Reddedilen kalibrasyon noktalarını görselleştir | ✅ Bitti | turuncu ✕ + tooltip + "X kabul Y reddedildi" |
+| T8 | Dingil adımlama yöntemi | ✅ Bitti | AxleStepper + endpoint + AxleSteppingPanel; `tasks/T8.md` |
 | T2 | Recalibrate sonrası rapor metadata tutarsızlığı | ✅ Bitti | frame_step ve model_name orijinalden aktarılıyor |
 | T5 | M6 şerit tespitinde aykırı değer eleme | ✅ Bitti | sınır-dışı öneri bastırma (Seçenek B) |
 | T6 | Pipeline sonucunu kalıcı JSON'a yaz | ✅ Bitti | serialization.py round-trip + _finalize_job result_data.json |
@@ -68,7 +69,7 @@ H ile kaba dünya konumuna oturtup bilinen genişliğe göre düzeltiyor. Yeni e
 
 Durum işaretleri: ⬜ Başlanmadı · 🟡 Devam ediyor · ✅ Bitti · ⛔ Engellendi
 
-**Test durumu:** `pytest` **230/230 yeşil**. `frontend/` `npm run build` temiz. PyInstaller paketi
+**Test durumu:** `pytest` **249/249 yeşil**. `frontend/` `npm run build` temiz. PyInstaller paketi
 (`dist/SpeedDetection/`, ~772 MB arm64) M9 + kuş bakışı + recalibrate + smoother düzeltmesi
 sonrası yeniden build edilmedi — bir sonraki paketleme öncesi kontrol edilmeli.
 
@@ -86,21 +87,17 @@ sonrası yeniden build edilmedi — bir sonraki paketleme öncesi kontrol edilme
   yeniden hesaplanır; her hız CI + güven seviyesi taşır (çıplak sayı yok); harici ağ çağrısı yok
   (fontlar self-host).
 
-## Son Oturum (2026-09-09)
+## Son Oturum (2026-09-10)
 
-- **T1 tamamlandı:** `/api/calibrate` yanıtına `rejected_points` eklendi (id, error_cm, threshold_cm).
-  Frontend: `CalibrationCanvas` turuncu ✕ ikonu, `PointsTable` hover tooltip, panel "X kabul Y reddedildi" özeti.
-  Commits: `221b2b8` (backend), `e207d32` (frontend).
-- **T2 tamamlandı:** `JobState`'e `frame_step` ve `model_name_used` alanları eklendi;
-  `_finalize_job` bunları doldurur, `_run_recalibrate_thread` orijinal job'dan alıp rapora yansıtır.
-  Commit: `221b2b8`.
-
-- **T5 tamamlandı:** `proposer.py` propose() döngüsüne sınır kontrolü eklendi; `0 <= x < w` ve
-  `0 <= y < h` sağlanmazsa öneri atlanır. Sıfır-öneri durumunda `StatusBanner(warning)` gösterilir.
-  Invariant testi eklendi. Commit: `c79e31a`.
+- **T8 tamamlandı:** Dingil adımlama yöntemi. `src/speed/axle_stepping.py` (AxleStepper —
+  dünya-uzayı projeksiyon, alt-kare enterpolasyon, gap tespiti + AxleStepResult dataclass).
+  13 birim test. Backend: `AxleStepRequest/Response` şemaları + `POST /api/job/{id}/track/{id}/axle-step`.
+  Frontend: `AxleSteppingPanel.tsx` (2-tıklama ön/arka işaretleme, wheelbase hazır listesi,
+  H-tabanlı hızla karşılaştırma kutusu), ResultsStep yeni "Dingil" sütunu.
+  pytest 249/249, npm run build temiz. Commit: `d68a39b`.
 
 **Sıradaki:** T3/T4 (tarayıcı testleri) veya T9 (PyInstaller yeniden build).
-T8 (dingil adımlama) için arkadaşın fotoğrafları bekleniyor — tasarım onlarla netleşecek.
+T8 tamamlandı — fotoğraflar gelince ek refinement yapılabilir.
 
 ## Açık İşler
 

@@ -26,7 +26,7 @@
 | T5 | M6 şerit tespitinde aykırı değer eleme | Kalibrasyon | Orta | — | ✅ |
 | T6 | Pipeline sonucunu kalıcı JSON'a yaz | Backend | Orta | — | ✅ |
 | T7 | Aks doğrulama sonucunu PDF'e ekle | Rapor | Küçük | T6 | ✅ |
-| T8 | Dingil adımlama yöntemi | Yeni özellik | Büyük | — | ⬜ |
+| T8 | Dingil adımlama yöntemi | Yeni özellik | Büyük | — | ✅ |
 | T9 | PyInstaller paketi yeniden build ve smoke test | Paketleme | Küçük | — | ⬜ |
 | T10 | GPS referanslı doğrulama veri seti | Doğrulama | Dış bağımlı | — | ⬜ |
 | T11 | Plaka OCR | Gelecek | Büyük | — | ⬜ |
@@ -384,3 +384,4 @@ yüklemek RCE riski taşıyor (bkz. `DECISIONS.md`).
 | 2026-09-09 | T5 | proposer.py sınır-dışı öneri bastırma + UI uyarı + invariant testi | `c79e31a` |
 | 2026-09-10 | T6 | serialization.py round-trip JSON + _finalize_job result_data.json yazımı | `924166b` |
 | 2026-09-10 | T7 | generate_report axle_checks param + /report/regenerate endpoint + frontend v2 rapor indirme | `924166b` |
+| 2026-09-10 | T8 | AxleStepper + 13 birim test + /axle-step endpoint + AxleSteppingPanel + ResultsStep entegrasyon | `d68a39b` |
