@@ -33,6 +33,7 @@ from src.reliability.axle_check import (
 )
 
 from .job_store import JobState, JobStore
+from . import session_log as slog
 from .schemas import (
     AutoRefRequest,
     AxleCheckRequest,
@@ -360,6 +361,24 @@ def _finalize_job(job: JobState, result, out_video: Path, out_report: Path, out_
     job.video_path = result.video_path
     job.progress_pct = 100.0
     job.state = "done"
+
+    slog.append(
+        out_dir,
+        "pipeline_run",
+        job_id=job.job_id,
+        model=result.model_name,
+        frame_step=result.frame_step,
+        vehicle_count=len(estimates),
+        estimates=[
+            {
+                "track_id": e["track_id"],
+                "speed_kmh": e["speed_kmh"],
+                "ci_kmh": e["ci_kmh"],
+                "confidence_level": e["confidence_level"],
+            }
+            for e in estimates
+        ],
+    )
 
 
 def _run_pipeline_thread(
@@ -757,6 +776,15 @@ async def axle_check(job_id: str, track_id: int, req: AxleCheckRequest) -> AxleC
         json.dumps(audit, ensure_ascii=False, indent=2)
     )
 
+    slog.append(
+        _job_out_dir(job_id),
+        "axle_check",
+        track_id=track_id,
+        known_width_m=req.known_width_m,
+        measured_width_m=round(result.get("measured_width_m", 0), 4),
+        error_m=round(result.get("error_m", 0), 4),
+        error_pct=round(result.get("error_pct", 0), 2),
+    )
     return AxleCheckResponse(**result)
 
 
@@ -865,7 +893,7 @@ async def axle_step(job_id: str, track_id: int, req: AxleStepRequest) -> AxleSte
         except Exception:
             pass
 
-    return AxleStepResponse(
+    resp = AxleStepResponse(
         speed_kmh=round(r.speed_kmh, 2) if r.speed_kmh is not None else None,
         ci_kmh=round(r.ci_kmh, 2) if r.ci_kmh is not None else None,
         step_count=r.step_count,
@@ -875,6 +903,20 @@ async def axle_step(job_id: str, track_id: int, req: AxleStepRequest) -> AxleSte
         initial_distance_m=round(r.initial_distance_m, 4),
         h_speed_window_kmh=round(h_speed_window_kmh, 2) if h_speed_window_kmh is not None else None,
     )
+    slog.append(
+        _job_out_dir(job_id),
+        "axle_step_manual",
+        track_id=track_id,
+        frame_n=req.frame_n,
+        wheelbase_m=req.wheelbase_m,
+        measured_distance_m=resp.initial_distance_m,
+        speed_kmh=resp.speed_kmh,
+        ci_kmh=resp.ci_kmh,
+        step_count=resp.step_count,
+        h_speed_window_kmh=resp.h_speed_window_kmh,
+        interrupted=resp.interrupted,
+    )
+    return resp
 
 
 @app.post(
@@ -942,7 +984,7 @@ async def axle_step_auto(job_id: str, track_id: int, req: AxleStepAutoRequest) -
         except Exception:
             pass
 
-    return AxleStepResponse(
+    resp = AxleStepResponse(
         speed_kmh=round(r.speed_kmh, 2) if r.speed_kmh is not None else None,
         ci_kmh=round(r.ci_kmh, 2) if r.ci_kmh is not None else None,
         step_count=r.step_count,
@@ -952,6 +994,18 @@ async def axle_step_auto(job_id: str, track_id: int, req: AxleStepAutoRequest) -
         initial_distance_m=None,
         h_speed_window_kmh=round(h_speed_window_kmh, 2) if h_speed_window_kmh is not None else None,
     )
+    slog.append(
+        _job_out_dir(job_id),
+        "axle_step_auto",
+        track_id=track_id,
+        wheelbase_m=req.wheelbase_m,
+        speed_kmh=resp.speed_kmh,
+        ci_kmh=resp.ci_kmh,
+        step_count=resp.step_count,
+        h_speed_window_kmh=resp.h_speed_window_kmh,
+        interrupted=resp.interrupted,
+    )
+    return resp
 
 
 @app.post("/api/job/{job_id}/recalibrate", status_code=202)
@@ -1018,7 +1072,26 @@ async def recalibrate(job_id: str, req: RecalibrateRequest) -> dict:
     )
     thread.start()
 
+    slog.append(
+        _job_out_dir(job_id),
+        "recalibrate_started",
+        source_job_id=job_id,
+        new_job_id=new_job_id,
+        track_id=req.track_id,
+        known_width_m=req.known_width_m,
+        old_point_count=len(req.control_points),
+        new_point_count=len(new_points),
+        new_rms_cm=round(new_cal_result.reprojection_rms_m * 100, 2),
+    )
+
     return {"job_id": new_job_id, "source_job_id": old_job.job_id}
+
+
+@app.get("/api/job/{job_id}/session-log")
+async def get_session_log(job_id: str) -> list[dict]:
+    """Job oturum logu — her adım, parametre ve sonuç (session_log.jsonl)."""
+    _get_done_job(job_id)
+    return slog.read(_job_out_dir(job_id))
 
 
 # ── Static files ──────────────────────────────────────────────────────────────

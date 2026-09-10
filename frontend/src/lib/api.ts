@@ -208,4 +208,9 @@ export const api = {
   async speedSeries(jobId: string, trackId: number): Promise<SpeedSeriesOut> {
     return unwrap(await fetch(`/api/job/${jobId}/track/${trackId}/speed-series`))
   },
+
+  /** Oturum logu — her adım, parametre ve sonuç. */
+  async sessionLog(jobId: string): Promise<Record<string, unknown>[]> {
+    return unwrap(await fetch(`/api/job/${jobId}/session-log`))
+  },
 }

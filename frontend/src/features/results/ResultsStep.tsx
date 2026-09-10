@@ -14,6 +14,7 @@ import { InfoHint } from '@/components/common/InfoHint'
 import { AxleCheckPanel } from './AxleCheckPanel'
 import { AxleSteppingPanel } from './AxleSteppingPanel'
 import { SpeedSparkline } from './SpeedSparkline'
+import { SessionLogPanel } from './SessionLogPanel'
 
 export function ResultsStep() {
   const jobId = useWizard((s) => s.jobId)
@@ -355,6 +356,8 @@ export function ResultsStep() {
             <Download /> Overlay Video İndir
           </a>
         </div>
+
+        {jobId && <SessionLogPanel jobId={jobId} />}
 
         <Separator />
 
