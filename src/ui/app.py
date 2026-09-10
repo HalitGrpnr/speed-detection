@@ -365,7 +365,7 @@ def _finalize_job(job: JobState, result, out_video: Path, out_report: Path, out_
     slog.append(
         out_dir,
         "pipeline_run",
-        job_id=job.job_id,
+        _job_id=job.job_id,
         model=result.model_name,
         frame_step=result.frame_step,
         vehicle_count=len(estimates),
@@ -779,6 +779,7 @@ async def axle_check(job_id: str, track_id: int, req: AxleCheckRequest) -> AxleC
     slog.append(
         _job_out_dir(job_id),
         "axle_check",
+        _job_id=job_id,
         track_id=track_id,
         known_width_m=req.known_width_m,
         measured_width_m=round(result.get("measured_width_m", 0), 4),
@@ -906,6 +907,7 @@ async def axle_step(job_id: str, track_id: int, req: AxleStepRequest) -> AxleSte
     slog.append(
         _job_out_dir(job_id),
         "axle_step_manual",
+        _job_id=job_id,
         track_id=track_id,
         frame_n=req.frame_n,
         wheelbase_m=req.wheelbase_m,
@@ -997,6 +999,7 @@ async def axle_step_auto(job_id: str, track_id: int, req: AxleStepAutoRequest) -
     slog.append(
         _job_out_dir(job_id),
         "axle_step_auto",
+        _job_id=job_id,
         track_id=track_id,
         wheelbase_m=req.wheelbase_m,
         speed_kmh=resp.speed_kmh,
@@ -1075,6 +1078,7 @@ async def recalibrate(job_id: str, req: RecalibrateRequest) -> dict:
     slog.append(
         _job_out_dir(job_id),
         "recalibrate_started",
+        _job_id=job_id,
         source_job_id=job_id,
         new_job_id=new_job_id,
         track_id=req.track_id,
