@@ -30,6 +30,8 @@
 | T9 | PyInstaller paketi yeniden build ve smoke test | Paketleme | Küçük | — | ⬜ |
 | T10 | GPS referanslı doğrulama veri seti | Doğrulama | Dış bağımlı | — | ⬜ |
 | T11 | Plaka OCR | Gelecek | Büyük | — | ⬜ |
+| T12 | Dingil karşılaştırmasında pencere H-hızı | UI/Backend | Küçük | T8 | ⬜ |
+| T13 | Track hız zaman serisi hover grafiği | UI | Orta | — | ⬜ |
 
 Durum: ⬜ Başlanmadı · 🟡 Devam ediyor · ✅ Bitti · ⛔ Engellendi
 
