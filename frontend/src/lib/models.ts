@@ -59,6 +59,10 @@ export interface AxleStepResponse {
   steps: AxleStepOut[]
   interrupted: boolean
   interrupt_reason: string | null
-  initial_distance_m: number
+  initial_distance_m: number | null  // manuel modda ön-arka mesafesi; otomatik modda null
   h_speed_window_kmh: number | null
+}
+
+export interface AxleStepAutoRequest {
+  wheelbase_m: number
 }

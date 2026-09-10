@@ -155,5 +155,9 @@ class AxleStepResponse(BaseModel):
     steps: list[AxleStepOut]
     interrupted: bool
     interrupt_reason: str | None
-    initial_distance_m: float   # ön-arka arası ölçülen dünya mesafesi (doğrulama)
-    h_speed_window_kmh: float | None = None  # dingil penceresi içindeki H-tabanlı medyan hız
+    initial_distance_m: float | None  # manuel: ön-arka mesafesi; otomatik: None
+    h_speed_window_kmh: float | None = None
+
+
+class AxleStepAutoRequest(BaseModel):
+    wheelbase_m: float  # dingil mesafesi (metre) — yön track'ten otomatik tahmin edilir

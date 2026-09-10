@@ -39,6 +39,7 @@ from .schemas import (
     AxleCheckResponse,
     AxleSuggestFrameResponse,
     AxleStepRequest,
+    AxleStepAutoRequest,
     AxleStepResponse,
     AxleStepOut,
     CalibrateRequest,
@@ -872,6 +873,83 @@ async def axle_step(job_id: str, track_id: int, req: AxleStepRequest) -> AxleSte
         interrupted=r.interrupted,
         interrupt_reason=r.interrupt_reason,
         initial_distance_m=round(r.initial_distance_m, 4),
+        h_speed_window_kmh=round(h_speed_window_kmh, 2) if h_speed_window_kmh is not None else None,
+    )
+
+
+@app.post(
+    "/api/job/{job_id}/track/{track_id}/axle-step-auto",
+    response_model=AxleStepResponse,
+)
+async def axle_step_auto(job_id: str, track_id: int, req: AxleStepAutoRequest) -> AxleStepResponse:
+    """Tam otomatik dingil adımlama.
+
+    Yön vektörü track'in tüm contact_pixel noktalarından PCA ile tahmin edilir.
+    Operatör yalnızca dingil mesafesini seçer; hiçbir piksel işaretlemesi gerekmez.
+    """
+    from src.speed.axle_stepping import AxleStepper
+
+    _get_done_job(job_id)
+    track = _get_track_or_404(job_id, track_id)
+
+    if not track.points:
+        raise HTTPException(status_code=422, detail="Bu track'te hiç nokta yok.")
+
+    cal_json_path = _job_out_dir(job_id) / "calibration.json"
+    if not cal_json_path.exists():
+        raise HTTPException(status_code=404, detail="Kalibrasyon verisi bulunamadı.")
+    _, control_points, (fps, _) = load_calibration(cal_json_path)
+
+    try:
+        cal_result = compute_homography(control_points)
+    except CalibrationError as e:
+        raise HTTPException(status_code=422, detail=f"Kalibrasyon yeniden hesaplanamadı: {e}")
+
+    H = cal_result.homography
+    track_pixels = [tp.contact_pixel for tp in track.points]
+
+    try:
+        stepper = AxleStepper.from_track_auto(
+            H=H,
+            track_pixels=track_pixels,
+            wheelbase_m=req.wheelbase_m,
+            fps=fps,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+
+    for tp in track.points:
+        stepper.feed(tp.frame, tp.contact_pixel)
+
+    r = stepper.result()
+
+    h_speed_window_kmh: float | None = None
+    result_data_path = _job_out_dir(job_id) / "result_data.json"
+    if result_data_path.exists() and r.steps:
+        try:
+            rd = read_result_data(_job_out_dir(job_id))
+            window_start_t_s = r.steps[0].frame / fps
+            window_end_t_s = r.steps[-1].frame / fps
+            for est in rd.speed_estimates:
+                if est.track_id == track_id:
+                    window_speeds = [
+                        v for (t_s, v) in est.smoothed_series
+                        if window_start_t_s <= t_s <= window_end_t_s
+                    ]
+                    if window_speeds:
+                        h_speed_window_kmh = float(np.median(window_speeds))
+                    break
+        except Exception:
+            pass
+
+    return AxleStepResponse(
+        speed_kmh=round(r.speed_kmh, 2) if r.speed_kmh is not None else None,
+        ci_kmh=round(r.ci_kmh, 2) if r.ci_kmh is not None else None,
+        step_count=r.step_count,
+        steps=[AxleStepOut(frame=s.frame, distance_m=s.distance_m) for s in r.steps],
+        interrupted=r.interrupted,
+        interrupt_reason=r.interrupt_reason,
+        initial_distance_m=None,
         h_speed_window_kmh=round(h_speed_window_kmh, 2) if h_speed_window_kmh is not None else None,
     )
 

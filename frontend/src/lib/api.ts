@@ -8,6 +8,7 @@ import type {
   AxleCheckResponse,
   AxleSuggestFrameResponse,
   AxleStepRequest,
+  AxleStepAutoRequest,
   AxleStepResponse,
   CalibrateRequest,
   CalibrateResponse,
@@ -181,10 +182,21 @@ export const api = {
   /** Güncellenmiş raporu indirme URL'i. */
   reportV2Url: (jobId: string) => `/api/job/${jobId}/report/v2`,
 
-  /** Dingil adımlama hız tahmini (T8). */
+  /** Dingil adımlama hız tahmini (T8, manuel mod). */
   async axleStep(jobId: string, trackId: number, req: AxleStepRequest): Promise<AxleStepResponse> {
     return unwrap(
       await fetch(`/api/job/${jobId}/track/${trackId}/axle-step`, {
+        method: 'POST',
+        headers: jsonHeaders,
+        body: JSON.stringify(req),
+      }),
+    )
+  },
+
+  /** Tam otomatik dingil adımlama — yön track'ten PCA ile tahmin edilir. */
+  async axleStepAuto(jobId: string, trackId: number, req: AxleStepAutoRequest): Promise<AxleStepResponse> {
+    return unwrap(
+      await fetch(`/api/job/${jobId}/track/${trackId}/axle-step-auto`, {
         method: 'POST',
         headers: jsonHeaders,
         body: JSON.stringify(req),

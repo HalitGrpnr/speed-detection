@@ -1,10 +1,10 @@
-"""Birim testler — AxleStepper (T8)."""
+"""Birim testler — AxleStepper (T8) ve otomatik mod."""
 from __future__ import annotations
 
 import numpy as np
 import pytest
 
-from src.speed.axle_stepping import AxleStepper, AxleStep
+from src.speed.axle_stepping import AxleStepper, AxleStep, estimate_travel_direction
 
 
 # ── Yardımcılar ──────────────────────────────────────────────────────────────
@@ -231,3 +231,88 @@ class TestResultHelper:
         assert isinstance(r.steps, list)
         if r.step_count >= 2:
             assert r.speed_kmh is not None
+
+
+# ── Otomatik mod (from_track_auto + estimate_travel_direction) ───────────────
+
+class TestAutoMode:
+    def test_direction_y_axis(self):
+        """Y ekseninde hareket eden track → yön vektörü [0, 1]."""
+        H = _identity_H()
+        pixels = [(0.0, float(i)) for i in range(10)]
+        d = estimate_travel_direction(H, pixels)
+        assert abs(d[0]) < 1e-9
+        assert abs(d[1] - 1.0) < 1e-9
+
+    def test_direction_x_axis(self):
+        """X ekseninde hareket eden track → yön vektörü [1, 0]."""
+        H = _identity_H()
+        pixels = [(float(i), 0.0) for i in range(10)]
+        d = estimate_travel_direction(H, pixels)
+        assert abs(d[0] - 1.0) < 1e-9
+        assert abs(d[1]) < 1e-9
+
+    def test_direction_diagonal(self):
+        """45° hareket → yön vektörü [1/√2, 1/√2]."""
+        H = _identity_H()
+        pixels = [(float(i), float(i)) for i in range(10)]
+        d = estimate_travel_direction(H, pixels)
+        expected = 1.0 / np.sqrt(2)
+        assert abs(d[0] - expected) < 1e-6
+        assert abs(d[1] - expected) < 1e-6
+
+    def test_direction_unit_length(self):
+        """Döndürülen yön vektörü her zaman birim uzunlukta."""
+        H = _identity_H()
+        pixels = [(float(i * 3), float(i * 7)) for i in range(15)]
+        d = estimate_travel_direction(H, pixels)
+        assert abs(np.linalg.norm(d) - 1.0) < 1e-9
+
+    def test_direction_too_few_points(self):
+        """Yetersiz nokta → ValueError."""
+        H = _identity_H()
+        with pytest.raises(ValueError, match="en az"):
+            estimate_travel_direction(H, [(0.0, 0.0), (1.0, 1.0)], min_points=3)
+
+    def test_from_track_auto_speed(self):
+        """Otomatik modda bilinen hız doğru hesaplanır."""
+        fps = 25.0
+        wheelbase_m = 2.65
+        speed_kmh = 50.0
+        speed_ms = speed_kmh / 3.6
+
+        H = _identity_H()
+        # Track: araç Y ekseninde sabit hızda
+        n_frames = 60
+        track_pixels = [(0.0, speed_ms * i / fps) for i in range(n_frames)]
+
+        stepper = AxleStepper.from_track_auto(H, track_pixels, wheelbase_m, fps)
+        for i, px in enumerate(track_pixels):
+            stepper.feed(i, px)
+
+        speed, ci = stepper.estimate_speed()
+        assert speed is not None
+        assert abs(speed - speed_kmh) < 0.5
+
+    def test_from_track_auto_initial_distance_none(self):
+        """Otomatik modda initial_distance_m = None."""
+        H = _identity_H()
+        track_pixels = [(0.0, float(i)) for i in range(10)]
+        stepper = AxleStepper.from_track_auto(H, track_pixels, 2.65, fps=25.0)
+        assert stepper.initial_distance_m is None
+
+    def test_from_track_auto_result_initial_none(self):
+        """result().initial_distance_m = None otomatik modda."""
+        H = _identity_H()
+        track_pixels = [(0.0, float(i) * 0.5) for i in range(20)]
+        stepper = AxleStepper.from_track_auto(H, track_pixels, 2.65, fps=25.0)
+        for i, px in enumerate(track_pixels):
+            stepper.feed(i, px)
+        r = stepper.result()
+        assert r.initial_distance_m is None
+
+    def test_from_track_auto_too_few_points(self):
+        """Track çok kısa → ValueError."""
+        H = _identity_H()
+        with pytest.raises(ValueError):
+            AxleStepper.from_track_auto(H, [(0.0, 0.0), (1.0, 1.0)], 2.65, fps=25.0)

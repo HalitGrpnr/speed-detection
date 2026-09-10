@@ -1,19 +1,58 @@
 """Dingil adımlama hız tahmini.
 
-Araç bir karede ön + arka teker temas noktası işaretlenirse, arka teker eski ön tekerin
-dünya konumuna geldiğinde araç tam 1 dingil mesafesi (wheelbase_m) ilerlemiştir.
-Bu gözlem homografi ile zemin düzleminde perspektif bozulmasından bağımsız olarak doğrudur.
+İki mod:
+- Manuel (T8): operatör ilk karede ön+arka tekeri işaretler, yön vektörü buradan hesaplanır.
+- Otomatik:    yön vektörü track'in tüm contact_pixel noktalarından PCA ile tahmin edilir,
+               operatör hiçbir şey işaretlemez.
 
-Kamera/kalibrasyon hatasından bağımsız bağımsız çapraz doğrulama üretir.
+Her iki modda da arka teker eski ön tekerin dünya konumuna geldiğinde araç tam 1 dingil
+mesafesi ilerlemiştir (perspektif bozulmasından bağımsız, homografi düzlem koşulu yeterli).
+
 Sistemin confidence_level hesabına dahil edilmez; yalnızca destekleyici kanıt.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 import numpy as np
 
 from src.calibration.homography import pixel_to_world
+
+
+def estimate_travel_direction(
+    H: np.ndarray,
+    track_pixels: list[tuple[float, float]],
+    min_points: int = 3,
+) -> np.ndarray:
+    """Track temas noktalarından seyahat yönü birim vektörünü PCA ile tahmin et.
+
+    track_pixels: [(px, py), ...] — tüm karelerin contact_pixel listesi.
+    Döndürür: shape (2,) birim vektör, ilk→son noktaya hizalı.
+    """
+    if len(track_pixels) < min_points:
+        raise ValueError(
+            f"Otomatik yön tahmini için en az {min_points} track noktası gerekli "
+            f"({len(track_pixels)} var)."
+        )
+
+    world_pts = np.array(
+        [pixel_to_world(H, px) for px in track_pixels], dtype=np.float64
+    )  # shape (N, 2)
+
+    # SVD tabanlı PCA: en büyük varyans yönü = seyahat yönü
+    centered = world_pts - world_pts.mean(axis=0)
+    _, _, Vt = np.linalg.svd(centered, full_matrices=False)
+    direction = Vt[0]  # ilk sağ tekil vektör
+
+    # İlk → son nokta yönüne hizala (araç ileri gidiyor)
+    if np.dot(world_pts[-1] - world_pts[0], direction) < 0:
+        direction = -direction
+
+    norm = np.linalg.norm(direction)
+    if norm < 1e-9:
+        raise ValueError("Track noktaları neredeyse sabit — seyahat yönü belirlenemedi.")
+
+    return direction / norm
 
 
 @dataclass
@@ -30,7 +69,7 @@ class AxleStepResult:
     steps: list[AxleStep]
     interrupted: bool
     interrupt_reason: str | None
-    initial_distance_m: float    # ön–arka teker arası ölçülen dünya mesafesi (doğrulama)
+    initial_distance_m: float | None  # manuel modda ön–arka mesafesi; otomatik modda None
 
 
 class AxleStepper:
@@ -167,3 +206,37 @@ class AxleStepper:
             interrupt_reason=self.interrupt_reason,
             initial_distance_m=self.initial_distance_m,
         )
+
+    @classmethod
+    def from_track_auto(
+        cls,
+        H: np.ndarray,
+        track_pixels: list[tuple[float, float]],
+        wheelbase_m: float,
+        fps: float,
+        max_gap_frames: int = 10,
+        min_points: int = 3,
+    ) -> "AxleStepper":
+        """Tam otomatik mod: yön track noktalarından PCA ile tahmin edilir.
+
+        front_pixel / rear_pixel gerekmez. initial_distance_m = None döner.
+        """
+        direction = estimate_travel_direction(H, track_pixels, min_points)
+
+        stepper = cls.__new__(cls)
+        stepper._dir = direction
+        stepper._H = H
+        stepper._wheelbase_m = wheelbase_m
+        stepper._fps = fps
+        stepper._max_gap = max_gap_frames
+        stepper.initial_distance_m = None
+
+        stepper._steps = []
+        stepper._next_target = wheelbase_m
+        stepper._w_ref = None
+        stepper._prev_disp = None
+        stepper._prev_frame = None
+        stepper.interrupted = False
+        stepper.interrupt_reason = None
+
+        return stepper
