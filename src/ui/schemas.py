@@ -122,3 +122,25 @@ class RecalibrateRequest(BaseModel):
     pixel_left: tuple[float, float]
     pixel_right: tuple[float, float]
     known_width_m: float
+
+
+class AxleStepRequest(BaseModel):
+    frame_n: int                         # operatörün tekerlek işaretlediği kare
+    front_pixel: tuple[float, float]     # ön teker temas noktası
+    rear_pixel: tuple[float, float]      # arka teker temas noktası
+    wheelbase_m: float                   # dingil mesafesi (metre)
+
+
+class AxleStepOut(BaseModel):
+    frame: float       # kesirli kare (alt-kare enterpolasyon)
+    distance_m: float  # kümülatif mesafe
+
+
+class AxleStepResponse(BaseModel):
+    speed_kmh: float | None
+    ci_kmh: float | None
+    step_count: int
+    steps: list[AxleStepOut]
+    interrupted: bool
+    interrupt_reason: str | None
+    initial_distance_m: float   # ön-arka arası ölçülen dünya mesafesi (doğrulama)

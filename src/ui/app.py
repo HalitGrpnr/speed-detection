@@ -38,6 +38,9 @@ from .schemas import (
     AxleCheckRequest,
     AxleCheckResponse,
     AxleSuggestFrameResponse,
+    AxleStepRequest,
+    AxleStepResponse,
+    AxleStepOut,
     CalibrateRequest,
     CalibrateResponse,
     JobResultOut,
@@ -752,6 +755,65 @@ async def axle_check(job_id: str, track_id: int, req: AxleCheckRequest) -> AxleC
     )
 
     return AxleCheckResponse(**result)
+
+
+@app.post(
+    "/api/job/{job_id}/track/{track_id}/axle-step",
+    response_model=AxleStepResponse,
+)
+async def axle_step(job_id: str, track_id: int, req: AxleStepRequest) -> AxleStepResponse:
+    """Dingil adımlama hız tahmini (T8).
+
+    Operatörün işaretlediği ön/arka teker piksel konumu + dingil mesafesinden yola çıkar;
+    track contact_pixel'lerini H üzerinden dünya uzayında izleyerek adım zamanlarını bulur.
+    H-tabanlı hızla bağımsız çapraz doğrulama üretir — confidence_level hesabına dahil edilmez.
+    """
+    from src.speed.axle_stepping import AxleStepper
+
+    _get_done_job(job_id)
+    track = _get_track_or_404(job_id, track_id)
+
+    if not track.points:
+        raise HTTPException(status_code=422, detail="Bu track'te hiç nokta yok.")
+
+    cal_json_path = _job_out_dir(job_id) / "calibration.json"
+    if not cal_json_path.exists():
+        raise HTTPException(status_code=404, detail="Kalibrasyon verisi bulunamadı.")
+    _, control_points, (fps, _) = load_calibration(cal_json_path)
+
+    try:
+        cal_result = compute_homography(control_points)
+    except CalibrationError as e:
+        raise HTTPException(status_code=422, detail=f"Kalibrasyon yeniden hesaplanamadı: {e}")
+
+    H = cal_result.homography
+
+    try:
+        stepper = AxleStepper(
+            H=H,
+            front_pixel=req.front_pixel,
+            rear_pixel=req.rear_pixel,
+            wheelbase_m=req.wheelbase_m,
+            fps=fps,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+
+    # Track noktalarını frame_n'den itibaren işle
+    for tp in track.points:
+        if tp.frame >= req.frame_n:
+            stepper.feed(tp.frame, tp.contact_pixel)
+
+    r = stepper.result()
+    return AxleStepResponse(
+        speed_kmh=round(r.speed_kmh, 2) if r.speed_kmh is not None else None,
+        ci_kmh=round(r.ci_kmh, 2) if r.ci_kmh is not None else None,
+        step_count=r.step_count,
+        steps=[AxleStepOut(frame=s.frame, distance_m=s.distance_m) for s in r.steps],
+        interrupted=r.interrupted,
+        interrupt_reason=r.interrupt_reason,
+        initial_distance_m=round(r.initial_distance_m, 4),
+    )
 
 
 @app.post("/api/job/{job_id}/recalibrate", status_code=202)

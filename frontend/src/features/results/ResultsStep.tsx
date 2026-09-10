@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Download, FileText, Loader2, Map, Ruler, RotateCcw } from 'lucide-react'
+import { Download, FileText, Loader2, Map, Milestone, Ruler, RotateCcw } from 'lucide-react'
 import { api } from '@/lib/api'
 import { useWizard } from '@/store/wizard'
 import { Button, buttonVariants } from '@/components/ui/button'
@@ -12,6 +12,7 @@ import { StatusBanner } from '@/components/common/StatusBanner'
 import { StepFooter } from '@/components/common/StepFooter'
 import { InfoHint } from '@/components/common/InfoHint'
 import { AxleCheckPanel } from './AxleCheckPanel'
+import { AxleSteppingPanel } from './AxleSteppingPanel'
 
 export function ResultsStep() {
   const jobId = useWizard((s) => s.jobId)
@@ -20,6 +21,7 @@ export function ResultsStep() {
   const controlPoints = useWizard((s) => s.controlPoints)
   const reset = useWizard((s) => s.reset)
   const [axleTrackId, setAxleTrackId] = useState<number | null>(null)
+  const [steppingTrackId, setSteppingTrackId] = useState<number | null>(null)
   const [showPlanView, setShowPlanView] = useState(false)
   const [hasV2Report, setHasV2Report] = useState(false)
 
@@ -145,8 +147,14 @@ export function ResultsStep() {
                   </th>
                   <th className="px-3 py-2 text-right font-medium">
                     <span className="flex items-center justify-end gap-1">
-                      Ek Doğrulama
+                      Aks Doğrulama
                       <InfoHint text="Aracın aks genişliğini ölçerek homografiyi çapraz doğrular. Bilinen araç genişliğiyle karşılaştırılır; büyük sapma kalibrasyon sorununa işaret eder." />
+                    </span>
+                  </th>
+                  <th className="px-3 py-2 text-right font-medium">
+                    <span className="flex items-center justify-end gap-1">
+                      Dingil Adımlama
+                      <InfoHint text="Ön/arka teker adımı ile bağımsız hız tahmini. Araç kendi tekerleklerini referans alır, harici nokta gerekmez. H-tabanlı hızla karşılaştırma üretir." />
                     </span>
                   </th>
                 </tr>
@@ -174,11 +182,24 @@ export function ResultsStep() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() =>
+                        onClick={() => {
                           setAxleTrackId(axleTrackId === e.track_id ? null : e.track_id)
-                        }
+                          if (steppingTrackId === e.track_id) setSteppingTrackId(null)
+                        }}
                       >
                         <Ruler className="size-3.5" /> Aks Doğrula
+                      </Button>
+                    </td>
+                    <td className="px-3 py-2 text-right">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setSteppingTrackId(steppingTrackId === e.track_id ? null : e.track_id)
+                          if (axleTrackId === e.track_id) setAxleTrackId(null)
+                        }}
+                      >
+                        <Milestone className="size-3.5" /> Dingil
                       </Button>
                     </td>
                   </tr>
@@ -198,6 +219,19 @@ export function ResultsStep() {
             onReportRegenerated={() => setHasV2Report(true)}
           />
         )}
+
+        {steppingTrackId != null && jobId && videoMeta && (() => {
+          const est = result.estimates.find((e) => e.track_id === steppingTrackId)
+          return (
+            <AxleSteppingPanel
+              jobId={jobId}
+              videoId={videoMeta.video_id}
+              trackId={steppingTrackId}
+              hSpeedKmh={est?.speed_kmh ?? 0}
+              onClose={() => setSteppingTrackId(null)}
+            />
+          )
+        })()}
 
         <MethodInfoCard />
 

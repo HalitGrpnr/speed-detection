@@ -25,3 +25,26 @@ export type RecalibrateRequest = Schemas['RecalibrateRequest']
 export type ControlPointSource = ControlPoint['source']
 export type ConfidenceLevel = 'high' | 'medium' | 'low'
 export type ModelSize = PipelineRequest['model_size']
+
+// T8 — Dingil adımlama (types.ts'de yok, doğrudan tanımlanıyor)
+export interface AxleStepRequest {
+  frame_n: number
+  front_pixel: [number, number]
+  rear_pixel: [number, number]
+  wheelbase_m: number
+}
+
+export interface AxleStepOut {
+  frame: number
+  distance_m: number
+}
+
+export interface AxleStepResponse {
+  speed_kmh: number | null
+  ci_kmh: number | null
+  step_count: number
+  steps: AxleStepOut[]
+  interrupted: boolean
+  interrupt_reason: string | null
+  initial_distance_m: number
+}

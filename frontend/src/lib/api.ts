@@ -7,6 +7,8 @@ import type {
   AxleCheckRequest,
   AxleCheckResponse,
   AxleSuggestFrameResponse,
+  AxleStepRequest,
+  AxleStepResponse,
   CalibrateRequest,
   CalibrateResponse,
   JobResult,
@@ -177,4 +179,15 @@ export const api = {
 
   /** Güncellenmiş raporu indirme URL'i. */
   reportV2Url: (jobId: string) => `/api/job/${jobId}/report/v2`,
+
+  /** Dingil adımlama hız tahmini (T8). */
+  async axleStep(jobId: string, trackId: number, req: AxleStepRequest): Promise<AxleStepResponse> {
+    return unwrap(
+      await fetch(`/api/job/${jobId}/track/${trackId}/axle-step`, {
+        method: 'POST',
+        headers: jsonHeaders,
+        body: JSON.stringify(req),
+      }),
+    )
+  },
 }
