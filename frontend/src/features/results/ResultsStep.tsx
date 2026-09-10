@@ -285,7 +285,19 @@ export function ResultsStep() {
 
         {/* Overlay video */}
         <div className="space-y-2">
-          <h3 className="text-sm font-medium">Overlay Video</h3>
+          <div className="flex items-start justify-between gap-2">
+            <h3 className="text-sm font-medium">Overlay Video</h3>
+            <div className="flex flex-col items-end gap-1">
+              <span className="rounded bg-muted px-2 py-0.5 text-xs text-muted-foreground font-mono">
+                H-tabanlı anlık hız · Job: {jobId}
+              </span>
+              {sourceJobId && (
+                <span className="rounded bg-amber-100 px-2 py-0.5 text-xs text-amber-700 font-medium">
+                  ⟳ Yeniden kalibrasyon uygulandı (kaynak: {sourceJobId})
+                </span>
+              )}
+            </div>
+          </div>
           <video
             key={jobId}
             controls
@@ -294,6 +306,9 @@ export function ResultsStep() {
           >
             Tarayıcınız video oynatmayı desteklemiyor.
           </video>
+          <p className="text-xs text-muted-foreground">
+            Her karede gösterilen hız H-tabanlı anlık hızdır. Dingil adımlama sonucu bu videoya yansımaz.
+          </p>
         </div>
 
         {/* Kuş bakışı */}
