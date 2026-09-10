@@ -31,7 +31,7 @@
 | T10 | GPS referanslı doğrulama veri seti | Doğrulama | Dış bağımlı | — | ⬜ |
 | T11 | Plaka OCR | Gelecek | Büyük | — | ⬜ |
 | T12 | Dingil karşılaştırmasında pencere H-hızı | UI/Backend | Küçük | T8 | ✅ |
-| T13 | Track hız zaman serisi hover grafiği | UI | Orta | — | ⬜ |
+| T13 | Track hız zaman serisi hover grafiği | UI | Orta | — | ✅ |
 
 Durum: ⬜ Başlanmadı · 🟡 Devam ediyor · ✅ Bitti · ⛔ Engellendi
 
@@ -388,3 +388,4 @@ yüklemek RCE riski taşıyor (bkz. `DECISIONS.md`).
 | 2026-09-10 | T7 | generate_report axle_checks param + /report/regenerate endpoint + frontend v2 rapor indirme | `924166b` |
 | 2026-09-10 | T8 | AxleStepper + 13 birim test + /axle-step endpoint + AxleSteppingPanel + ResultsStep entegrasyon | `d68a39b` |
 | 2026-09-10 | T12 | AxleStepResponse.h_speed_window_kmh + endpoint pencere medyanı + panel "aynı pencere" etiketi | `1930da3` |
+| 2026-09-10 | T13 | /speed-series endpoint + SpeedSparkline SVG + ResultsStep hover popup | `4990102` |

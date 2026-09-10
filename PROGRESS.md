@@ -5,7 +5,7 @@
 > geçmişine bakılır; bu dosya yalnızca **anlık durumun özetini** tutar (şişirmeyin).
 
 **Son güncelleme:** 2026-09-10
-**Aktif görev:** _(T12 tamamlandı — sıradaki: T13/T3/T4/T9, bkz. `tasks/BACKLOG.md`)_
+**Aktif görev:** _(T13 tamamlandı — sıradaki: T3/T4/T9, bkz. `tasks/BACKLOG.md`)_
 
 **En son (önemli, forensic-etkili bir düzeltme):** Kullanıcı gerçek video analizinde şunu fark
 etti: araç kareye girdiği an overlay videoda ~25 km/h, birkaç kare sonra "aniden" ~65 km/h
@@ -61,6 +61,7 @@ H ile kaba dünya konumuna oturtup bilinen genişliğe göre düzeltiyor. Yeni e
 | T1 | Reddedilen kalibrasyon noktalarını görselleştir | ✅ Bitti | turuncu ✕ + tooltip + "X kabul Y reddedildi" |
 | T8 | Dingil adımlama yöntemi | ✅ Bitti | AxleStepper + endpoint + AxleSteppingPanel; `tasks/T8.md` |
 | T12 | Dingil karşılaştırmasında pencere H-hızı | ✅ Bitti | h_speed_window_kmh; `tasks/T12.md` |
+| T13 | Track hız zaman serisi hover grafiği | ✅ Bitti | /speed-series + SpeedSparkline SVG; `tasks/T13.md` |
 | T2 | Recalibrate sonrası rapor metadata tutarsızlığı | ✅ Bitti | frame_step ve model_name orijinalden aktarılıyor |
 | T5 | M6 şerit tespitinde aykırı değer eleme | ✅ Bitti | sınır-dışı öneri bastırma (Seçenek B) |
 | T6 | Pipeline sonucunu kalıcı JSON'a yaz | ✅ Bitti | serialization.py round-trip + _finalize_job result_data.json |
@@ -89,6 +90,13 @@ sonrası yeniden build edilmedi — bir sonraki paketleme öncesi kontrol edilme
   (fontlar self-host).
 
 ## Son Oturum (2026-09-10)
+
+- **T13 tamamlandı:** Ana sonuç tablosunda track satırına hover ile açılan mini SVG sparkline.
+  `GET /api/job/{id}/track/{id}/speed-series` → `smoothed_series` → `SpeedSeriesOut`.
+  `SpeedSparkline.tsx`: saf SVG, max nokta (kırmızı), medyan çizgisi (gri kesik), süre etiketi.
+  `ResultsStep.tsx`: `hoveredTrackId` state + 120ms debounce + React Query (`staleTime: Infinity`).
+  Harici kütüphane yok. `result_data.json` yoksa popup "Sonuç verisi mevcut değil" gösteriyor.
+  pytest 249/249, build temiz. Commit: `4990102`.
 
 - **T12 tamamlandı:** Dingil panelindeki H-tabanlı karşılaştırma kutusuna "pencere" hızı eklendi.
   `AxleStepResponse.h_speed_window_kmh` → backend `result_data.json` → track'in `smoothed_series`
