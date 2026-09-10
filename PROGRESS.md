@@ -5,7 +5,7 @@
 > geçmişine bakılır; bu dosya yalnızca **anlık durumun özetini** tutar (şişirmeyin).
 
 **Son güncelleme:** 2026-09-10
-**Aktif görev:** _(T13 tamamlandı — sıradaki: T3/T4/T9, bkz. `tasks/BACKLOG.md`)_
+**Aktif görev:** _(T8 otomatik mod tamamlandı — sıradaki: T3/T4/T9, bkz. `tasks/BACKLOG.md`)_
 
 **En son (önemli, forensic-etkili bir düzeltme):** Kullanıcı gerçek video analizinde şunu fark
 etti: araç kareye girdiği an overlay videoda ~25 km/h, birkaç kare sonra "aniden" ~65 km/h
@@ -90,6 +90,8 @@ sonrası yeniden build edilmedi — bir sonraki paketleme öncesi kontrol edilme
   (fontlar self-host).
 
 ## Son Oturum (2026-09-10)
+
+- **T8 otomatik mod tamamlandı:** `estimate_travel_direction()` (SVD/PCA) + `AxleStepper.from_track_auto()` classmethod eklendi. Backend `/axle-step-auto` endpoint — operatör yalnızca wheelbase seçiyor, front/rear tıklama yok. Frontend `AxleSteppingPanel.tsx` Otomatik/Manuel toggle ile yeniden yazıldı; varsayılan otomatik. `initial_distance_m` → `float | None` (auto modda None). 9 yeni birim test. pytest 258/258, build temiz. Commit: `f35da87`. Arkadaşın önerdiği "ByteTrack track'ten yön auto-tahmin" tam olarak bu.
 
 - **T13 tamamlandı:** Ana sonuç tablosunda track satırına hover ile açılan mini SVG sparkline.
   `GET /api/job/{id}/track/{id}/speed-series` → `smoothed_series` → `SpeedSeriesOut`.
