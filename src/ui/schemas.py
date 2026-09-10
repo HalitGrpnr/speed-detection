@@ -124,6 +124,18 @@ class RecalibrateRequest(BaseModel):
     known_width_m: float
 
 
+class SpeedSeriesPoint(BaseModel):
+    t_s: float
+    speed_kmh: float
+
+
+class SpeedSeriesOut(BaseModel):
+    track_id: int
+    points: list[SpeedSeriesPoint]
+    max_kmh: float
+    median_kmh: float
+
+
 class AxleStepRequest(BaseModel):
     frame_n: int                         # operatörün tekerlek işaretlediği kare
     front_pixel: tuple[float, float]     # ön teker temas noktası

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Download, FileText, Loader2, Map, Milestone, Ruler, RotateCcw } from 'lucide-react'
 import { api } from '@/lib/api'
@@ -13,6 +13,7 @@ import { StepFooter } from '@/components/common/StepFooter'
 import { InfoHint } from '@/components/common/InfoHint'
 import { AxleCheckPanel } from './AxleCheckPanel'
 import { AxleSteppingPanel } from './AxleSteppingPanel'
+import { SpeedSparkline } from './SpeedSparkline'
 
 export function ResultsStep() {
   const jobId = useWizard((s) => s.jobId)
@@ -24,6 +25,24 @@ export function ResultsStep() {
   const [steppingTrackId, setSteppingTrackId] = useState<number | null>(null)
   const [showPlanView, setShowPlanView] = useState(false)
   const [hasV2Report, setHasV2Report] = useState(false)
+  const [hoveredTrackId, setHoveredTrackId] = useState<number | null>(null)
+  const leaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const sparklineQuery = useQuery({
+    queryKey: ['speedSeries', jobId, hoveredTrackId],
+    queryFn: () => api.speedSeries(jobId!, hoveredTrackId!),
+    enabled: !!jobId && hoveredTrackId != null,
+    staleTime: Infinity,
+    retry: false,
+  })
+
+  const handleRowEnter = (trackId: number) => {
+    if (leaveTimer.current) clearTimeout(leaveTimer.current)
+    setHoveredTrackId(trackId)
+  }
+  const handleRowLeave = () => {
+    leaveTimer.current = setTimeout(() => setHoveredTrackId(null), 120)
+  }
 
   const resultsQuery = useQuery({
     queryKey: ['jobResults', jobId],
@@ -161,13 +180,46 @@ export function ResultsStep() {
               </thead>
               <tbody>
                 {result.estimates.map((e) => (
-                  <tr key={e.track_id} className="border-b last:border-0">
+                  <tr
+                    key={e.track_id}
+                    className="border-b last:border-0"
+                    onMouseEnter={() => handleRowEnter(e.track_id)}
+                    onMouseLeave={handleRowLeave}
+                  >
                     <td className="px-3 py-2 tabular-nums text-muted-foreground">#{e.track_id}</td>
                     <td className="px-3 py-2">{e.vehicle_class}</td>
-                    <td className="px-3 py-2 text-right">
+                    <td className="px-3 py-2 text-right relative">
                       <span className="text-base font-semibold tabular-nums">
                         {e.speed_kmh.toFixed(1)}
                       </span>
+                      {hoveredTrackId === e.track_id && (
+                        <div
+                          className="absolute right-0 bottom-full z-20 mb-1 rounded-lg border bg-card shadow-md p-2 w-56"
+                          onMouseEnter={() => handleRowEnter(e.track_id)}
+                          onMouseLeave={handleRowLeave}
+                        >
+                          <div className="text-[0.65rem] text-muted-foreground mb-1 font-medium">
+                            Hız zaman serisi
+                          </div>
+                          {sparklineQuery.isPending ? (
+                            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                              <Loader2 className="size-3 animate-spin" /> Yükleniyor…
+                            </div>
+                          ) : sparklineQuery.data ? (
+                            <SpeedSparkline
+                              points={sparklineQuery.data.points}
+                              maxKmh={sparklineQuery.data.max_kmh}
+                              medianKmh={sparklineQuery.data.median_kmh}
+                              width={200}
+                              height={64}
+                            />
+                          ) : (
+                            <div className="text-xs text-muted-foreground">
+                              Sonuç verisi mevcut değil
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </td>
                     <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">
                       ± {e.ci_kmh.toFixed(1)}

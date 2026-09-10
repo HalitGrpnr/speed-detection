@@ -26,6 +26,19 @@ export type ControlPointSource = ControlPoint['source']
 export type ConfidenceLevel = 'high' | 'medium' | 'low'
 export type ModelSize = PipelineRequest['model_size']
 
+// T13 — Hız zaman serisi sparkline
+export interface SpeedSeriesPoint {
+  t_s: number
+  speed_kmh: number
+}
+
+export interface SpeedSeriesOut {
+  track_id: number
+  points: SpeedSeriesPoint[]
+  max_kmh: number
+  median_kmh: number
+}
+
 // T8 — Dingil adımlama (types.ts'de yok, doğrudan tanımlanıyor)
 export interface AxleStepRequest {
   frame_n: number

@@ -17,6 +17,7 @@ import type {
   PlanViewRequest,
   ProposedPoint,
   RecalibrateRequest,
+  SpeedSeriesOut,
   VideoMeta,
 } from '@/lib/models'
 
@@ -189,5 +190,10 @@ export const api = {
         body: JSON.stringify(req),
       }),
     )
+  },
+
+  /** Track hız zaman serisi (T13 sparkline). result_data.json yoksa hata fırlatır. */
+  async speedSeries(jobId: string, trackId: number): Promise<SpeedSeriesOut> {
+    return unwrap(await fetch(`/api/job/${jobId}/track/${trackId}/speed-series`))
   },
 }

@@ -51,6 +51,8 @@ from .schemas import (
     RecalibrateRequest,
     RejectedPointOut,
     SpeedEstimateOut,
+    SpeedSeriesOut,
+    SpeedSeriesPoint,
     VideoMetaOut,
 )
 
@@ -755,6 +757,42 @@ async def axle_check(job_id: str, track_id: int, req: AxleCheckRequest) -> AxleC
     )
 
     return AxleCheckResponse(**result)
+
+
+@app.get(
+    "/api/job/{job_id}/track/{track_id}/speed-series",
+    response_model=SpeedSeriesOut,
+)
+async def speed_series(job_id: str, track_id: int) -> SpeedSeriesOut:
+    """Track'in yumuşatılmış hız zaman serisini döndürür (T13 sparkline).
+
+    result_data.json yoksa (eski iş) 404 döner — frontend bunu sessizce atlar.
+    """
+    _get_done_job(job_id)
+    out_dir = _job_out_dir(job_id)
+    result_data_path = out_dir / "result_data.json"
+    if not result_data_path.exists():
+        raise HTTPException(
+            status_code=404,
+            detail="Sonuç verisi bulunamadı — bu analiz eski formatta kaydedilmiş.",
+        )
+    try:
+        rd = read_result_data(out_dir)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Sonuç verisi okunamadı: {exc}")
+
+    for est in rd.speed_estimates:
+        if est.track_id == track_id:
+            if not est.smoothed_series:
+                raise HTTPException(status_code=404, detail="Bu track için smoothed_series boş.")
+            speeds = [v for _, v in est.smoothed_series]
+            return SpeedSeriesOut(
+                track_id=track_id,
+                points=[SpeedSeriesPoint(t_s=t, speed_kmh=v) for t, v in est.smoothed_series],
+                max_kmh=float(max(speeds)),
+                median_kmh=float(np.median(speeds)),
+            )
+    raise HTTPException(status_code=404, detail=f"Track {track_id} bulunamadı.")
 
 
 @app.post(
