@@ -12,7 +12,6 @@ interface Props {
   jobId: string
   videoId: string
   trackId: number
-  hSpeedKmh: number   // H-tabanlı hız karşılaştırma için
   onClose: () => void
 }
 
@@ -26,7 +25,7 @@ const WHEELBASE_PRESETS: { label: string; value: number }[] = [
 
 // CalibrationCanvas'ın kaynak renkleri: auto → mavi (ön), site_measurement → yeşil (arka)
 
-export function AxleSteppingPanel({ jobId, videoId, trackId, hSpeedKmh, onClose }: Props) {
+export function AxleSteppingPanel({ jobId, videoId, trackId, onClose }: Props) {
   const [points, setPoints] = useState<ControlPoint[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [wheelbase, setWheelbase] = useState(2.65)
@@ -86,7 +85,10 @@ export function AxleSteppingPanel({ jobId, videoId, trackId, hSpeedKmh, onClose 
   const frameN = manualFrame ?? frameQuery.data?.frame_n
 
   const data = stepMutation.data
-  const diff = data?.speed_kmh != null ? Math.abs(data.speed_kmh - hSpeedKmh) : null
+  const hWindowKmh = data?.h_speed_window_kmh ?? null
+  const diff = data?.speed_kmh != null && hWindowKmh != null
+    ? Math.abs(data.speed_kmh - hWindowKmh)
+    : null
 
   return (
     <div className="space-y-3 rounded-lg border bg-muted/30 p-4">
@@ -255,15 +257,25 @@ export function AxleSteppingPanel({ jobId, videoId, trackId, hSpeedKmh, onClose 
                   </div>
                 </div>
                 <div className="rounded-md border p-2">
-                  <div className="text-xs text-muted-foreground">H-tabanlı (karşılaştırma)</div>
-                  <div className="mt-0.5 text-lg font-bold tabular-nums">
-                    {hSpeedKmh.toFixed(1)}{' '}
-                    <span className="text-sm font-normal text-muted-foreground">km/h</span>
+                  <div className="text-xs text-muted-foreground">
+                    H-tabanlı {hWindowKmh != null ? '(aynı pencere)' : '(veri yok)'}
                   </div>
-                  {diff != null && (
-                    <div className={`text-xs ${diff < 3 ? 'text-green-600' : diff < 8 ? 'text-amber-600' : 'text-red-600'}`}>
-                      Fark: {diff.toFixed(1)} km/h
-                      {diff < 3 ? ' ✓ tutarlı' : diff < 8 ? ' ⚠ orta sapma' : ' ✗ büyük sapma'}
+                  {hWindowKmh != null ? (
+                    <>
+                      <div className="mt-0.5 text-lg font-bold tabular-nums">
+                        {hWindowKmh.toFixed(1)}{' '}
+                        <span className="text-sm font-normal text-muted-foreground">km/h</span>
+                      </div>
+                      {diff != null && (
+                        <div className={`text-xs ${diff < 3 ? 'text-green-600' : diff < 8 ? 'text-amber-600' : 'text-red-600'}`}>
+                          Fark: {diff.toFixed(1)} km/h
+                          {diff < 3 ? ' ✓ tutarlı' : diff < 8 ? ' ⚠ orta sapma' : ' ✗ büyük sapma'}
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <div className="mt-0.5 text-sm text-muted-foreground">
+                      Sonuç verisi mevcut değil
                     </div>
                   )}
                 </div>

@@ -805,6 +805,27 @@ async def axle_step(job_id: str, track_id: int, req: AxleStepRequest) -> AxleSte
             stepper.feed(tp.frame, tp.contact_pixel)
 
     r = stepper.result()
+
+    # Dingil penceresindeki H-tabanlı hız: result_data.json yoksa (eski iş) None döner.
+    h_speed_window_kmh: float | None = None
+    result_data_path = _job_out_dir(job_id) / "result_data.json"
+    if result_data_path.exists() and r.steps:
+        try:
+            rd = read_result_data(_job_out_dir(job_id))
+            window_start_t_s = req.frame_n / fps
+            window_end_t_s = r.steps[-1].frame / fps
+            for est in rd.speed_estimates:
+                if est.track_id == track_id:
+                    window_speeds = [
+                        v for (t_s, v) in est.smoothed_series
+                        if window_start_t_s <= t_s <= window_end_t_s
+                    ]
+                    if window_speeds:
+                        h_speed_window_kmh = float(np.median(window_speeds))
+                    break
+        except Exception:
+            pass
+
     return AxleStepResponse(
         speed_kmh=round(r.speed_kmh, 2) if r.speed_kmh is not None else None,
         ci_kmh=round(r.ci_kmh, 2) if r.ci_kmh is not None else None,
@@ -813,6 +834,7 @@ async def axle_step(job_id: str, track_id: int, req: AxleStepRequest) -> AxleSte
         interrupted=r.interrupted,
         interrupt_reason=r.interrupt_reason,
         initial_distance_m=round(r.initial_distance_m, 4),
+        h_speed_window_kmh=round(h_speed_window_kmh, 2) if h_speed_window_kmh is not None else None,
     )
 
 

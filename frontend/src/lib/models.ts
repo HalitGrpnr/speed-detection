@@ -47,4 +47,5 @@ export interface AxleStepResponse {
   interrupted: boolean
   interrupt_reason: string | null
   initial_distance_m: number
+  h_speed_window_kmh: number | null
 }

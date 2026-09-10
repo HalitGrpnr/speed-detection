@@ -220,18 +220,14 @@ export function ResultsStep() {
           />
         )}
 
-        {steppingTrackId != null && jobId && videoMeta && (() => {
-          const est = result.estimates.find((e) => e.track_id === steppingTrackId)
-          return (
-            <AxleSteppingPanel
-              jobId={jobId}
-              videoId={videoMeta.video_id}
-              trackId={steppingTrackId}
-              hSpeedKmh={est?.speed_kmh ?? 0}
-              onClose={() => setSteppingTrackId(null)}
-            />
-          )
-        })()}
+        {steppingTrackId != null && jobId && videoMeta && (
+          <AxleSteppingPanel
+            jobId={jobId}
+            videoId={videoMeta.video_id}
+            trackId={steppingTrackId}
+            onClose={() => setSteppingTrackId(null)}
+          />
+        )}
 
         <MethodInfoCard />
 

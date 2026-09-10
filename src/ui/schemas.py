@@ -144,3 +144,4 @@ class AxleStepResponse(BaseModel):
     interrupted: bool
     interrupt_reason: str | None
     initial_distance_m: float   # ön-arka arası ölçülen dünya mesafesi (doğrulama)
+    h_speed_window_kmh: float | None = None  # dingil penceresi içindeki H-tabanlı medyan hız
