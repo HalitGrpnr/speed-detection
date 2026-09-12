@@ -317,12 +317,15 @@ async def interpolate_point(video_id: str, req: InterpolatePointRequest) -> Inte
     returns the interpolated pixel where the wheel aligns exactly with the target.
     """
     _get_video_path(video_id)
-    from src.calibration.interpolation import interpolate_calibration_point
+    from src.calibration.interpolation import interpolate_calibration_point, apply_t
     try:
         px, t = interpolate_calibration_point(req.frame_n_px, req.frame_n1_px, req.target_px)
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
-    return InterpolatePointResponse(interpolated_px=px, t=t)
+    second_px = None
+    if req.second_n_px is not None and req.second_n1_px is not None:
+        second_px = apply_t(t, req.second_n_px, req.second_n1_px)
+    return InterpolatePointResponse(interpolated_px=px, t=t, second_interpolated_px=second_px)
 
 
 # ── T15: Transverse kılavuz yönü endpoint ─────────────────────────────────────

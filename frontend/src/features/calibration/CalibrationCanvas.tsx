@@ -26,8 +26,10 @@ export type CanvasMode = 'point' | 'quad' | 'road-anchor' | 'bracket'
 export type QuadCorners = [[number,number],[number,number],[number,number],[number,number]]
 
 export interface BracketPoints {
-  n: [number, number] | null
-  n1: [number, number] | null
+  rear_n: [number, number] | null
+  rear_n1: [number, number] | null
+  front_n: [number, number] | null
+  front_n1: [number, number] | null
 }
 
 interface Props {
@@ -276,8 +278,10 @@ export function CalibrationCanvas({
         ctx.textBaseline = 'middle'
         ctx.fillText(label, cx, cy)
       }
-      drawBracket(bracketPoints.n, 'N', BRACKET_N_COLOR)
-      drawBracket(bracketPoints.n1, 'N+1', BRACKET_N1_COLOR)
+      drawBracket(bracketPoints.rear_n,   'AN',   BRACKET_N_COLOR)
+      drawBracket(bracketPoints.rear_n1,  'AN+1', BRACKET_N1_COLOR)
+      drawBracket(bracketPoints.front_n,  'ÖN',   '#22d3ee')
+      drawBracket(bracketPoints.front_n1, 'ÖN+1', '#2dd4bf')
     }
 
     // Dörtgen overlay
@@ -330,6 +334,8 @@ export function CalibrationCanvas({
     const wrap = wrapRef.current
     if (!wrap) return
     const onWheel = (e: WheelEvent) => {
+      // Pinch (ctrlKey=true on Mac) → zoom. İki parmak scroll → native pan.
+      if (!e.ctrlKey) return
       const canvas = canvasRef.current
       if (!canvas) return
       e.preventDefault()

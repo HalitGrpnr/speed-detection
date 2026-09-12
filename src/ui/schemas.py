@@ -169,11 +169,15 @@ class InterpolatePointRequest(BaseModel):
     frame_n_px: tuple[float, float]
     frame_n1_px: tuple[float, float]
     target_px: tuple[float, float]
+    # Opsiyonel ikinci nokta çifti (ön teker) — aynı t ile enterpolasyon yapılır
+    second_n_px: tuple[float, float] | None = None
+    second_n1_px: tuple[float, float] | None = None
 
 
 class InterpolatePointResponse(BaseModel):
     interpolated_px: tuple[float, float]
     t: float  # kesirli kare ofseti [0, 1]
+    second_interpolated_px: tuple[float, float] | None = None
 
 
 # T15 — Transverse guide: yol yönü + kılavuz hesabı

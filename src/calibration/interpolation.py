@@ -1,6 +1,18 @@
 from __future__ import annotations
 
 
+def apply_t(
+    t: float,
+    n_px: tuple[float, float],
+    n1_px: tuple[float, float],
+) -> tuple[float, float]:
+    """Apply a known fractional frame offset t to a second point pair."""
+    return (
+        n_px[0] + t * (n1_px[0] - n_px[0]),
+        n_px[1] + t * (n1_px[1] - n_px[1]),
+    )
+
+
 def interpolate_calibration_point(
     frame_n_px: tuple[float, float],
     frame_n1_px: tuple[float, float],

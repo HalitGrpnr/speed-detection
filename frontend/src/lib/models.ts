@@ -44,11 +44,14 @@ export interface InterpolatePointRequest {
   frame_n_px: [number, number]
   frame_n1_px: [number, number]
   target_px: [number, number]
+  second_n_px?: [number, number] | null
+  second_n1_px?: [number, number] | null
 }
 
 export interface InterpolatePointResponse {
   interpolated_px: [number, number]
   t: number
+  second_interpolated_px?: [number, number] | null
 }
 
 // T8 — Dingil adımlama (types.ts'de yok, doğrudan tanımlanıyor)
