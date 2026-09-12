@@ -11,14 +11,24 @@ const COLORS: Record<ControlPointSource, string> = {
   operator: '#f59e0b',
   auto: '#60a5fa',
   site_measurement: '#34d399',
+  interpolated: '#a3e635',
 }
 const SELECT = '#ef4444'
 const REJECTED = '#f97316'
 const QUAD_COLOR = '#a78bfa'
+const GHOST_COLOR = '#ff6b35'
+const ROAD_ANCHOR_COLOR = '#38bdf8'
+const BRACKET_N_COLOR = '#f472b6'
+const BRACKET_N1_COLOR = '#fb923c'
 const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n))
 
-export type CanvasMode = 'point' | 'quad'
+export type CanvasMode = 'point' | 'quad' | 'road-anchor' | 'bracket'
 export type QuadCorners = [[number,number],[number,number],[number,number],[number,number]]
+
+export interface BracketPoints {
+  n: [number, number] | null
+  n1: [number, number] | null
+}
 
 interface Props {
   imageUrl: string
@@ -27,16 +37,28 @@ interface Props {
   rejectedIds?: Set<string>
   mode?: CanvasMode
   quadCorners?: QuadCorners | null
+  /** T14: Ghost target overlay — önceki ön teker konumu (yarı saydam turuncu crosshair) */
+  ghostTarget?: [number, number] | null
+  /** T14: Bracket mode işaret noktaları — N (pembe) ve N+1 (turuncu) */
+  bracketPoints?: BracketPoints | null
+  /** T15: Yol yönü anchor noktaları (mavi) */
+  roadAnchors?: [number, number][]
+  /** T15: Transverse yön vektörü; ayarlıysa tüm kontrol noktaları + imlecinden kılavuz çizgisi */
+  transverseDir?: [number, number] | null
+  /** T15: İmleç konumu kılavuz çizgisi için (canvas koordinatları, skalasız) */
+  cursorImagePx?: [number, number] | null
   onAdd: (pixel: [number, number]) => void
   onMove: (id: string, pixel: [number, number]) => void
   onSelect: (id: string | null) => void
   onMoveQuadCorner?: (index: number, pixel: [number, number]) => void
+  onCursorMove?: (px: [number, number] | null) => void
 }
 
 export function CalibrationCanvas({
   imageUrl, points, selectedId, rejectedIds,
   mode = 'point', quadCorners,
-  onAdd, onMove, onSelect, onMoveQuadCorner,
+  ghostTarget, bracketPoints, roadAnchors, transverseDir, cursorImagePx,
+  onAdd, onMove, onSelect, onMoveQuadCorner, onCursorMove,
 }: Props) {
   const wrapRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -138,6 +160,126 @@ export function CalibrationCanvas({
       }
     })
 
+    // T15: Transverse kılavuz çizgileri (kontrol noktalarından + imlecinden)
+    if (transverseDir) {
+      const [tx, ty] = transverseDir
+      const W = img.naturalWidth
+      const H = img.naturalHeight
+      const drawGuide = (wx: number, wy: number, alpha: number) => {
+        // canvas sınırında t aralığını bul
+        let tMin = -1e6, tMax = 1e6
+        if (Math.abs(tx) > 1e-9) {
+          const tA = -wx / tx, tB = (W - wx) / tx
+          tMin = Math.max(tMin, Math.min(tA, tB))
+          tMax = Math.min(tMax, Math.max(tA, tB))
+        }
+        if (Math.abs(ty) > 1e-9) {
+          const tA = -wy / ty, tB = (H - wy) / ty
+          tMin = Math.max(tMin, Math.min(tA, tB))
+          tMax = Math.min(tMax, Math.max(tA, tB))
+        }
+        const x1 = (wx + tMin * tx) * scale, y1 = (wy + tMin * ty) * scale
+        const x2 = (wx + tMax * tx) * scale, y2 = (wy + tMax * ty) * scale
+        ctx.save()
+        ctx.globalAlpha = alpha
+        ctx.strokeStyle = '#f97316'
+        ctx.lineWidth = 1.5
+        ctx.setLineDash([8, 5])
+        ctx.beginPath()
+        ctx.moveTo(x1, y1)
+        ctx.lineTo(x2, y2)
+        ctx.stroke()
+        ctx.setLineDash([])
+        ctx.restore()
+      }
+      // kontrol noktalarının her birinden kılavuz çiz
+      points.forEach((pt) => drawGuide(pt.pixel[0], pt.pixel[1], 0.45))
+      // imleç konumundan canlı önizleme kılavuzu
+      if (cursorImagePx) drawGuide(cursorImagePx[0], cursorImagePx[1], 0.85)
+    }
+
+    // T15: Yol yönü anchor noktaları
+    if (roadAnchors && roadAnchors.length > 0) {
+      roadAnchors.forEach((anchor, i) => {
+        const cx = anchor[0] * scale, cy = anchor[1] * scale
+        ctx.beginPath()
+        ctx.arc(cx, cy, 7, 0, Math.PI * 2)
+        ctx.fillStyle = ROAD_ANCHOR_COLOR + 'cc'
+        ctx.fill()
+        ctx.strokeStyle = '#fff'
+        ctx.lineWidth = 1.5
+        ctx.stroke()
+        ctx.fillStyle = '#fff'
+        ctx.font = 'bold 10px sans-serif'
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'middle'
+        ctx.fillText(`Y${i + 1}`, cx, cy)
+      })
+      // İki anchor arasında yol yönü çizgisi
+      if (roadAnchors.length >= 2) {
+        ctx.save()
+        ctx.globalAlpha = 0.5
+        ctx.strokeStyle = ROAD_ANCHOR_COLOR
+        ctx.lineWidth = 1.5
+        ctx.setLineDash([6, 4])
+        ctx.beginPath()
+        ctx.moveTo(roadAnchors[0][0] * scale, roadAnchors[0][1] * scale)
+        ctx.lineTo(roadAnchors[1][0] * scale, roadAnchors[1][1] * scale)
+        ctx.stroke()
+        ctx.setLineDash([])
+        ctx.restore()
+      }
+    }
+
+    // T14: Ghost target overlay — önceki ön teker konumu
+    if (ghostTarget) {
+      const [gx, gy] = [ghostTarget[0] * scale, ghostTarget[1] * scale]
+      const gr = 14
+      ctx.save()
+      ctx.globalAlpha = 0.7
+      ctx.strokeStyle = GHOST_COLOR
+      ctx.lineWidth = 2
+      ctx.setLineDash([5, 3])
+      ctx.beginPath()
+      ctx.arc(gx, gy, gr, 0, Math.PI * 2)
+      ctx.stroke()
+      ctx.setLineDash([])
+      // Crosshair
+      ctx.lineWidth = 1.5
+      ctx.beginPath()
+      ctx.moveTo(gx - gr - 4, gy); ctx.lineTo(gx + gr + 4, gy)
+      ctx.moveTo(gx, gy - gr - 4); ctx.lineTo(gx, gy + gr + 4)
+      ctx.stroke()
+      ctx.restore()
+      // Etiket
+      ctx.font = '10px sans-serif'
+      ctx.fillStyle = GHOST_COLOR
+      ctx.textAlign = 'left'
+      ctx.fillText('Hedef', gx + gr + 6, gy - 4)
+    }
+
+    // T14: Bracket points
+    if (bracketPoints) {
+      const drawBracket = (px: [number,number] | null, label: string, color: string) => {
+        if (!px) return
+        const [cx, cy] = [px[0] * scale, px[1] * scale]
+        ctx.beginPath()
+        ctx.arc(cx, cy, 9, 0, Math.PI * 2)
+        ctx.fillStyle = color + 'cc'
+        ctx.fill()
+        ctx.strokeStyle = '#fff'
+        ctx.lineWidth = 1.5
+        ctx.stroke()
+        ctx.fillStyle = '#fff'
+        ctx.font = 'bold 9px sans-serif'
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'middle'
+        ctx.fillText(label, cx, cy)
+      }
+      drawBracket(bracketPoints.n, 'N', BRACKET_N_COLOR)
+      drawBracket(bracketPoints.n1, 'N+1', BRACKET_N1_COLOR)
+    }
+
     // Dörtgen overlay
     if (quadCorners) {
       const sc = (p: [number,number]) => [p[0] * scale, p[1] * scale] as [number,number]
@@ -182,7 +324,7 @@ export function CalibrationCanvas({
         ctx.fillText(labels[i], cx, cy)
       })
     }
-  }, [points, selectedId, rejectedIds, scale, ready, quadCorners])
+  }, [points, selectedId, rejectedIds, scale, ready, quadCorners, ghostTarget, bracketPoints, roadAnchors, transverseDir, cursorImagePx])
 
   useEffect(() => {
     const wrap = wrapRef.current
@@ -269,6 +411,13 @@ export function CalibrationCanvas({
       return
     }
 
+    // T15: road-anchor modu — tıklamalar onAdd'e yönlendirilir (CalibrationStep yönetir)
+    // T14: bracket modu — tıklamalar onAdd'e yönlendirilir (CalibrationStep yönetir)
+    if (mode === 'road-anchor' || mode === 'bracket') {
+      onAdd([ix, iy])
+      return
+    }
+
     const hit = findNear(ix, iy)
     if (hit) {
       onSelect(hit)
@@ -291,6 +440,12 @@ export function CalibrationCanvas({
       return
     }
 
+    // T15: imlec konumunu transverse guide preview için bildir
+    if (transverseDir) {
+      const [ix, iy] = toImage(e)
+      onCursorMove?.([ix, iy])
+    }
+
     if (!dragRef.current) return
     const [ix, iy] = toImage(e)
     onMove(dragRef.current, [
@@ -302,6 +457,7 @@ export function CalibrationCanvas({
   const endDrag = () => {
     dragRef.current = null
     quadDragRef.current = null
+    onCursorMove?.(null)
   }
 
   const isQuadCornerNear = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -312,6 +468,7 @@ export function CalibrationCanvas({
 
   const getCursor = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (mode === 'quad') return isQuadCornerNear(e) ? 'grab' : 'default'
+    if (mode === 'road-anchor' || mode === 'bracket') return 'crosshair'
     return 'crosshair'
   }
 

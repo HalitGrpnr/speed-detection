@@ -12,6 +12,8 @@ import type {
   AxleStepResponse,
   CalibrateRequest,
   CalibrateResponse,
+  InterpolatePointRequest,
+  InterpolatePointResponse,
   JobResult,
   JobStatus,
   PipelineRequest,
@@ -212,5 +214,16 @@ export const api = {
   /** Oturum logu — her adım, parametre ve sonuç. */
   async sessionLog(jobId: string): Promise<Record<string, unknown>[]> {
     return unwrap(await fetch(`/api/job/${jobId}/session-log`))
+  },
+
+  /** T14 — Alt-kare enterpolasyon: bracketing iki karedeki teker konumundan ara nokta hesaplar. */
+  async interpolatePoint(videoId: string, req: InterpolatePointRequest): Promise<InterpolatePointResponse> {
+    return unwrap(
+      await fetch(`/api/video/${videoId}/interpolate-point`, {
+        method: 'POST',
+        headers: jsonHeaders,
+        body: JSON.stringify(req),
+      }),
+    )
   },
 }

@@ -19,24 +19,29 @@ def _result_to_dict(
     fps_source: str = "container",
     holdout_rows: list[dict] | None = None,
     frame_n: int | None = None,
+    transverse_guide: dict | None = None,
 ) -> dict[str, Any]:
     """Serialize CalibrationResult to the §8 schema dict."""
-    return {
+    cp_list = []
+    for p in points:
+        entry: dict[str, Any] = {
+            "id": p.id,
+            "pixel": list(p.pixel),
+            "world_m": list(p.world_m),
+            "source": p.source,
+            "held_out": p.held_out,
+        }
+        if p.interpolation_meta is not None:
+            entry["interpolation_meta"] = p.interpolation_meta
+        cp_list.append(entry)
+
+    d: dict[str, Any] = {
         "calibration_id": calibration_id or str(uuid.uuid4()),
         "video_id": video_id or str(uuid.uuid4()),
         "fps": fps,
         "fps_source": fps_source,
         "frame_n": frame_n,
-        "control_points": [
-            {
-                "id": p.id,
-                "pixel": list(p.pixel),
-                "world_m": list(p.world_m),
-                "source": p.source,
-                "held_out": p.held_out,
-            }
-            for p in points
-        ],
+        "control_points": cp_list,
         "homography": result.homography.tolist(),
         "metrics": {
             "reprojection_rms_m": result.reprojection_rms_m,
@@ -46,16 +51,20 @@ def _result_to_dict(
         },
         "confidence_layer": result.confidence_layer,
     }
+    if transverse_guide is not None:
+        d["transverse_guide"] = transverse_guide
+    return d
 
 
 def save_calibration(
     path: str | Path,
     result: CalibrationResult,
     points: list[ControlPoint],
+    transverse_guide: dict | None = None,
     **kwargs: Any,
 ) -> None:
     """Write calibration to JSON file."""
-    data = _result_to_dict(result, points, **kwargs)
+    data = _result_to_dict(result, points, transverse_guide=transverse_guide, **kwargs)
     Path(path).write_text(json.dumps(data, indent=2, ensure_ascii=False))
 
 
@@ -76,6 +85,7 @@ def load_calibration(
             world_m=tuple(cp["world_m"]),
             source=cp["source"],
             held_out=cp.get("held_out", False),
+            interpolation_meta=cp.get("interpolation_meta"),
         )
         for cp in data["control_points"]
     ]

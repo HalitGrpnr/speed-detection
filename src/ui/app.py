@@ -45,6 +45,8 @@ from .schemas import (
     AxleStepOut,
     CalibrateRequest,
     CalibrateResponse,
+    InterpolatePointRequest,
+    InterpolatePointResponse,
     JobResultOut,
     JobStatusOut,
     PipelineRequest,
@@ -55,6 +57,8 @@ from .schemas import (
     SpeedEstimateOut,
     SpeedSeriesOut,
     SpeedSeriesPoint,
+    TransverseGuideRequest,
+    TransverseGuideResponse,
     VideoMetaOut,
 )
 
@@ -301,6 +305,43 @@ async def plan_view(video_id: str, req: PlanViewRequest) -> Response:
     if not ok:
         raise HTTPException(status_code=500, detail="Görsel PNG'ye kodlanamadı.")
     return Response(content=buf.tobytes(), media_type="image/png")
+
+
+# ── T14: Alt-kare enterpolasyon endpoint ──────────────────────────────────────
+
+@app.post("/api/video/{video_id}/interpolate-point", response_model=InterpolatePointResponse)
+async def interpolate_point(video_id: str, req: InterpolatePointRequest) -> InterpolatePointResponse:
+    """Sub-frame calibration point interpolation (T14).
+
+    Given two consecutive frames bracketing the target longitudinal position,
+    returns the interpolated pixel where the wheel aligns exactly with the target.
+    """
+    _get_video_path(video_id)
+    from src.calibration.interpolation import interpolate_calibration_point
+    try:
+        px, t = interpolate_calibration_point(req.frame_n_px, req.frame_n1_px, req.target_px)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    return InterpolatePointResponse(interpolated_px=px, t=t)
+
+
+# ── T15: Transverse kılavuz yönü endpoint ─────────────────────────────────────
+
+@app.post("/api/video/{video_id}/transverse-guide", response_model=TransverseGuideResponse)
+async def transverse_guide(video_id: str, req: TransverseGuideRequest) -> TransverseGuideResponse:
+    """Compute transverse (cross-road) guide direction for calibration (T15).
+
+    Given two road-direction anchor pixels, returns the perpendicular (transverse)
+    direction. If wheel_px is provided, also returns the guide line endpoints clipped
+    to the canvas.
+    """
+    _get_video_path(video_id)
+    from src.calibration.transverse_guide import compute_transverse_direction, guide_line_endpoints
+    d = compute_transverse_direction(req.road_p1, req.road_p2)
+    p1, p2 = None, None
+    if req.wheel_px is not None:
+        p1, p2 = guide_line_endpoints(req.wheel_px, d, req.canvas_w, req.canvas_h)
+    return TransverseGuideResponse(transverse_dir=d, guide_p1=p1, guide_p2=p2)
 
 
 # ── AutoRef endpoint ──────────────────────────────────────────────────────────

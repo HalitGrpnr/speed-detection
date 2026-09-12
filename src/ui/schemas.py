@@ -19,8 +19,9 @@ class ControlPointIn(BaseModel):
     id: str
     pixel: tuple[float, float]
     world_m: tuple[float, float]
-    source: Literal["operator", "site_measurement", "auto"] = "operator"
+    source: Literal["operator", "site_measurement", "auto", "interpolated"] = "operator"
     held_out: bool = False
+    interpolation_meta: dict | None = None
 
 
 class CalibrateRequest(BaseModel):
@@ -161,3 +162,30 @@ class AxleStepResponse(BaseModel):
 
 class AxleStepAutoRequest(BaseModel):
     wheelbase_m: float  # dingil mesafesi (metre) — yön track'ten otomatik tahmin edilir
+
+
+# T14 — Kalibrasyon noktası alt-kare enterpolasyonu
+class InterpolatePointRequest(BaseModel):
+    frame_n_px: tuple[float, float]
+    frame_n1_px: tuple[float, float]
+    target_px: tuple[float, float]
+
+
+class InterpolatePointResponse(BaseModel):
+    interpolated_px: tuple[float, float]
+    t: float  # kesirli kare ofseti [0, 1]
+
+
+# T15 — Transverse guide: yol yönü + kılavuz hesabı
+class TransverseGuideRequest(BaseModel):
+    road_p1: tuple[float, float]
+    road_p2: tuple[float, float]
+    canvas_w: int
+    canvas_h: int
+    wheel_px: tuple[float, float] | None = None
+
+
+class TransverseGuideResponse(BaseModel):
+    transverse_dir: tuple[float, float]
+    guide_p1: tuple[float, float] | None = None
+    guide_p2: tuple[float, float] | None = None

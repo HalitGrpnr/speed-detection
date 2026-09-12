@@ -418,12 +418,14 @@ export interface components {
              * @default operator
              * @enum {string}
              */
-            source: "operator" | "site_measurement" | "auto";
+            source: "operator" | "site_measurement" | "auto" | "interpolated";
             /**
              * Held Out
              * @default false
              */
             held_out: boolean;
+            /** Interpolation Meta — T14 audit trail for sub-frame interpolated points */
+            interpolation_meta?: Record<string, unknown> | null;
         };
         /** HTTPValidationError */
         HTTPValidationError: {

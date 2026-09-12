@@ -7,6 +7,7 @@ const SOURCE_DOT: Record<ControlPointSource, string> = {
   operator: 'bg-amber-500',
   auto: 'bg-blue-400',
   site_measurement: 'bg-emerald-400',
+  interpolated: 'bg-lime-400',
 }
 
 type RejectedPoint = CalibrateResponse['rejected_points'][number]
@@ -120,6 +121,7 @@ export function PointsTable({
                     <option value="operator">operatör</option>
                     <option value="auto">otomatik</option>
                     <option value="site_measurement">saha ölçümü</option>
+                    <option value="interpolated">enterpolasyon</option>
                   </select>
                 </td>
                 <td className="px-3 py-1.5 text-right">

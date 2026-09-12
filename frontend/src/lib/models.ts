@@ -39,6 +39,18 @@ export interface SpeedSeriesOut {
   median_kmh: number
 }
 
+// T14 — Kalibrasyon noktası alt-kare enterpolasyonu
+export interface InterpolatePointRequest {
+  frame_n_px: [number, number]
+  frame_n1_px: [number, number]
+  target_px: [number, number]
+}
+
+export interface InterpolatePointResponse {
+  interpolated_px: [number, number]
+  t: number
+}
+
 // T8 — Dingil adımlama (types.ts'de yok, doğrudan tanımlanıyor)
 export interface AxleStepRequest {
   frame_n: number
