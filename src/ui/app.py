@@ -406,22 +406,35 @@ def _finalize_job(job: JobState, result, out_video: Path, out_report: Path, out_
     job.progress_pct = 100.0
     job.state = "done"
 
+    # Ham hız serisi — GPS doğrulaması ve hata analizi için
+    _est_by_id = {est.track_id: est for est in result.speed_estimates}
+    detailed_estimates = []
+    for e in estimates:
+        est = _est_by_id.get(e["track_id"])
+        raw_speeds = (
+            [round(s.speed_kmh, 2) for s in est.speed_series[1:]]
+            if est and len(est.speed_series) > 1 else []
+        )
+        detailed_estimates.append({
+            "track_id": e["track_id"],
+            "speed_kmh": e["speed_kmh"],
+            "ci_kmh": e["ci_kmh"],
+            "confidence_level": e["confidence_level"],
+            "frame_count": e["frame_count"],
+            "smoothness_residual_kmh": round(est.track_quality.smoothness_residual, 2) if est else None,
+            "raw_speed_kmh": raw_speeds,
+        })
+
     slog.append(
         out_dir,
         "pipeline_run",
         _job_id=job.job_id,
+        fps=round(result.video_meta.fps, 4),
+        fps_source=result.video_meta.fps_source,
         model=result.model_name,
         frame_step=result.frame_step,
         vehicle_count=len(estimates),
-        estimates=[
-            {
-                "track_id": e["track_id"],
-                "speed_kmh": e["speed_kmh"],
-                "ci_kmh": e["ci_kmh"],
-                "confidence_level": e["confidence_level"],
-            }
-            for e in estimates
-        ],
+        estimates=detailed_estimates,
     )
 
 
@@ -583,6 +596,27 @@ async def start_pipeline(req: PipelineRequest) -> dict:
 
     video_sha256 = _sha256(video_path)
     model_name = _MODEL_MAP.get(req.model_size, "yolo11n.pt")
+
+    slog.append(
+        out_dir,
+        "calibration_confirmed",
+        _job_id=job_id,
+        fps=round(fps, 4),
+        fps_source=fps_source,
+        rms_cm=round(cal_result.reprojection_rms_m * 100, 2),
+        loo_rms_cm=round(loo_rms_val * 100, 2) if loo_rms_val is not None else None,
+        confidence_layer=cal_result.confidence_layer,
+        point_count=len(control_points),
+        control_points=[
+            {
+                "id": p.id,
+                "pixel": [round(p.pixel[0], 1), round(p.pixel[1], 1)],
+                "world_m": [round(p.world_m[0], 4), round(p.world_m[1], 4)],
+                "held_out": p.held_out,
+            }
+            for p in control_points
+        ],
+    )
 
     thread = threading.Thread(
         target=_run_pipeline_thread,
