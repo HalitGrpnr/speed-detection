@@ -32,6 +32,8 @@
 | T11 | Plaka OCR | Gelecek | Büyük | — | ⬜ |
 | T12 | Dingil karşılaştırmasında pencere H-hızı | UI/Backend | Küçük | T8 | ✅ |
 | T13 | Track hız zaman serisi hover grafiği | UI | Orta | — | ✅ |
+| T14 | Kalibrasyon noktası alt-kare enterpolasyonu | Kalibrasyon | Orta | — | ✅ |
+| T15 | Kalibrasyon: Şerit noktası transverse yön kılavuzu | Kalibrasyon | Büyük | — | ✅ |
 
 Durum: ⬜ Başlanmadı · 🟡 Devam ediyor · ✅ Bitti · ⛔ Engellendi
 
@@ -389,3 +391,5 @@ yüklemek RCE riski taşıyor (bkz. `DECISIONS.md`).
 | 2026-09-10 | T8 | AxleStepper + 13 birim test + /axle-step endpoint + AxleSteppingPanel + ResultsStep entegrasyon | `d68a39b` |
 | 2026-09-10 | T12 | AxleStepResponse.h_speed_window_kmh + endpoint pencere medyanı + panel "aynı pencere" etiketi | `1930da3` |
 | 2026-09-10 | T13 | /speed-series endpoint + SpeedSparkline SVG + ResultsStep hover popup | `4990102` |
+| 2026-09-12 | T14 | interpolation.py + bracket mode UI + ghost overlay + 8 test | `972ad16` |
+| 2026-09-12 | T15 | transverse_guide.py + canvas kılavuz çizgisi + yol anchor modu + 8 test | `972ad16` |

@@ -4,8 +4,8 @@
 > "Nerede kaldık" sorusunun cevabı burası + `git log`'tur. Oturum-oturum detay için git
 > geçmişine bakılır; bu dosya yalnızca **anlık durumun özetini** tutar (şişirmeyin).
 
-**Son güncelleme:** 2026-09-10
-**Aktif görev:** _(T8 otomatik mod tamamlandı — sıradaki: T3/T4/T9, bkz. `tasks/BACKLOG.md`)_
+**Son güncelleme:** 2026-09-12
+**Aktif görev:** _(T14+T15 tamamlandı — sıradaki: T3/T4/T9, bkz. `tasks/BACKLOG.md`)_
 
 **En son (önemli, forensic-etkili bir düzeltme):** Kullanıcı gerçek video analizinde şunu fark
 etti: araç kareye girdiği an overlay videoda ~25 km/h, birkaç kare sonra "aniden" ~65 km/h
@@ -62,6 +62,8 @@ H ile kaba dünya konumuna oturtup bilinen genişliğe göre düzeltiyor. Yeni e
 | T8 | Dingil adımlama yöntemi | ✅ Bitti | AxleStepper + endpoint + AxleSteppingPanel; `tasks/T8.md` |
 | T12 | Dingil karşılaştırmasında pencere H-hızı | ✅ Bitti | h_speed_window_kmh; `tasks/T12.md` |
 | T13 | Track hız zaman serisi hover grafiği | ✅ Bitti | /speed-series + SpeedSparkline SVG; `tasks/T13.md` |
+| T14 | Kalibrasyon noktası alt-kare enterpolasyonu | ✅ Bitti | bracket mode + ghost overlay + interpolation endpoint; `tasks/T14.md` |
+| T15 | Kalibrasyon şerit noktası transverse kılavuz | ✅ Bitti | transverse_guide.py + canvas kılavuz + yol anchor modu; `tasks/T15.md` |
 | T2 | Recalibrate sonrası rapor metadata tutarsızlığı | ✅ Bitti | frame_step ve model_name orijinalden aktarılıyor |
 | T5 | M6 şerit tespitinde aykırı değer eleme | ✅ Bitti | sınır-dışı öneri bastırma (Seçenek B) |
 | T6 | Pipeline sonucunu kalıcı JSON'a yaz | ✅ Bitti | serialization.py round-trip + _finalize_job result_data.json |
@@ -71,7 +73,7 @@ H ile kaba dünya konumuna oturtup bilinen genişliğe göre düzeltiyor. Yeni e
 
 Durum işaretleri: ⬜ Başlanmadı · 🟡 Devam ediyor · ✅ Bitti · ⛔ Engellendi
 
-**Test durumu:** `pytest` **249/249 yeşil**. `frontend/` `npm run build` temiz. PyInstaller paketi
+**Test durumu:** `pytest` **274/274 yeşil** (16 yeni test: T14+T15). `frontend/` `npm run build` temiz. PyInstaller paketi
 (`dist/SpeedDetection/`, ~772 MB arm64) M9 + kuş bakışı + recalibrate + smoother düzeltmesi
 sonrası yeniden build edilmedi — bir sonraki paketleme öncesi kontrol edilmeli.
 
@@ -88,6 +90,22 @@ sonrası yeniden build edilmedi — bir sonraki paketleme öncesi kontrol edilme
 - **Adli kurallar (CLAUDE.md):** orijinal dosyaya yazılmaz + SHA-256 loglanır; sunucu-tarafı H
   yeniden hesaplanır; her hız CI + güven seviyesi taşır (çıplak sayı yok); harici ağ çağrısı yok
   (fontlar self-host).
+
+## Son Oturum (2026-09-12)
+
+- **T14 tamamlandı:** Kalibrasyon alt-kare enterpolasyon. `src/calibration/interpolation.py`
+  (`interpolate_calibration_point()` — primary-axis t hesabı). Yeni endpoint:
+  `POST /api/video/{id}/interpolate-point`. Frontend'de bracket modu: kare gezinme (prev/next),
+  ghost target (turuncu crosshair), N/N+1 işaret + "Enterpolasyonu Hesapla" + onay.
+  `ControlPoint.source` += `"interpolated"`, `interpolation_meta` audit trail (frame_n/n1, t, ghost_id)
+  `calibration.json`'a yazılıyor. 8 yeni birim test. Commit: `972ad16`.
+
+- **T15 tamamlandı:** Transverse kılavuz. `src/calibration/transverse_guide.py`
+  (`compute_transverse_direction()` Seçenek A — 90° CCW, yaklaşık; `guide_line_endpoints()`).
+  Yeni endpoint: `POST /api/video/{id}/transverse-guide`.
+  Frontend'de "Yol Yönü Tanımla" modu — 2 şerit anchor → mavi nokta + kesikli çizgi.
+  Aktif olunca her kontrol noktası + imleç konumundan turuncu kesikli transverse kılavuz çizgisi.
+  `calibration.json`'a `transverse_guide` alanı eklendi (io.py). 8 yeni birim test. Commit: `972ad16`.
 
 ## Son Oturum (2026-09-10)
 
@@ -114,7 +132,7 @@ sonrası yeniden build edilmedi — bir sonraki paketleme öncesi kontrol edilme
   pytest 249/249, npm run build temiz. Commit: `d68a39b`.
 
 **Sıradaki:** T3/T4 (tarayıcı testleri) veya T9 (PyInstaller yeniden build).
-T8 tamamlandı — fotoğraflar gelince ek refinement yapılabilir.
+T14+T15 tamamlandı — gerçek video ile bracket/transverse kılavuz denenince ek refinement yapılabilir.
 
 ## Açık İşler
 
