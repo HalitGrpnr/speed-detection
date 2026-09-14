@@ -4,8 +4,8 @@
 > "Nerede kaldık" sorusunun cevabı burası + `git log`'tur. Oturum-oturum detay için git
 > geçmişine bakılır; bu dosya yalnızca **anlık durumun özetini** tutar (şişirmeyin).
 
-**Son güncelleme:** 2026-09-12
-**Aktif görev:** _(T14+T15 tamamlandı — sıradaki: T3/T4/T9, bkz. `tasks/BACKLOG.md`)_
+**Son güncelleme:** 2026-09-15
+**Aktif görev:** _(T16 tamamlandı — sıradaki: T17 (hull guardrail), T18 (sadeleştirme), bkz. `tasks/BACKLOG.md`)_
 
 **En son (önemli, forensic-etkili bir düzeltme):** Kullanıcı gerçek video analizinde şunu fark
 etti: araç kareye girdiği an overlay videoda ~25 km/h, birkaç kare sonra "aniden" ~65 km/h
@@ -64,6 +64,7 @@ H ile kaba dünya konumuna oturtup bilinen genişliğe göre düzeltiyor. Yeni e
 | T13 | Track hız zaman serisi hover grafiği | ✅ Bitti | /speed-series + SpeedSparkline SVG; `tasks/T13.md` |
 | T14 | Kalibrasyon noktası alt-kare enterpolasyonu | ✅ Bitti | bracket mode + ghost overlay + interpolation endpoint; `tasks/T14.md` |
 | T15 | Kalibrasyon şerit noktası transverse kılavuz | ✅ Bitti | transverse_guide.py + canvas kılavuz + yol anchor modu; `tasks/T15.md` |
+| T16 | Operatör-tekerlek temas noktası birincil hız | ✅ Bitti | wheel_contact.py + 10 test + endpoint + WheelSpeedPanel + rapor; `tasks/T16.md` |
 | T2 | Recalibrate sonrası rapor metadata tutarsızlığı | ✅ Bitti | frame_step ve model_name orijinalden aktarılıyor |
 | T5 | M6 şerit tespitinde aykırı değer eleme | ✅ Bitti | sınır-dışı öneri bastırma (Seçenek B) |
 | T6 | Pipeline sonucunu kalıcı JSON'a yaz | ✅ Bitti | serialization.py round-trip + _finalize_job result_data.json |
@@ -73,9 +74,8 @@ H ile kaba dünya konumuna oturtup bilinen genişliğe göre düzeltiyor. Yeni e
 
 Durum işaretleri: ⬜ Başlanmadı · 🟡 Devam ediyor · ✅ Bitti · ⛔ Engellendi
 
-**Test durumu:** `pytest` **274/274 yeşil** (16 yeni test: T14+T15). `frontend/` `npm run build` temiz. PyInstaller paketi
-(`dist/SpeedDetection/`, ~772 MB arm64) M9 + kuş bakışı + recalibrate + smoother düzeltmesi
-sonrası yeniden build edilmedi — bir sonraki paketleme öncesi kontrol edilmeli.
+**Test durumu:** `pytest` **284/284 yeşil** (10 yeni test: T16). `frontend/` `npm run build` temiz. PyInstaller paketi
+(`dist/SpeedDetection/`, ~772 MB arm64) T16 sonrası yeniden build edilmedi — bir sonraki paketleme öncesi kontrol edilmeli.
 
 ---
 
@@ -90,6 +90,18 @@ sonrası yeniden build edilmedi — bir sonraki paketleme öncesi kontrol edilme
 - **Adli kurallar (CLAUDE.md):** orijinal dosyaya yazılmaz + SHA-256 loglanır; sunucu-tarafı H
   yeniden hesaplanır; her hız CI + güven seviyesi taşır (çıplak sayı yok); harici ağ çağrısı yok
   (fontlar self-host).
+
+## Son Oturum (2026-09-15)
+
+- **T16 tamamlandı:** Operatör-tekerlek temas noktası birincil hız yöntemi.
+  `src/speed/wheel_contact.py` — `wheel_contact_speed(marks, H, fps) → WheelSpeedResult`.
+  Algoritma: piksel → dünya → kümülatif mesafe → doğrusal regresyon → hız (m/s → km/h);
+  CI: ardışık çift hız std × 2 / √(n-1). 10 birim testi (sentetik + GPS fixture).
+  Yeni endpoint: `POST /api/job/{job_id}/track/{track_id}/wheel-speed`.
+  Sonuç `wheel_speed_{track_id}.json` diske yazılır; audit-log'a eklenir.
+  `generate_report()` yeni `wheel_speeds` parametresi ile "Birincil" bölüm ekler.
+  Frontend: `WheelSpeedPanel.tsx` — jargonsuz 3 adım rehberi + kare navigasyon +
+  `CalibrationCanvas` ile tıklama işaretleme + güven rozeti + "Rapora Ekle". pytest 284/284, build temiz.
 
 ## Son Oturum (2026-09-12)
 

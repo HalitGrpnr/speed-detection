@@ -34,6 +34,9 @@
 | T13 | Track hız zaman serisi hover grafiği | UI | Orta | — | ✅ |
 | T14 | Kalibrasyon noktası alt-kare enterpolasyonu | Kalibrasyon | Orta | — | ✅ |
 | T15 | Kalibrasyon: Şerit noktası transverse yön kılavuzu | Kalibrasyon | Büyük | — | ✅ |
+| T16 | Operatör-tekerlek temas noktası birincil hız | Hız çekirdeği + UX | Büyük | T14, M9 | ✅ |
+| T17 | Kalibrasyon-dışı araç guardrail (convex hull) | Güvenilirlik | Orta | — | ⬜ |
+| T18 | Arayüz sadeleştirme + ölü özellik temizliği | UX | Orta-Büyük | T16 | ⬜ |
 
 Durum: ⬜ Başlanmadı · 🟡 Devam ediyor · ✅ Bitti · ⛔ Engellendi
 
@@ -393,3 +396,4 @@ yüklemek RCE riski taşıyor (bkz. `DECISIONS.md`).
 | 2026-09-10 | T13 | /speed-series endpoint + SpeedSparkline SVG + ResultsStep hover popup | `4990102` |
 | 2026-09-12 | T14 | interpolation.py + bracket mode UI + ghost overlay + 8 test | `972ad16` |
 | 2026-09-12 | T15 | transverse_guide.py + canvas kılavuz çizgisi + yol anchor modu + 8 test | `972ad16` |
+| 2026-09-15 | T16 | wheel_contact.py + 10 test + /wheel-speed endpoint + WheelSpeedPanel + rapor bölümü | pending |

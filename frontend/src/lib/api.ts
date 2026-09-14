@@ -22,6 +22,8 @@ import type {
   RecalibrateRequest,
   SpeedSeriesOut,
   VideoMeta,
+  WheelSpeedRequest,
+  WheelSpeedResponse,
 } from '@/lib/models'
 
 async function unwrap<T>(res: Response): Promise<T> {
@@ -214,6 +216,17 @@ export const api = {
   /** Oturum logu — her adım, parametre ve sonuç. */
   async sessionLog(jobId: string): Promise<Record<string, unknown>[]> {
     return unwrap(await fetch(`/api/job/${jobId}/session-log`))
+  },
+
+  /** T16 — Operatör-tekerlek hız ölçümü: işaretlerden birincil hızı hesapla. */
+  async wheelSpeed(jobId: string, trackId: number, req: WheelSpeedRequest): Promise<WheelSpeedResponse> {
+    return unwrap(
+      await fetch(`/api/job/${jobId}/track/${trackId}/wheel-speed`, {
+        method: 'POST',
+        headers: jsonHeaders,
+        body: JSON.stringify(req),
+      }),
+    )
   },
 
   /** T14 — Alt-kare enterpolasyon: bracketing iki karedeki teker konumundan ara nokta hesaplar. */

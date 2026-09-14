@@ -351,3 +351,23 @@ Format:
 - **Test:** `tests/test_speed_smoother.py`'ye 3 regresyon testi eklendi (sabit hızlı track'te
   ilk örneğin bozulmaması — median ve mean için, + tek-noktalı track edge case).
   `pytest` 230/230. Mevcut 227 testte hiçbir regresyon yok (tümü zaten geçiyordu).
+
+## [2026-09-15] T16 — Operatör-tekerlek temas noktası birincil hız yöntemi
+- **Karar:** bbox alt-orta temas noktası yerine operatörün elle işaretlediği tekerlek-zemin teması
+  birincil hız ölçümü olarak benimsendi. `src/speed/wheel_contact.py::wheel_contact_speed()`.
+- **Gerekçe (GPS doğrulama kanıtı):** Aynı H matrisi, aynı FPS:
+  - bbox alt-orta (mevcut `contact_point()`) → **~74 km/h** (GPS: 82 km/h, ~%10 düşük)
+  - Elle işaretlenmiş tekerlek temas noktası → **~80 km/h** (~%2 düşük, kabul edilebilir)
+  - Kök neden: `y2` tampon/kaporta alt kenarıdır, zemin temas noktası değil. Eğik kamera +
+    yükseklik farkı → parallax kayması → bbox "geri kayar" → hız sistematik olarak düşük.
+  - FPS, kalibrasyon ölçeği ve H matrisi temiz olduğu kanıtlandı; sorun yalnızca takip noktasında.
+- **Algoritma:** Operatör 2-5 farklı karede aynı tekerin yere değdiği noktayı işaretler.
+  Her piksel H ile dünya m'ye çevrilir; kümülatif Öklid mesafesi vs. zaman doğrusal regresyon
+  → hız (m/s → km/h). CI: ardışık çift hız std'si × 2 / √(n-1).
+- **Alternatifler reddedildi:**
+  - `bbox_frac (y1 + (y2-y1)*0.9)`: Araç tipine bağımlı, sabit fraksiyon = yanlı.
+  - YOLO pose/keypoint: Üçüncü parti model RCE riski (bkz. T11 kararı).
+  - Kamera yüksekliği + parallax düzeltmesi: Geometri bilinmiyor, yeni parametre gerektirir.
+- **Forensic etki:** Birincil hız artık bbox-oto değil operatör işaretli. Eski bbox değeri
+  overlay videoda kalmaya devam eder (T18'de temizlenecek). PDF raporu, `/report/regenerate`
+  ile wheel_speed_*.json dosyalarını okuyarak T16 hızını birincil bölüm olarak ekler.

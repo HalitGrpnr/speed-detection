@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Download, FileText, Loader2, Map, Milestone, Ruler, RotateCcw } from 'lucide-react'
+import { Download, FileText, Loader2, Map, Milestone, Ruler, RotateCcw, Target } from 'lucide-react'
 import { api } from '@/lib/api'
 import { useWizard } from '@/store/wizard'
 import { Button, buttonVariants } from '@/components/ui/button'
@@ -15,6 +15,7 @@ import { AxleCheckPanel } from './AxleCheckPanel'
 import { AxleSteppingPanel } from './AxleSteppingPanel'
 import { SpeedSparkline } from './SpeedSparkline'
 import { SessionLogPanel } from './SessionLogPanel'
+import { WheelSpeedPanel } from './WheelSpeedPanel'
 
 export function ResultsStep() {
   const jobId = useWizard((s) => s.jobId)
@@ -24,6 +25,7 @@ export function ResultsStep() {
   const reset = useWizard((s) => s.reset)
   const [axleTrackId, setAxleTrackId] = useState<number | null>(null)
   const [steppingTrackId, setSteppingTrackId] = useState<number | null>(null)
+  const [wheelTrackId, setWheelTrackId] = useState<number | null>(null)
   const [showPlanView, setShowPlanView] = useState(false)
   const [hasV2Report, setHasV2Report] = useState(false)
   const [hoveredTrackId, setHoveredTrackId] = useState<number | null>(null)
@@ -177,6 +179,12 @@ export function ResultsStep() {
                       <InfoHint text="Ön/arka teker adımı ile bağımsız hız tahmini. Araç kendi tekerleklerini referans alır, harici nokta gerekmez. H-tabanlı hızla karşılaştırma üretir." />
                     </span>
                   </th>
+                  <th className="px-3 py-2 text-right font-medium">
+                    <span className="flex items-center justify-end gap-1">
+                      Tekerlek Hızı
+                      <InfoHint text="Operatörün tekerlek-zemin temas noktasını elle işaretlediği birincil hız ölçümü. YOLO bbox parallax hatasından bağımsız — GPS doğrulamada bbox ~74, tekerlek ~80 km/h verdi." />
+                    </span>
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -238,6 +246,7 @@ export function ResultsStep() {
                         onClick={() => {
                           setAxleTrackId(axleTrackId === e.track_id ? null : e.track_id)
                           if (steppingTrackId === e.track_id) setSteppingTrackId(null)
+                          if (wheelTrackId === e.track_id) setWheelTrackId(null)
                         }}
                       >
                         <Ruler className="size-3.5" /> Aks Doğrula
@@ -250,9 +259,23 @@ export function ResultsStep() {
                         onClick={() => {
                           setSteppingTrackId(steppingTrackId === e.track_id ? null : e.track_id)
                           if (axleTrackId === e.track_id) setAxleTrackId(null)
+                          if (wheelTrackId === e.track_id) setWheelTrackId(null)
                         }}
                       >
                         <Milestone className="size-3.5" /> Dingil
+                      </Button>
+                    </td>
+                    <td className="px-3 py-2 text-right">
+                      <Button
+                        variant={wheelTrackId === e.track_id ? 'default' : 'ghost'}
+                        size="sm"
+                        onClick={() => {
+                          setWheelTrackId(wheelTrackId === e.track_id ? null : e.track_id)
+                          if (axleTrackId === e.track_id) setAxleTrackId(null)
+                          if (steppingTrackId === e.track_id) setSteppingTrackId(null)
+                        }}
+                      >
+                        <Target className="size-3.5" /> Hızı Ölç
                       </Button>
                     </td>
                   </tr>
@@ -279,6 +302,17 @@ export function ResultsStep() {
             videoId={videoMeta.video_id}
             trackId={steppingTrackId}
             onClose={() => setSteppingTrackId(null)}
+          />
+        )}
+
+        {wheelTrackId != null && jobId && videoMeta && (
+          <WheelSpeedPanel
+            jobId={jobId}
+            videoId={videoMeta.video_id}
+            trackId={wheelTrackId}
+            frameCount={videoMeta.frame_count}
+            onClose={() => setWheelTrackId(null)}
+            onReportRegenerated={() => setHasV2Report(true)}
           />
         )}
 

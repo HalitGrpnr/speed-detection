@@ -193,3 +193,22 @@ class TransverseGuideResponse(BaseModel):
     transverse_dir: tuple[float, float]
     guide_p1: tuple[float, float] | None = None
     guide_p2: tuple[float, float] | None = None
+
+
+# T16 — Operatör-tekerlek hız ölçümü
+class WheelMarkIn(BaseModel):
+    frame: float  # tam veya alt-kare (T14 bracket mod)
+    pixel: tuple[float, float]
+
+
+class WheelSpeedRequest(BaseModel):
+    marks: list[WheelMarkIn]
+
+
+class WheelSpeedResponse(BaseModel):
+    value_kmh: float
+    ci_kmh: float
+    confidence_level: str
+    mark_count: int
+    residual_kmh: float
+    warnings: list[str] = []

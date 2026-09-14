@@ -124,7 +124,11 @@ def collect_report_texts(result: PipelineResult) -> list[str]:
     return texts
 
 
-def _build_story(result: PipelineResult, axle_checks: list[dict] | None = None) -> list:
+def _build_story(
+    result: PipelineResult,
+    axle_checks: list[dict] | None = None,
+    wheel_speeds: list[dict] | None = None,
+) -> list:
     S = _styles()
     meta = result.video_meta
     cal = result.calibration_result
@@ -364,6 +368,49 @@ def _build_story(result: PipelineResult, axle_checks: list[dict] | None = None) 
         story.append(t_axle)
         story.append(Spacer(1, 0.5 * cm))
 
+    # 4c. Operatör-Tekerlek Hız Ölçümü (T16, isteğe bağlı — rapor regenerate edilince eklenir)
+    if wheel_speeds:
+        story.append(Paragraph("Operator-Tekerlek Hiz Olcumu (Birincil)", S["SectionTitle"]))
+        story.append(Paragraph(
+            "Asagidaki sonuclar operatorun isaretledigi tekerlek-zemin temas noktalarindan "
+            "hesaplanmistir. Her track icin operatör en az 2 farkli karede ayni tekerin "
+            "yere degdigi yeri isaretlemistir; bu pikseller H ile dunya koordinatina "
+            "cevrilerek dogrusal regresyon ile hiz elde edilmistir. "
+            "Bu yontem YOLO bbox parallax hatasindan bagimsizdir ve forensic birincil "
+            "hiz olarak kullanilmalidir (bkz. GPS dogrulama — bbox ~74, tekerlek ~80 km/h).",
+            S["Normal"],
+        ))
+        story.append(Spacer(1, 0.2 * cm))
+        ws_header = [
+            "Track ID", "Hiz (km/h)", "CI (km/h)", "Guven", "Isaret Sayisi",
+            "Residual (km/h)", "Hesaplama Tarihi",
+        ]
+        ws_rows = [ws_header]
+        for ws in sorted(wheel_speeds, key=lambda w: w.get("track_id", 0)):
+            ws_rows.append([
+                f"#{ws.get('track_id', '?')}",
+                f"{ws.get('value_kmh', 0):.1f}",
+                f"{ws.get('ci_kmh', 0):.1f}",
+                _CONFIDENCE_TR.get(ws.get("confidence_level", ""), ws.get("confidence_level", "—")),
+                str(ws.get("mark_count", "?")),
+                f"{ws.get('residual_kmh', 0):.1f}",
+                ws.get("computed_at", "")[:19].replace("T", " "),
+            ])
+        t_ws = Table(
+            ws_rows,
+            colWidths=[2 * cm, 2.5 * cm, 2.5 * cm, 2.5 * cm, 2.5 * cm, 2.5 * cm, 3.5 * cm],
+        )
+        t_ws.setStyle(_header_table_style())
+        story.append(t_ws)
+        if any(ws.get("warnings") for ws in wheel_speeds):
+            for ws in wheel_speeds:
+                for w in ws.get("warnings", []):
+                    story.append(Spacer(1, 0.1 * cm))
+                    story.append(Paragraph(
+                        f"Track #{ws.get('track_id', '?')} uyari: {w}", S["Note"]
+                    ))
+        story.append(Spacer(1, 0.5 * cm))
+
     # 5. Varsayımlar
     story.append(Paragraph("Varsayimlar ve Sinirlamalar", S["SectionTitle"]))
 
@@ -409,11 +456,13 @@ def generate_report(
     result: PipelineResult,
     out_path: str | Path,
     axle_checks: list[dict] | None = None,
+    wheel_speeds: list[dict] | None = None,
 ) -> None:
     """Adli raporu PDF olarak yaz (ReportLab).
 
-    axle_checks: aks genişliği doğrulama sonuçları listesi (her eleman bir track'e ait dict).
-    Verilirse rapora ayrı bir bölüm olarak eklenir.
+    axle_checks: aks genişliği doğrulama sonuçları listesi.
+    wheel_speeds: T16 operatör-tekerlek hız ölçümü sonuçları listesi (birincil).
+    Verilirse rapora ilgili bölümler olarak eklenir.
     """
     out_path = Path(out_path)
     doc = SimpleDocTemplate(
@@ -423,4 +472,4 @@ def generate_report(
         topMargin=_MARGIN, bottomMargin=_MARGIN,
         title="Arac Hiz Tespit Raporu",
     )
-    doc.build(_build_story(result, axle_checks=axle_checks))
+    doc.build(_build_story(result, axle_checks=axle_checks, wheel_speeds=wheel_speeds))

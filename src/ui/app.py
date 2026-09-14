@@ -60,6 +60,8 @@ from .schemas import (
     TransverseGuideRequest,
     TransverseGuideResponse,
     VideoMetaOut,
+    WheelSpeedRequest,
+    WheelSpeedResponse,
 )
 
 import sys as _sys
@@ -687,15 +689,33 @@ async def regenerate_report(job_id: str) -> dict:
         except Exception:
             pass
 
+    # Tüm wheel_speed_*.json dosyalarını topla (T16)
+    wheel_speeds = []
+    for p in sorted(out_dir.glob("wheel_speed_*.json")):
+        try:
+            data = json.loads(p.read_text())
+            wheel_speeds.append(data)
+        except Exception:
+            pass
+
     report_v2_path = out_dir / "report_v2.pdf"
     try:
         from src.output.report import generate_report
-        generate_report(result, report_v2_path, axle_checks=axle_checks or None)
+        generate_report(
+            result,
+            report_v2_path,
+            axle_checks=axle_checks or None,
+            wheel_speeds=wheel_speeds or None,
+        )
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Rapor üretilemedi: {exc}")
 
     job.report_v2_path = report_v2_path
-    return {"status": "ok", "axle_check_count": len(axle_checks)}
+    return {
+        "status": "ok",
+        "axle_check_count": len(axle_checks),
+        "wheel_speed_count": len(wheel_speeds),
+    }
 
 
 @app.get("/api/job/{job_id}/report/v2")
@@ -1167,6 +1187,78 @@ async def recalibrate(job_id: str, req: RecalibrateRequest) -> dict:
     )
 
     return {"job_id": new_job_id, "source_job_id": old_job.job_id}
+
+
+@app.post(
+    "/api/job/{job_id}/track/{track_id}/wheel-speed",
+    response_model=WheelSpeedResponse,
+)
+async def wheel_speed(job_id: str, track_id: int, req: WheelSpeedRequest) -> WheelSpeedResponse:
+    """Operatör-işaretli tekerlek temas noktalarından birincil hız hesapla (T16).
+
+    Operatör sonuç ekranında 2-5 farklı karede aynı tekerin yere değdiği noktayı
+    işaretler; bu endpoint H + fps ile hızı hesaplar, sonucu diske yazar ve
+    audit-log'a kaydeder. Detection tekrar çalışmaz.
+    """
+    from src.speed.wheel_contact import wheel_contact_speed
+
+    _get_done_job(job_id)
+
+    cal_json_path = _job_out_dir(job_id) / "calibration.json"
+    if not cal_json_path.exists():
+        raise HTTPException(status_code=404, detail="Kalibrasyon verisi bulunamadı.")
+    _, control_points_cal, (fps, _) = load_calibration(cal_json_path)
+
+    try:
+        cal_result = compute_homography(control_points_cal)
+    except CalibrationError as e:
+        raise HTTPException(status_code=422, detail=f"Kalibrasyon yeniden hesaplanamadı: {e}")
+
+    H = cal_result.homography
+    marks = [{"frame": m.frame, "pixel": list(m.pixel)} for m in req.marks]
+
+    try:
+        result = wheel_contact_speed(marks, H, fps)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+
+    out_dir = _job_out_dir(job_id)
+    wheel_path = out_dir / f"wheel_speed_{track_id}.json"
+    wheel_data = {
+        "track_id": track_id,
+        "value_kmh": result.value_kmh,
+        "ci_kmh": result.ci_kmh,
+        "confidence_level": result.confidence_level,
+        "mark_count": result.mark_count,
+        "residual_kmh": result.residual_kmh,
+        "warnings": result.warnings,
+        "marks": marks,
+        "computed_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+    }
+    wheel_path.write_text(json.dumps(wheel_data, ensure_ascii=False))
+
+    slog.append(
+        out_dir,
+        "wheel_speed",
+        _job_id=job_id,
+        track_id=track_id,
+        mark_count=result.mark_count,
+        marks=marks,
+        value_kmh=result.value_kmh,
+        ci_kmh=result.ci_kmh,
+        confidence_level=result.confidence_level,
+        residual_kmh=result.residual_kmh,
+        warnings=result.warnings,
+    )
+
+    return WheelSpeedResponse(
+        value_kmh=result.value_kmh,
+        ci_kmh=result.ci_kmh,
+        confidence_level=result.confidence_level,
+        mark_count=result.mark_count,
+        residual_kmh=result.residual_kmh,
+        warnings=result.warnings,
+    )
 
 
 @app.get("/api/job/{job_id}/session-log")

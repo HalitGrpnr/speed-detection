@@ -81,3 +81,22 @@ export interface AxleStepResponse {
 export interface AxleStepAutoRequest {
   wheelbase_m: number
 }
+
+// T16 — Operatör-tekerlek hız ölçümü
+export interface WheelMark {
+  frame: number  // tam veya alt-kare (T14)
+  pixel: [number, number]
+}
+
+export interface WheelSpeedRequest {
+  marks: WheelMark[]
+}
+
+export interface WheelSpeedResponse {
+  value_kmh: number
+  ci_kmh: number
+  confidence_level: string
+  mark_count: number
+  residual_kmh: number
+  warnings: string[]
+}
