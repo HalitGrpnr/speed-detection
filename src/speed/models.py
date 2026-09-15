@@ -28,3 +28,5 @@ class SpeedEstimate:
     speed_series: list[SpeedSample]
     smoothed_series: list[tuple[float, float]]   # [(t_s, smoothed_kmh)]
     track_quality: TrackQuality
+    hull_inside_fraction: float = 1.0   # kalibrasyon hull içindeki kare oranı
+    out_of_calibration_zone: bool = False  # oranı çok düşük → adli olarak güvenilmez

@@ -5,7 +5,7 @@
 > geçmişine bakılır; bu dosya yalnızca **anlık durumun özetini** tutar (şişirmeyin).
 
 **Son güncelleme:** 2026-09-15
-**Aktif görev:** _(T18 tamamlandı — sıradaki: T17 (hull guardrail), T3/T4 (tarayıcı testleri), bkz. `tasks/BACKLOG.md`)_
+**Aktif görev:** _(T17+T18 tamamlandı — sıradaki: T3/T4 (tarayıcı testleri), T9 (PyInstaller build), bkz. `tasks/BACKLOG.md`)_
 
 **En son (önemli, forensic-etkili bir düzeltme):** Kullanıcı gerçek video analizinde şunu fark
 etti: araç kareye girdiği an overlay videoda ~25 km/h, birkaç kare sonra "aniden" ~65 km/h
@@ -66,6 +66,7 @@ H ile kaba dünya konumuna oturtup bilinen genişliğe göre düzeltiyor. Yeni e
 | T15 | Kalibrasyon şerit noktası transverse kılavuz | ✅ Bitti | transverse_guide.py + canvas kılavuz + yol anchor modu; `tasks/T15.md` |
 | T16 | Operatör-tekerlek temas noktası birincil hız | ✅ Bitti | wheel_contact.py + 10 test + endpoint + WheelSpeedPanel + rapor; `tasks/T16.md` |
 | T18 | Arayüz sadeleştirme + ölü özellik temizliği | ✅ Bitti | autoref/axle_stepping/sparkline kaldırıldı; tablo sadeleşti; 235/235 test; `tasks/T18.md` |
+| T17 | Kalibrasyon-dışı araç guardrail (convex hull) | ✅ Bitti | hull.py + 13 test + hull-içi median + UI rozeti + canvas çizim; `tasks/T17.md` |
 | T2 | Recalibrate sonrası rapor metadata tutarsızlığı | ✅ Bitti | frame_step ve model_name orijinalden aktarılıyor |
 | T5 | M6 şerit tespitinde aykırı değer eleme | ✅ Bitti | sınır-dışı öneri bastırma (Seçenek B) |
 | T6 | Pipeline sonucunu kalıcı JSON'a yaz | ✅ Bitti | serialization.py round-trip + _finalize_job result_data.json |
@@ -75,7 +76,7 @@ H ile kaba dünya konumuna oturtup bilinen genişliğe göre düzeltiyor. Yeni e
 
 Durum işaretleri: ⬜ Başlanmadı · 🟡 Devam ediyor · ✅ Bitti · ⛔ Engellendi
 
-**Test durumu:** `pytest` **235/235 yeşil** (T18: 49 test silindi — axle_stepping + autoref + autoref UI testi). `frontend/` `npm run build` temiz. PyInstaller paketi
+**Test durumu:** `pytest` **248/248 yeşil** (T17: 13 yeni hull testi). `frontend/` `npm run build` temiz. PyInstaller paketi
 (`dist/SpeedDetection/`, ~772 MB arm64) T18 sonrası yeniden build edilmedi — bir sonraki paketleme öncesi kontrol edilmeli.
 
 ---
@@ -91,6 +92,17 @@ Durum işaretleri: ⬜ Başlanmadı · 🟡 Devam ediyor · ✅ Bitti · ⛔ Eng
 - **Adli kurallar (CLAUDE.md):** orijinal dosyaya yazılmaz + SHA-256 loglanır; sunucu-tarafı H
   yeniden hesaplanır; her hız CI + güven seviyesi taşır (çıplak sayı yok); harici ağ çağrısı yok
   (fontlar self-host).
+
+## Son Oturum (2026-09-15) — T17
+
+- **T17 tamamlandı:** Kalibrasyon-dışı araç guardrail.
+  `src/reliability/hull.py` — `calibration_hull()`, `point_in_hull()`, `hull_inside_fraction()`.
+  `estimate_speed` artık hull parametresi alıyor; yalnızca hull-içi kareler median'a giriyor.
+  `out_of_calibration_zone: True` → `confidence_level` otomatik "low". 13 birim test.
+  SpeedEstimateOut'a `hull_inside_fraction` + `out_of_calibration_zone` alanları eklendi.
+  Sonuç tablosunda "KAL. DIŞI" rozeti + kırmızı satır + ⚠ kısmi uyarı.
+  CalibrationCanvas'ta hull sınırı siyan kesikli çizgi ile gösteriliyor.
+  pytest 248/248, build temiz.
 
 ## Son Oturum (2026-09-15) — T18
 

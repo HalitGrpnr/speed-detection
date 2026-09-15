@@ -15,6 +15,7 @@ class ConfidenceSignals:
     value_kmh: float = 0.0            # hız tahmini — oransal hesaplar için
     ci_kmh: float = 0.0               # IQR/2 güven aralığı
     calibration_point_count: int = 0  # R3'te high-gate için kullanılır
+    out_of_calibration_zone: bool = False  # T17: hull dışı → otomatik low
 
 
 # Mutlak eşikler (RMS, kare sayısı) — GPS doğrulamasına kadar geçici
@@ -45,6 +46,8 @@ def compute_confidence_level(
     v = signals.value_kmh  # kısaltma
 
     # ── Low koşulları ────────────────────────────────────────────────────────
+    if signals.out_of_calibration_zone:
+        return "low"
     if signals.calibration_layer == "standard_assumption":
         return "low"
     if signals.reprojection_rms_m >= _MEDIUM_RMS_M:

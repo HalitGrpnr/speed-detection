@@ -78,6 +78,8 @@ class SpeedEstimateOut(BaseModel):
     ci_kmh: float
     confidence_level: str
     frame_count: int
+    hull_inside_fraction: float = 1.0
+    out_of_calibration_zone: bool = False
 
 
 class JobResultOut(BaseModel):

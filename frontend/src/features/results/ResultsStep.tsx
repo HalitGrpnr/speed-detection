@@ -168,11 +168,32 @@ export function ResultsStep() {
                 </thead>
                 <tbody>
                   {result.estimates.map((e) => (
-                    <tr key={e.track_id} className="border-b last:border-0">
+                    <tr
+                    key={e.track_id}
+                    className={`border-b last:border-0 ${e.out_of_calibration_zone ? 'bg-red-950/20' : ''}`}
+                  >
                       <td className="px-3 py-2 tabular-nums text-muted-foreground">#{e.track_id}</td>
-                      <td className="px-3 py-2">{e.vehicle_class}</td>
+                      <td className="px-3 py-2">
+                        <span>{e.vehicle_class}</span>
+                        {e.out_of_calibration_zone && (
+                          <span
+                            className="ml-2 rounded px-1.5 py-0.5 text-[10px] font-bold bg-red-900/60 text-red-300 border border-red-700/60"
+                            title={`Kalibrasyon dışı — hull-içi kare oranı: ${((e.hull_inside_fraction ?? 0) * 100).toFixed(0)}%. Homografi bu bölgede geçersiz olabilir; hız adli raporda GÜVEN İLMEZ olarak işaretlenir.`}
+                          >
+                            KAL. DIŞI
+                          </span>
+                        )}
+                      </td>
                       <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">
                         {e.speed_kmh.toFixed(1)}
+                        {!e.out_of_calibration_zone && (e.hull_inside_fraction ?? 1) < 0.8 && (
+                          <span
+                            className="ml-1 text-[9px] text-amber-500"
+                            title={`Hull-içi: ${((e.hull_inside_fraction ?? 0) * 100).toFixed(0)}% — bazı kareler kalibrasyon bölgesi dışında`}
+                          >
+                            ⚠
+                          </span>
+                        )}
                       </td>
                       <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">
                         ± {e.ci_kmh.toFixed(1)}

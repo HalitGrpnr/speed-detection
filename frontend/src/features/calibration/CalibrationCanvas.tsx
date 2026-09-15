@@ -118,6 +118,29 @@ export function CalibrationCanvas({
     ctx.clearRect(0, 0, canvas.width, canvas.height)
     ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
 
+    // T17: Kalibrasyon hull sınırı — pixel uzayında convex hull (≥3 non-rejected nokta)
+    const validPts = points.filter((p) => !(rejectedIds?.has(p.id)))
+    if (validPts.length >= 3) {
+      const hull2d = _convexHull2D(validPts.map((p) => p.pixel as [number, number]))
+      if (hull2d.length >= 3) {
+        ctx.save()
+        ctx.beginPath()
+        ctx.moveTo(hull2d[0][0] * scale, hull2d[0][1] * scale)
+        for (let i = 1; i < hull2d.length; i++) {
+          ctx.lineTo(hull2d[i][0] * scale, hull2d[i][1] * scale)
+        }
+        ctx.closePath()
+        ctx.strokeStyle = 'rgba(34, 211, 238, 0.55)'
+        ctx.lineWidth = 1.5
+        ctx.setLineDash([6, 4])
+        ctx.stroke()
+        ctx.fillStyle = 'rgba(34, 211, 238, 0.06)'
+        ctx.fill()
+        ctx.setLineDash([])
+        ctx.restore()
+      }
+    }
+
     // Kontrol noktaları
     points.forEach((pt, i) => {
       const cx = pt.pixel[0] * scale
@@ -537,4 +560,30 @@ export function CalibrationCanvas({
       )}
     </div>
   )
+}
+
+// Andrew's monotone chain — 2D convex hull
+function _cross(O: [number,number], A: [number,number], B: [number,number]): number {
+  return (A[0] - O[0]) * (B[1] - O[1]) - (A[1] - O[1]) * (B[0] - O[0])
+}
+
+function _convexHull2D(pts: [number,number][]): [number,number][] {
+  const n = pts.length
+  if (n < 3) return [...pts]
+  const sorted = [...pts].sort((a, b) => a[0] !== b[0] ? a[0] - b[0] : a[1] - b[1])
+  const lower: [number,number][] = []
+  for (const p of sorted) {
+    while (lower.length >= 2 && _cross(lower[lower.length-2], lower[lower.length-1], p) <= 0)
+      lower.pop()
+    lower.push(p)
+  }
+  const upper: [number,number][] = []
+  for (let i = n - 1; i >= 0; i--) {
+    const p = sorted[i]
+    while (upper.length >= 2 && _cross(upper[upper.length-2], upper[upper.length-1], p) <= 0)
+      upper.pop()
+    upper.push(p)
+  }
+  lower.pop(); upper.pop()
+  return [...lower, ...upper]
 }

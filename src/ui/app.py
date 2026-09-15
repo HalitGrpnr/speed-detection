@@ -354,6 +354,8 @@ def _finalize_job(job: JobState, result, out_video: Path, out_report: Path, out_
             "ci_kmh": round(est.ci_kmh, 1),
             "confidence_level": est.confidence_level,
             "frame_count": est.track_quality.frame_count,
+            "hull_inside_fraction": round(est.hull_inside_fraction, 3),
+            "out_of_calibration_zone": est.out_of_calibration_zone,
         }
         for est in result.speed_estimates
     ]

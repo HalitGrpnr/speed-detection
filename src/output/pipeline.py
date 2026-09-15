@@ -14,6 +14,7 @@ from src.calibration.planview import compute_plan_view
 from src.detection.models import Track
 from src.detection.tracker import VehicleTracker
 from src.detection.video import iter_video_frames, read_video_meta
+from src.reliability.hull import calibration_hull
 from src.speed.calculator import estimate_speed
 from .models import PipelineResult
 from .overlay import write_overlay_video
@@ -125,12 +126,17 @@ def run_pipeline(
         if on_progress:
             on_progress(87.0)
 
-    # 3. Hız hesabı
+    # 3. Hız hesabı — T17: inlier kontrol noktalarından hull oluştur
+    cal_hull = calibration_hull(
+        control_points,
+        used_ids=set(cal_result.used_point_ids),
+    )
+
     speed_estimates = []
     for track in tracks:
         if len(track.points) < min_track_points:
             continue
-        est = estimate_speed(track, H, fps_used, calibration_result=cal_result)
+        est = estimate_speed(track, H, fps_used, calibration_result=cal_result, hull=cal_hull)
         speed_estimates.append(est)
 
     if progress:

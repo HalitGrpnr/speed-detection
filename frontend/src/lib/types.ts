@@ -539,6 +539,10 @@ export interface components {
             confidence_level: string;
             /** Frame Count */
             frame_count: number;
+            /** Hull Inside Fraction */
+            hull_inside_fraction?: number;
+            /** Out Of Calibration Zone */
+            out_of_calibration_zone?: boolean;
         };
         /** ValidationError */
         ValidationError: {

@@ -35,8 +35,10 @@
 | T14 | Kalibrasyon noktası alt-kare enterpolasyonu | Kalibrasyon | Orta | — | ✅ |
 | T15 | Kalibrasyon: Şerit noktası transverse yön kılavuzu | Kalibrasyon | Büyük | — | ✅ |
 | T16 | Operatör-tekerlek temas noktası birincil hız | Hız çekirdeği + UX | Büyük | T14, M9 | ✅ |
-| T17 | Kalibrasyon-dışı araç guardrail (convex hull) | Güvenilirlik | Orta | — | ⬜ |
+| T17 | Kalibrasyon-dışı araç guardrail (convex hull) | Güvenilirlik | Orta | — | ✅ |
 | T18 | Arayüz sadeleştirme + ölü özellik temizliği | UX | Orta-Büyük | T16 | ✅ |
+| T19 | Çok-işaretli hız profili + overlay (fren/ivme) | Hız çekirdeği + Çıktı | Orta-Büyük | T16 | ⬜ |
+| T20 | Otomatik tekerlek-zemin temas noktası tespiti (manuel/auto) | Hız çekirdeği + Tespit | Büyük | T19, T16 | ⬜ |
 
 Durum: ⬜ Başlanmadı · 🟡 Devam ediyor · ✅ Bitti · ⛔ Engellendi
 

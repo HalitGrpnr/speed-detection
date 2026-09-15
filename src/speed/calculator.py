@@ -5,11 +5,13 @@ from pathlib import Path
 from typing import Literal
 
 import numpy as np
+from scipy.spatial import ConvexHull
 
 from src.calibration.homography import pixel_to_world
 from src.calibration.models import CalibrationResult
 from src.detection.models import Track
 from src.reliability.confidence import ConfidenceSignals, compute_confidence_level
+from src.reliability.hull import point_in_hull, OUT_OF_ZONE_FRACTION
 from .models import SpeedSample, SpeedEstimate, TrackQuality
 from .smoother import sliding_window_smooth
 
@@ -57,16 +59,46 @@ def estimate_speed(
     calibration_result: CalibrationResult,
     window_s: float = 0.4,
     method: Literal["median", "mean", "regression"] = "median",
+    hull: ConvexHull | None = None,
 ) -> SpeedEstimate:
-    """Tam pipeline: track → metrik → ham seri → yumuşatma → SpeedEstimate."""
+    """Tam pipeline: track → metrik → ham seri → yumuşatma → SpeedEstimate.
+
+    hull verilmişse yalnızca kalibrasyon bölgesi içindeki kareler final estimate'e dahil edilir.
+    Hull dışındaki kareler speed_series'te yer alır ama medyan hesabından çıkarılır.
+    """
     samples = track_to_world(track, H, fps)
     # 3 km/h altı tespit jitter'ı — durmuş araçta 0 göster
     smoothed = sliding_window_smooth(samples, window_s, method, min_detectable_kmh=3.0)
 
     smoothed_values = np.array([v for _, v in smoothed])
 
-    # Nokta tahmini: ilk sample speed=0 olduğundan onu hariç tut
-    est_values = smoothed_values[1:] if len(smoothed_values) > 1 else smoothed_values
+    # ── T17: Hull içi sınıflama ──────────────────────────────────────────────
+    if hull is not None and samples:
+        inside_flags = [point_in_hull(s.world_m, hull) for s in samples]
+        n_inside = sum(inside_flags)
+        hull_inside_frac = n_inside / len(samples)
+    else:
+        inside_flags = [True] * len(samples)
+        hull_inside_frac = 1.0
+
+    out_of_zone = (hull is not None) and hull_inside_frac < OUT_OF_ZONE_FRACTION
+
+    # Final estimate: ilk sample (speed=0 artefakt) hariç; hull-dışı kareler hariç
+    est_mask = np.array(
+        [i > 0 and inside_flags[i] for i in range(len(samples))], dtype=bool
+    )
+    if np.any(est_mask):
+        est_values = smoothed_values[est_mask]
+    elif len(smoothed_values) > 1:
+        # Hull-içi yeterli veri yok — fallback ile tüm seri; kesin out_of_zone
+        est_values = smoothed_values[1:]
+        if hull is not None:
+            out_of_zone = True
+    else:
+        est_values = smoothed_values
+        if hull is not None:
+            out_of_zone = True
+
     value_kmh = float(np.median(est_values)) if len(est_values) > 0 else 0.0
 
     # CI: IQR/2; tek örnek varsa CI tanımsız → value_kmh (geniş/tanımsız sinyal)
@@ -101,6 +133,7 @@ def estimate_speed(
         value_kmh=value_kmh,
         ci_kmh=ci_kmh,
         calibration_point_count=len(calibration_result.used_point_ids),
+        out_of_calibration_zone=out_of_zone,
     )
     confidence_level = compute_confidence_level(signals)
 
@@ -112,6 +145,8 @@ def estimate_speed(
         speed_series=samples,
         smoothed_series=smoothed,
         track_quality=quality,
+        hull_inside_fraction=hull_inside_frac,
+        out_of_calibration_zone=out_of_zone,
     )
 
 
