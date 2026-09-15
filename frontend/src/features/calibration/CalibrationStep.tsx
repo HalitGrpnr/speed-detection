@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { ChevronLeft, ChevronRight, CheckSquare, Loader2, Square, Trash2, Target, Navigation, GitBranch } from 'lucide-react'
 import { api } from '@/lib/api'
 import type {
-  CalibrateResponse, ControlPoint, ControlPointSource, InterpolatePointResponse, ProposedPoint,
+  CalibrateResponse, ControlPoint, ControlPointSource, InterpolatePointResponse,
 } from '@/lib/models'
 import { useWizard } from '@/store/wizard'
 import { Button } from '@/components/ui/button'
@@ -14,7 +14,6 @@ import { StepFooter } from '@/components/common/StepFooter'
 import { CalibrationCanvas, type BracketPoints, type CanvasMode, type QuadCorners } from './CalibrationCanvas'
 import { PointsTable } from './PointsTable'
 import { GridPresetBar } from './GridPresetBar'
-import { AutoRefPanel } from './AutoRefPanel'
 
 const makeId = (src: string) => `cp-${src}-${crypto.randomUUID().slice(0, 8)}`
 
@@ -174,17 +173,6 @@ export function CalibrationStep() {
           : p,
       ),
     )
-  }
-
-  const addProposals = (proposals: ProposedPoint[]) => {
-    const auto: ControlPoint[] = proposals.map((pr) => ({
-      id: makeId('auto'),
-      pixel: pr.pixel,
-      world_m: pr.world_m,
-      source: 'auto' as const,
-      held_out: false,
-    }))
-    setControlPoints([...points, ...auto])
   }
 
   // ── Dörtgen ───────────────────────────────────────────────────────────────
@@ -450,11 +438,6 @@ export function CalibrationStep() {
             </div>
 
             <GridPresetBar pointCount={points.length} onApply={applyGrid} />
-            <AutoRefPanel
-              videoId={videoMeta.video_id}
-              frame={selectedFrame}
-              onProposals={addProposals}
-            />
 
             {/* ── T15: Yol yönü kılavuzu ── */}
             {canvasMode !== 'bracket' && canvasMode !== 'quad' && (

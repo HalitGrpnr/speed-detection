@@ -135,17 +135,6 @@ def test_calibrate_too_few_points_returns_422(client):
     assert r.status_code == 422
 
 
-# ── Test 6: AutoRef uç noktası ────────────────────────────────────────────────
-
-def test_autoref_returns_list(client):
-    vid = client._video_id
-    r = client.post(f'/api/video/{vid}/autoref', json={
-        'frame_n': 0, 'lane_width_m': 3.5, 'dash_length_m': 3.0
-    })
-    assert r.status_code == 200
-    assert isinstance(r.json(), list)  # boş olabilir (sentetik kare), ama liste olmalı
-
-
 # ── Test 7: Pipeline başlatma — job_id döner ─────────────────────────────────
 
 def test_pipeline_start_returns_job_id(client):

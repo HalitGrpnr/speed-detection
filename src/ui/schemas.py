@@ -53,20 +53,6 @@ class PlanViewRequest(BaseModel):
     control_points: list[ControlPointIn]
 
 
-class AutoRefRequest(BaseModel):
-    frame_n: int
-    lane_width_m: float = 3.5
-    dash_length_m: float = 3.0
-    d_near_m: float = 5.0  # yakın örnekleme noktasının kameradan tahmini mesafesi (m)
-
-
-class ProposedPointOut(BaseModel):
-    pixel: tuple[float, float]
-    world_m: tuple[float, float]
-    detection_confidence: float
-    description: str
-
-
 class PipelineRequest(BaseModel):
     video_id: str
     calibration: CalibrateResponse
@@ -123,45 +109,6 @@ class RecalibrateRequest(BaseModel):
     pixel_left: tuple[float, float]
     pixel_right: tuple[float, float]
     known_width_m: float
-
-
-class SpeedSeriesPoint(BaseModel):
-    t_s: float
-    speed_kmh: float
-
-
-class SpeedSeriesOut(BaseModel):
-    track_id: int
-    points: list[SpeedSeriesPoint]
-    max_kmh: float
-    median_kmh: float
-
-
-class AxleStepRequest(BaseModel):
-    frame_n: int                         # operatörün tekerlek işaretlediği kare
-    front_pixel: tuple[float, float]     # ön teker temas noktası
-    rear_pixel: tuple[float, float]      # arka teker temas noktası
-    wheelbase_m: float                   # dingil mesafesi (metre)
-
-
-class AxleStepOut(BaseModel):
-    frame: float       # kesirli kare (alt-kare enterpolasyon)
-    distance_m: float  # kümülatif mesafe
-
-
-class AxleStepResponse(BaseModel):
-    speed_kmh: float | None
-    ci_kmh: float | None
-    step_count: int
-    steps: list[AxleStepOut]
-    interrupted: bool
-    interrupt_reason: str | None
-    initial_distance_m: float | None  # manuel: ön-arka mesafesi; otomatik: None
-    h_speed_window_kmh: float | None = None
-
-
-class AxleStepAutoRequest(BaseModel):
-    wheelbase_m: float  # dingil mesafesi (metre) — yön track'ten otomatik tahmin edilir
 
 
 # T14 — Kalibrasyon noktası alt-kare enterpolasyonu

@@ -5,7 +5,7 @@
 > geçmişine bakılır; bu dosya yalnızca **anlık durumun özetini** tutar (şişirmeyin).
 
 **Son güncelleme:** 2026-09-15
-**Aktif görev:** _(T16 tamamlandı — sıradaki: T17 (hull guardrail), T18 (sadeleştirme), bkz. `tasks/BACKLOG.md`)_
+**Aktif görev:** _(T18 tamamlandı — sıradaki: T17 (hull guardrail), T3/T4 (tarayıcı testleri), bkz. `tasks/BACKLOG.md`)_
 
 **En son (önemli, forensic-etkili bir düzeltme):** Kullanıcı gerçek video analizinde şunu fark
 etti: araç kareye girdiği an overlay videoda ~25 km/h, birkaç kare sonra "aniden" ~65 km/h
@@ -65,6 +65,7 @@ H ile kaba dünya konumuna oturtup bilinen genişliğe göre düzeltiyor. Yeni e
 | T14 | Kalibrasyon noktası alt-kare enterpolasyonu | ✅ Bitti | bracket mode + ghost overlay + interpolation endpoint; `tasks/T14.md` |
 | T15 | Kalibrasyon şerit noktası transverse kılavuz | ✅ Bitti | transverse_guide.py + canvas kılavuz + yol anchor modu; `tasks/T15.md` |
 | T16 | Operatör-tekerlek temas noktası birincil hız | ✅ Bitti | wheel_contact.py + 10 test + endpoint + WheelSpeedPanel + rapor; `tasks/T16.md` |
+| T18 | Arayüz sadeleştirme + ölü özellik temizliği | ✅ Bitti | autoref/axle_stepping/sparkline kaldırıldı; tablo sadeleşti; 235/235 test; `tasks/T18.md` |
 | T2 | Recalibrate sonrası rapor metadata tutarsızlığı | ✅ Bitti | frame_step ve model_name orijinalden aktarılıyor |
 | T5 | M6 şerit tespitinde aykırı değer eleme | ✅ Bitti | sınır-dışı öneri bastırma (Seçenek B) |
 | T6 | Pipeline sonucunu kalıcı JSON'a yaz | ✅ Bitti | serialization.py round-trip + _finalize_job result_data.json |
@@ -74,8 +75,8 @@ H ile kaba dünya konumuna oturtup bilinen genişliğe göre düzeltiyor. Yeni e
 
 Durum işaretleri: ⬜ Başlanmadı · 🟡 Devam ediyor · ✅ Bitti · ⛔ Engellendi
 
-**Test durumu:** `pytest` **284/284 yeşil** (10 yeni test: T16). `frontend/` `npm run build` temiz. PyInstaller paketi
-(`dist/SpeedDetection/`, ~772 MB arm64) T16 sonrası yeniden build edilmedi — bir sonraki paketleme öncesi kontrol edilmeli.
+**Test durumu:** `pytest` **235/235 yeşil** (T18: 49 test silindi — axle_stepping + autoref + autoref UI testi). `frontend/` `npm run build` temiz. PyInstaller paketi
+(`dist/SpeedDetection/`, ~772 MB arm64) T18 sonrası yeniden build edilmedi — bir sonraki paketleme öncesi kontrol edilmeli.
 
 ---
 
@@ -91,7 +92,16 @@ Durum işaretleri: ⬜ Başlanmadı · 🟡 Devam ediyor · ✅ Bitti · ⛔ Eng
   yeniden hesaplanır; her hız CI + güven seviyesi taşır (çıplak sayı yok); harici ağ çağrısı yok
   (fontlar self-host).
 
-## Son Oturum (2026-09-15)
+## Son Oturum (2026-09-15) — T18
+
+- **T18 tamamlandı:** Arayüz sadeleştirme + ölü özellik temizliği.
+  Kaldırılanlar: `src/autoref/` paketi (M6), `src/speed/axle_stepping.py` (T8),
+  `AxleSteppingPanel.tsx`, `SpeedSparkline.tsx`, `AutoRefPanel.tsx`,
+  `/autoref`, `/speed-series`, `/axle-step`, `/axle-step-auto` endpointleri,
+  `AxleStep*`/`SpeedSeries*`/`AutoRef*`/`ProposedPoint*` şemaları.
+  Sonuç tablosu sadeleşti: "Hız (km/h)" → "Ön Tahmin (km/h)" (muted, yanlılık uyarısı),
+  "Tekerlek Hızı" → "Birincil Hız" (öne çıkan CTA), dingil adımlama sütunu kaldırıldı.
+  pytest 235/235, npm build temiz.
 
 - **T16 tamamlandı:** Operatör-tekerlek temas noktası birincil hız yöntemi.
   `src/speed/wheel_contact.py` — `wheel_contact_speed(marks, H, fps) → WheelSpeedResult`.

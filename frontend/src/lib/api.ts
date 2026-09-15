@@ -3,13 +3,9 @@
  * proxy uvicorn'a yönlendirir). Hiçbir harici servise çağrı yok (forensic, yerel).
  */
 import type {
-  AutoRefRequest,
   AxleCheckRequest,
   AxleCheckResponse,
   AxleSuggestFrameResponse,
-  AxleStepRequest,
-  AxleStepAutoRequest,
-  AxleStepResponse,
   CalibrateRequest,
   CalibrateResponse,
   InterpolatePointRequest,
@@ -18,9 +14,7 @@ import type {
   JobStatus,
   PipelineRequest,
   PlanViewRequest,
-  ProposedPoint,
   RecalibrateRequest,
-  SpeedSeriesOut,
   VideoMeta,
   WheelSpeedRequest,
   WheelSpeedResponse,
@@ -106,16 +100,6 @@ export const api = {
     )
   },
 
-  async autoref(videoId: string, req: AutoRefRequest): Promise<ProposedPoint[]> {
-    return unwrap(
-      await fetch(`/api/video/${videoId}/autoref`, {
-        method: 'POST',
-        headers: jsonHeaders,
-        body: JSON.stringify(req),
-      }),
-    )
-  },
-
   async startPipeline(req: PipelineRequest): Promise<{ job_id: string }> {
     return unwrap(
       await fetch('/api/pipeline', {
@@ -185,33 +169,6 @@ export const api = {
 
   /** Güncellenmiş raporu indirme URL'i. */
   reportV2Url: (jobId: string) => `/api/job/${jobId}/report/v2`,
-
-  /** Dingil adımlama hız tahmini (T8, manuel mod). */
-  async axleStep(jobId: string, trackId: number, req: AxleStepRequest): Promise<AxleStepResponse> {
-    return unwrap(
-      await fetch(`/api/job/${jobId}/track/${trackId}/axle-step`, {
-        method: 'POST',
-        headers: jsonHeaders,
-        body: JSON.stringify(req),
-      }),
-    )
-  },
-
-  /** Tam otomatik dingil adımlama — yön track'ten PCA ile tahmin edilir. */
-  async axleStepAuto(jobId: string, trackId: number, req: AxleStepAutoRequest): Promise<AxleStepResponse> {
-    return unwrap(
-      await fetch(`/api/job/${jobId}/track/${trackId}/axle-step-auto`, {
-        method: 'POST',
-        headers: jsonHeaders,
-        body: JSON.stringify(req),
-      }),
-    )
-  },
-
-  /** Track hız zaman serisi (T13 sparkline). result_data.json yoksa hata fırlatır. */
-  async speedSeries(jobId: string, trackId: number): Promise<SpeedSeriesOut> {
-    return unwrap(await fetch(`/api/job/${jobId}/track/${trackId}/speed-series`))
-  },
 
   /** Oturum logu — her adım, parametre ve sonuç. */
   async sessionLog(jobId: string): Promise<Record<string, unknown>[]> {

@@ -1,6 +1,6 @@
-import { useRef, useState } from 'react'
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Download, FileText, Loader2, Map, Milestone, Ruler, RotateCcw, Target } from 'lucide-react'
+import { Download, FileText, Loader2, Map, Ruler, RotateCcw, Target } from 'lucide-react'
 import { api } from '@/lib/api'
 import { useWizard } from '@/store/wizard'
 import { Button, buttonVariants } from '@/components/ui/button'
@@ -12,8 +12,6 @@ import { StatusBanner } from '@/components/common/StatusBanner'
 import { StepFooter } from '@/components/common/StepFooter'
 import { InfoHint } from '@/components/common/InfoHint'
 import { AxleCheckPanel } from './AxleCheckPanel'
-import { AxleSteppingPanel } from './AxleSteppingPanel'
-import { SpeedSparkline } from './SpeedSparkline'
 import { SessionLogPanel } from './SessionLogPanel'
 import { WheelSpeedPanel } from './WheelSpeedPanel'
 
@@ -24,28 +22,9 @@ export function ResultsStep() {
   const controlPoints = useWizard((s) => s.controlPoints)
   const reset = useWizard((s) => s.reset)
   const [axleTrackId, setAxleTrackId] = useState<number | null>(null)
-  const [steppingTrackId, setSteppingTrackId] = useState<number | null>(null)
   const [wheelTrackId, setWheelTrackId] = useState<number | null>(null)
   const [showPlanView, setShowPlanView] = useState(false)
   const [hasV2Report, setHasV2Report] = useState(false)
-  const [hoveredTrackId, setHoveredTrackId] = useState<number | null>(null)
-  const leaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  const sparklineQuery = useQuery({
-    queryKey: ['speedSeries', jobId, hoveredTrackId],
-    queryFn: () => api.speedSeries(jobId!, hoveredTrackId!),
-    enabled: !!jobId && hoveredTrackId != null,
-    staleTime: Infinity,
-    retry: false,
-  })
-
-  const handleRowEnter = (trackId: number) => {
-    if (leaveTimer.current) clearTimeout(leaveTimer.current)
-    setHoveredTrackId(trackId)
-  }
-  const handleRowLeave = () => {
-    leaveTimer.current = setTimeout(() => setHoveredTrackId(null), 120)
-  }
 
   const resultsQuery = useQuery({
     queryKey: ['jobResults', jobId],
@@ -107,8 +86,9 @@ export function ResultsStep() {
       <CardHeader>
         <CardTitle>Adım 6 — Sonuçlar</CardTitle>
         <CardDescription>
-          {result.vehicle_count} araç için hız tahmini. Her değer güven aralığı (±) ve güven
-          seviyesiyle birlikte verilir — çıplak sayı sunulmaz.
+          {result.vehicle_count} araç tespit edildi. Her araç için birincil hızı ölçmek üzere
+          "Hızı Ölç" butonunu kullanın — sonuç güven aralığı ve güven seviyesiyle birlikte
+          rapora eklenir.
         </CardDescription>
       </CardHeader>
 
@@ -120,169 +100,119 @@ export function ResultsStep() {
           </StatusBanner>
         )}
 
-        {/* Hız tablosu */}
+        {/* Araç tablosu */}
         {result.estimates.length === 0 ? (
           <StatusBanner tone="warning">
             Hız tahmini üretilemedi (yeterli/uzun takip bulunamadı). Overlay videoyu inceleyin veya
             kare adımını düşürüp tekrar deneyin.
           </StatusBanner>
         ) : (
-          <div className="overflow-x-auto rounded-lg border">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b bg-muted/40 text-left text-xs uppercase text-muted-foreground">
-                  <th className="px-3 py-2 font-medium">
-                    <span className="flex items-center gap-1">
-                      Takip
-                      <InfoHint text="ByteTrack tarafından aynı fiziksel araca atanan benzersiz kimlik numarası. Her analiz çalıştırmasında sıfırdan başlar." />
-                    </span>
-                  </th>
-                  <th className="px-3 py-2 font-medium">
-                    <span className="flex items-center gap-1">
-                      Sınıf
-                      <InfoHint text="YOLO modelinin tespit ettiği araç türü (car, truck, bus, motorcycle vb.)." />
-                    </span>
-                  </th>
-                  <th className="px-3 py-2 text-right font-medium">
-                    <span className="flex items-center justify-end gap-1">
-                      Hız (km/h)
-                      <InfoHint text="Aracın tekerlek-zemin temas noktasının homografi üzerinden dünya koordinatlarındaki ortalama hızı. Bbox merkezi değil temas noktası kullanılır — paralaks hatasını önler." />
-                    </span>
-                  </th>
-                  <th className="px-3 py-2 text-right font-medium">
-                    <span className="flex items-center justify-end gap-1">
-                      Güven Aralığı
-                      <InfoHint text="±değer: hız tahmininin %95 güven aralığı yarı genişliği. Takip boyunca ölçüm tutarsızlığından (kare-kare varyans) ve kalibrasyon belirsizliğinden hesaplanır. Daha dar = daha tutarlı ölçüm." />
-                    </span>
-                  </th>
-                  <th className="px-3 py-2 font-medium">
-                    <span className="flex items-center gap-1">
-                      Güven
-                      <InfoHint text="Tahminin genel güvenilirlik seviyesi: HIGH (kısa güven aralığı, uzun takip), MEDIUM veya LOW. Bilirkişi raporuna yansır." />
-                    </span>
-                  </th>
-                  <th className="px-3 py-2 text-right font-medium">
-                    <span className="flex items-center justify-end gap-1">
-                      Kare
-                      <InfoHint text="Bu aracın takip edildiği toplam kare sayısı. Daha fazla kare → daha güvenilir hız tahmini. Çok kısa takipler (genellikle &lt;5 kare) raporlanmaz." />
-                    </span>
-                  </th>
-                  <th className="px-3 py-2 text-right font-medium">
-                    <span className="flex items-center justify-end gap-1">
-                      Aks Doğrulama
-                      <InfoHint text="Aracın aks genişliğini ölçerek homografiyi çapraz doğrular. Bilinen araç genişliğiyle karşılaştırılır; büyük sapma kalibrasyon sorununa işaret eder." />
-                    </span>
-                  </th>
-                  <th className="px-3 py-2 text-right font-medium">
-                    <span className="flex items-center justify-end gap-1">
-                      Dingil Adımlama
-                      <InfoHint text="Ön/arka teker adımı ile bağımsız hız tahmini. Araç kendi tekerleklerini referans alır, harici nokta gerekmez. H-tabanlı hızla karşılaştırma üretir." />
-                    </span>
-                  </th>
-                  <th className="px-3 py-2 text-right font-medium">
-                    <span className="flex items-center justify-end gap-1">
-                      Tekerlek Hızı
-                      <InfoHint text="Operatörün tekerlek-zemin temas noktasını elle işaretlediği birincil hız ölçümü. YOLO bbox parallax hatasından bağımsız — GPS doğrulamada bbox ~74, tekerlek ~80 km/h verdi." />
-                    </span>
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {result.estimates.map((e) => (
-                  <tr
-                    key={e.track_id}
-                    className="border-b last:border-0"
-                    onMouseEnter={() => handleRowEnter(e.track_id)}
-                    onMouseLeave={handleRowLeave}
-                  >
-                    <td className="px-3 py-2 tabular-nums text-muted-foreground">#{e.track_id}</td>
-                    <td className="px-3 py-2">{e.vehicle_class}</td>
-                    <td className="px-3 py-2 text-right relative">
-                      <span className="text-base font-semibold tabular-nums">
-                        {e.speed_kmh.toFixed(1)}
+          <>
+            <StatusBanner tone="info">
+              Tablo, homografi tabanlı ön tahminleri gösterir. Birincil hız için her araç satırında
+              <strong> "Hızı Ölç"</strong> butonuna basın ve tekerlek temas noktasını işaretleyin.
+            </StatusBanner>
+            <div className="overflow-x-auto rounded-lg border">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b bg-muted/40 text-left text-xs uppercase text-muted-foreground">
+                    <th className="px-3 py-2 font-medium">
+                      <span className="flex items-center gap-1">
+                        Takip
+                        <InfoHint text="ByteTrack tarafından aynı fiziksel araca atanan benzersiz kimlik numarası. Her analiz çalıştırmasında sıfırdan başlar." />
                       </span>
-                      {hoveredTrackId === e.track_id && (
-                        <div
-                          className="absolute right-0 bottom-full z-20 mb-1 rounded-lg border bg-card shadow-md p-2 w-56"
-                          onMouseEnter={() => handleRowEnter(e.track_id)}
-                          onMouseLeave={handleRowLeave}
-                        >
-                          <div className="text-[0.65rem] text-muted-foreground mb-1 font-medium">
-                            Hız zaman serisi
-                          </div>
-                          {sparklineQuery.isPending ? (
-                            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                              <Loader2 className="size-3 animate-spin" /> Yükleniyor…
-                            </div>
-                          ) : sparklineQuery.data ? (
-                            <SpeedSparkline
-                              points={sparklineQuery.data.points}
-                              maxKmh={sparklineQuery.data.max_kmh}
-                              medianKmh={sparklineQuery.data.median_kmh}
-                              width={200}
-                              height={64}
-                            />
-                          ) : (
-                            <div className="text-xs text-muted-foreground">
-                              Sonuç verisi mevcut değil
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </td>
-                    <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">
-                      ± {e.ci_kmh.toFixed(1)}
-                    </td>
-                    <td className="px-3 py-2">
-                      <ConfidenceBadge level={e.confidence_level} />
-                    </td>
-                    <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">
-                      {e.frame_count}
-                    </td>
-                    <td className="px-3 py-2 text-right">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          setAxleTrackId(axleTrackId === e.track_id ? null : e.track_id)
-                          if (steppingTrackId === e.track_id) setSteppingTrackId(null)
-                          if (wheelTrackId === e.track_id) setWheelTrackId(null)
-                        }}
-                      >
-                        <Ruler className="size-3.5" /> Aks Doğrula
-                      </Button>
-                    </td>
-                    <td className="px-3 py-2 text-right">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          setSteppingTrackId(steppingTrackId === e.track_id ? null : e.track_id)
-                          if (axleTrackId === e.track_id) setAxleTrackId(null)
-                          if (wheelTrackId === e.track_id) setWheelTrackId(null)
-                        }}
-                      >
-                        <Milestone className="size-3.5" /> Dingil
-                      </Button>
-                    </td>
-                    <td className="px-3 py-2 text-right">
-                      <Button
-                        variant={wheelTrackId === e.track_id ? 'default' : 'ghost'}
-                        size="sm"
-                        onClick={() => {
-                          setWheelTrackId(wheelTrackId === e.track_id ? null : e.track_id)
-                          if (axleTrackId === e.track_id) setAxleTrackId(null)
-                          if (steppingTrackId === e.track_id) setSteppingTrackId(null)
-                        }}
-                      >
-                        <Target className="size-3.5" /> Hızı Ölç
-                      </Button>
-                    </td>
+                    </th>
+                    <th className="px-3 py-2 font-medium">
+                      <span className="flex items-center gap-1">
+                        Sınıf
+                        <InfoHint text="YOLO modelinin tespit ettiği araç türü (car, truck, bus, motorcycle vb.)." />
+                      </span>
+                    </th>
+                    <th className="px-3 py-2 text-right font-medium">
+                      <span className="flex items-center justify-end gap-1">
+                        Ön Tahmin (km/h)
+                        <InfoHint text="Homografi tabanlı otomatik ön tahmin — yanlı olabilir (±%10). Birincil hız için 'Hızı Ölç' butonunu kullanın." />
+                      </span>
+                    </th>
+                    <th className="px-3 py-2 text-right font-medium">
+                      <span className="flex items-center justify-end gap-1">
+                        Güven Aralığı
+                        <InfoHint text="±değer: ön tahmin için %95 güven aralığı yarı genişliği." />
+                      </span>
+                    </th>
+                    <th className="px-3 py-2 font-medium">
+                      <span className="flex items-center gap-1">
+                        Güven
+                        <InfoHint text="Tahminin genel güvenilirlik seviyesi: HIGH, MEDIUM veya LOW." />
+                      </span>
+                    </th>
+                    <th className="px-3 py-2 text-right font-medium">
+                      <span className="flex items-center justify-end gap-1">
+                        Kare
+                        <InfoHint text="Bu aracın takip edildiği toplam kare sayısı. Daha fazla kare → daha güvenilir tahmin." />
+                      </span>
+                    </th>
+                    <th className="px-3 py-2 text-right font-medium">
+                      <span className="flex items-center justify-end gap-1">
+                        Aks Doğrulama
+                        <InfoHint text="Aracın aks genişliğini ölçerek homografiyi çapraz doğrular." />
+                      </span>
+                    </th>
+                    <th className="px-3 py-2 text-right font-medium">
+                      <span className="flex items-center justify-end gap-1">
+                        Birincil Hız
+                        <InfoHint text="Operatörün tekerlek-zemin temas noktasını elle işaretlediği birincil ölçüm. GPS doğrulamada ön tahminden ~%8 daha doğru." />
+                      </span>
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {result.estimates.map((e) => (
+                    <tr key={e.track_id} className="border-b last:border-0">
+                      <td className="px-3 py-2 tabular-nums text-muted-foreground">#{e.track_id}</td>
+                      <td className="px-3 py-2">{e.vehicle_class}</td>
+                      <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">
+                        {e.speed_kmh.toFixed(1)}
+                      </td>
+                      <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">
+                        ± {e.ci_kmh.toFixed(1)}
+                      </td>
+                      <td className="px-3 py-2">
+                        <ConfidenceBadge level={e.confidence_level} />
+                      </td>
+                      <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">
+                        {e.frame_count}
+                      </td>
+                      <td className="px-3 py-2 text-right">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setAxleTrackId(axleTrackId === e.track_id ? null : e.track_id)
+                            if (wheelTrackId === e.track_id) setWheelTrackId(null)
+                          }}
+                        >
+                          <Ruler className="size-3.5" /> Aks Doğrula
+                        </Button>
+                      </td>
+                      <td className="px-3 py-2 text-right">
+                        <Button
+                          variant={wheelTrackId === e.track_id ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => {
+                            setWheelTrackId(wheelTrackId === e.track_id ? null : e.track_id)
+                            if (axleTrackId === e.track_id) setAxleTrackId(null)
+                          }}
+                        >
+                          <Target className="size-3.5" /> Hızı Ölç
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
 
         {axleTrackId != null && jobId && videoMeta && (
@@ -293,15 +223,6 @@ export function ResultsStep() {
             controlPoints={controlPoints}
             onClose={() => setAxleTrackId(null)}
             onReportRegenerated={() => setHasV2Report(true)}
-          />
-        )}
-
-        {steppingTrackId != null && jobId && videoMeta && (
-          <AxleSteppingPanel
-            jobId={jobId}
-            videoId={videoMeta.video_id}
-            trackId={steppingTrackId}
-            onClose={() => setSteppingTrackId(null)}
           />
         )}
 
@@ -324,7 +245,7 @@ export function ResultsStep() {
             <h3 className="text-sm font-medium">Overlay Video</h3>
             <div className="flex flex-col items-end gap-1">
               <span className="rounded bg-muted px-2 py-0.5 text-xs text-muted-foreground font-mono">
-                H-tabanlı anlık hız · Job: {jobId}
+                Ön tahmin · Job: {jobId}
               </span>
               {sourceJobId && (
                 <span className="rounded bg-amber-100 px-2 py-0.5 text-xs text-amber-700 font-medium">
@@ -342,7 +263,7 @@ export function ResultsStep() {
             Tarayıcınız video oynatmayı desteklemiyor.
           </video>
           <p className="text-xs text-muted-foreground">
-            Her karede gösterilen hız H-tabanlı anlık hızdır. Dingil adımlama sonucu bu videoya yansımaz.
+            Videodaki anlık hız değerleri ön tahmindir. Birincil hız için "Hızı Ölç" adımını kullanın.
           </p>
         </div>
 

@@ -16,7 +16,6 @@ from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 
-from src.autoref.proposer import AutoProposer
 from src.calibration.homography import compute_homography, pixel_to_world
 from src.calibration.io import load_calibration, save_calibration
 from src.calibration.metrics import holdout_validation, loo_rms
@@ -35,14 +34,9 @@ from src.reliability.axle_check import (
 from .job_store import JobState, JobStore
 from . import session_log as slog
 from .schemas import (
-    AutoRefRequest,
     AxleCheckRequest,
     AxleCheckResponse,
     AxleSuggestFrameResponse,
-    AxleStepRequest,
-    AxleStepAutoRequest,
-    AxleStepResponse,
-    AxleStepOut,
     CalibrateRequest,
     CalibrateResponse,
     InterpolatePointRequest,
@@ -51,12 +45,9 @@ from .schemas import (
     JobStatusOut,
     PipelineRequest,
     PlanViewRequest,
-    ProposedPointOut,
     RecalibrateRequest,
     RejectedPointOut,
     SpeedEstimateOut,
-    SpeedSeriesOut,
-    SpeedSeriesPoint,
     TransverseGuideRequest,
     TransverseGuideResponse,
     VideoMetaOut,
@@ -347,31 +338,6 @@ async def transverse_guide(video_id: str, req: TransverseGuideRequest) -> Transv
     if req.wheel_px is not None:
         p1, p2 = guide_line_endpoints(req.wheel_px, d, req.canvas_w, req.canvas_h)
     return TransverseGuideResponse(transverse_dir=d, guide_p1=p1, guide_p2=p2)
-
-
-# ── AutoRef endpoint ──────────────────────────────────────────────────────────
-
-@app.post("/api/video/{video_id}/autoref", response_model=list[ProposedPointOut])
-async def autoref(video_id: str, req: AutoRefRequest) -> list[ProposedPointOut]:
-    path = _get_video_path(video_id)
-    frame = _read_frame(path, req.frame_n)
-
-    proposer = AutoProposer(
-        lane_width_m=req.lane_width_m,
-        dash_length_m=req.dash_length_m,
-        d_near_m=req.d_near_m,
-    )
-    proposals = proposer.propose(frame)
-
-    return [
-        ProposedPointOut(
-            pixel=p.pixel,
-            world_m=p.world_m,
-            detection_confidence=p.detection_confidence,
-            description=p.description,
-        )
-        for p in proposals
-    ]
 
 
 # ── Pipeline endpoints ────────────────────────────────────────────────────────
@@ -885,228 +851,6 @@ async def axle_check(job_id: str, track_id: int, req: AxleCheckRequest) -> AxleC
         error_pct=round(result.get("error_pct", 0), 2),
     )
     return AxleCheckResponse(**result)
-
-
-@app.get(
-    "/api/job/{job_id}/track/{track_id}/speed-series",
-    response_model=SpeedSeriesOut,
-)
-async def speed_series(job_id: str, track_id: int) -> SpeedSeriesOut:
-    """Track'in yumuşatılmış hız zaman serisini döndürür (T13 sparkline).
-
-    result_data.json yoksa (eski iş) 404 döner — frontend bunu sessizce atlar.
-    """
-    _get_done_job(job_id)
-    out_dir = _job_out_dir(job_id)
-    result_data_path = out_dir / "result_data.json"
-    if not result_data_path.exists():
-        raise HTTPException(
-            status_code=404,
-            detail="Sonuç verisi bulunamadı — bu analiz eski formatta kaydedilmiş.",
-        )
-    try:
-        rd = read_result_data(out_dir)
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Sonuç verisi okunamadı: {exc}")
-
-    for est in rd.speed_estimates:
-        if est.track_id == track_id:
-            if not est.smoothed_series:
-                raise HTTPException(status_code=404, detail="Bu track için smoothed_series boş.")
-            speeds = [v for _, v in est.smoothed_series]
-            return SpeedSeriesOut(
-                track_id=track_id,
-                points=[SpeedSeriesPoint(t_s=t, speed_kmh=v) for t, v in est.smoothed_series],
-                max_kmh=float(max(speeds)),
-                median_kmh=float(np.median(speeds)),
-            )
-    raise HTTPException(status_code=404, detail=f"Track {track_id} bulunamadı.")
-
-
-@app.post(
-    "/api/job/{job_id}/track/{track_id}/axle-step",
-    response_model=AxleStepResponse,
-)
-async def axle_step(job_id: str, track_id: int, req: AxleStepRequest) -> AxleStepResponse:
-    """Dingil adımlama hız tahmini (T8).
-
-    Operatörün işaretlediği ön/arka teker piksel konumu + dingil mesafesinden yola çıkar;
-    track contact_pixel'lerini H üzerinden dünya uzayında izleyerek adım zamanlarını bulur.
-    H-tabanlı hızla bağımsız çapraz doğrulama üretir — confidence_level hesabına dahil edilmez.
-    """
-    from src.speed.axle_stepping import AxleStepper
-
-    _get_done_job(job_id)
-    track = _get_track_or_404(job_id, track_id)
-
-    if not track.points:
-        raise HTTPException(status_code=422, detail="Bu track'te hiç nokta yok.")
-
-    cal_json_path = _job_out_dir(job_id) / "calibration.json"
-    if not cal_json_path.exists():
-        raise HTTPException(status_code=404, detail="Kalibrasyon verisi bulunamadı.")
-    _, control_points, (fps, _) = load_calibration(cal_json_path)
-
-    try:
-        cal_result = compute_homography(control_points)
-    except CalibrationError as e:
-        raise HTTPException(status_code=422, detail=f"Kalibrasyon yeniden hesaplanamadı: {e}")
-
-    H = cal_result.homography
-
-    try:
-        stepper = AxleStepper(
-            H=H,
-            front_pixel=req.front_pixel,
-            rear_pixel=req.rear_pixel,
-            wheelbase_m=req.wheelbase_m,
-            fps=fps,
-        )
-    except ValueError as e:
-        raise HTTPException(status_code=422, detail=str(e))
-
-    # Track noktalarını frame_n'den itibaren işle
-    for tp in track.points:
-        if tp.frame >= req.frame_n:
-            stepper.feed(tp.frame, tp.contact_pixel)
-
-    r = stepper.result()
-
-    # Dingil penceresindeki H-tabanlı hız: result_data.json yoksa (eski iş) None döner.
-    h_speed_window_kmh: float | None = None
-    result_data_path = _job_out_dir(job_id) / "result_data.json"
-    if result_data_path.exists() and r.steps:
-        try:
-            rd = read_result_data(_job_out_dir(job_id))
-            window_start_t_s = req.frame_n / fps
-            window_end_t_s = r.steps[-1].frame / fps
-            for est in rd.speed_estimates:
-                if est.track_id == track_id:
-                    window_speeds = [
-                        v for (t_s, v) in est.smoothed_series
-                        if window_start_t_s <= t_s <= window_end_t_s
-                    ]
-                    if window_speeds:
-                        h_speed_window_kmh = float(np.median(window_speeds))
-                    break
-        except Exception:
-            pass
-
-    resp = AxleStepResponse(
-        speed_kmh=round(r.speed_kmh, 2) if r.speed_kmh is not None else None,
-        ci_kmh=round(r.ci_kmh, 2) if r.ci_kmh is not None else None,
-        step_count=r.step_count,
-        steps=[AxleStepOut(frame=s.frame, distance_m=s.distance_m) for s in r.steps],
-        interrupted=r.interrupted,
-        interrupt_reason=r.interrupt_reason,
-        initial_distance_m=round(r.initial_distance_m, 4),
-        h_speed_window_kmh=round(h_speed_window_kmh, 2) if h_speed_window_kmh is not None else None,
-    )
-    slog.append(
-        _job_out_dir(job_id),
-        "axle_step_manual",
-        _job_id=job_id,
-        track_id=track_id,
-        frame_n=req.frame_n,
-        wheelbase_m=req.wheelbase_m,
-        measured_distance_m=resp.initial_distance_m,
-        speed_kmh=resp.speed_kmh,
-        ci_kmh=resp.ci_kmh,
-        step_count=resp.step_count,
-        h_speed_window_kmh=resp.h_speed_window_kmh,
-        interrupted=resp.interrupted,
-    )
-    return resp
-
-
-@app.post(
-    "/api/job/{job_id}/track/{track_id}/axle-step-auto",
-    response_model=AxleStepResponse,
-)
-async def axle_step_auto(job_id: str, track_id: int, req: AxleStepAutoRequest) -> AxleStepResponse:
-    """Tam otomatik dingil adımlama.
-
-    Yön vektörü track'in tüm contact_pixel noktalarından PCA ile tahmin edilir.
-    Operatör yalnızca dingil mesafesini seçer; hiçbir piksel işaretlemesi gerekmez.
-    """
-    from src.speed.axle_stepping import AxleStepper
-
-    _get_done_job(job_id)
-    track = _get_track_or_404(job_id, track_id)
-
-    if not track.points:
-        raise HTTPException(status_code=422, detail="Bu track'te hiç nokta yok.")
-
-    cal_json_path = _job_out_dir(job_id) / "calibration.json"
-    if not cal_json_path.exists():
-        raise HTTPException(status_code=404, detail="Kalibrasyon verisi bulunamadı.")
-    _, control_points, (fps, _) = load_calibration(cal_json_path)
-
-    try:
-        cal_result = compute_homography(control_points)
-    except CalibrationError as e:
-        raise HTTPException(status_code=422, detail=f"Kalibrasyon yeniden hesaplanamadı: {e}")
-
-    H = cal_result.homography
-    track_pixels = [tp.contact_pixel for tp in track.points]
-
-    try:
-        stepper = AxleStepper.from_track_auto(
-            H=H,
-            track_pixels=track_pixels,
-            wheelbase_m=req.wheelbase_m,
-            fps=fps,
-        )
-    except ValueError as e:
-        raise HTTPException(status_code=422, detail=str(e))
-
-    for tp in track.points:
-        stepper.feed(tp.frame, tp.contact_pixel)
-
-    r = stepper.result()
-
-    h_speed_window_kmh: float | None = None
-    result_data_path = _job_out_dir(job_id) / "result_data.json"
-    if result_data_path.exists() and r.steps:
-        try:
-            rd = read_result_data(_job_out_dir(job_id))
-            window_start_t_s = r.steps[0].frame / fps
-            window_end_t_s = r.steps[-1].frame / fps
-            for est in rd.speed_estimates:
-                if est.track_id == track_id:
-                    window_speeds = [
-                        v for (t_s, v) in est.smoothed_series
-                        if window_start_t_s <= t_s <= window_end_t_s
-                    ]
-                    if window_speeds:
-                        h_speed_window_kmh = float(np.median(window_speeds))
-                    break
-        except Exception:
-            pass
-
-    resp = AxleStepResponse(
-        speed_kmh=round(r.speed_kmh, 2) if r.speed_kmh is not None else None,
-        ci_kmh=round(r.ci_kmh, 2) if r.ci_kmh is not None else None,
-        step_count=r.step_count,
-        steps=[AxleStepOut(frame=s.frame, distance_m=s.distance_m) for s in r.steps],
-        interrupted=r.interrupted,
-        interrupt_reason=r.interrupt_reason,
-        initial_distance_m=None,
-        h_speed_window_kmh=round(h_speed_window_kmh, 2) if h_speed_window_kmh is not None else None,
-    )
-    slog.append(
-        _job_out_dir(job_id),
-        "axle_step_auto",
-        _job_id=job_id,
-        track_id=track_id,
-        wheelbase_m=req.wheelbase_m,
-        speed_kmh=resp.speed_kmh,
-        ci_kmh=resp.ci_kmh,
-        step_count=resp.step_count,
-        h_speed_window_kmh=resp.h_speed_window_kmh,
-        interrupted=resp.interrupted,
-    )
-    return resp
 
 
 @app.post("/api/job/{job_id}/recalibrate", status_code=202)
