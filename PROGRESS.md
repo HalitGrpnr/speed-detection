@@ -102,7 +102,7 @@ Durum işaretleri: ⬜ Başlanmadı · 🟡 Devam ediyor · ✅ Bitti · ⛔ Eng
   `source_counts` ayrımı. Yeni endpoint: `GET /api/job/{id}/track/{id}/auto-contact-points`.
   Frontend `WheelSpeedPanel.tsx`: "Auto Yükle" butonu, turuncu auto / yeşil onaylı işaret
   renklendirmesi, "Onayla"/"Tümünü Onayla" aksiyon. 18 yeni birim testi.
-  Commit: pending.
+  Commit: `16344e7`.
 
 - **Code review T16–T19 bulguları düzeltildi:**
   1. `wheel_contact_speed` ters sıralı marks otomatik sıralanıyor (defensive sort) +
