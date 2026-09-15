@@ -5,7 +5,7 @@
 > geçmişine bakılır; bu dosya yalnızca **anlık durumun özetini** tutar (şişirmeyin).
 
 **Son güncelleme:** 2026-09-15
-**Aktif görev:** _(T17+T18 tamamlandı — sıradaki: T3/T4 (tarayıcı testleri), T9 (PyInstaller build), bkz. `tasks/BACKLOG.md`)_
+**Aktif görev:** _(T19 tamamlandı — sıradaki: T20 (otomatik tekerlek temas), T3/T4 (tarayıcı testleri), T9 (PyInstaller build))_
 
 **En son (önemli, forensic-etkili bir düzeltme):** Kullanıcı gerçek video analizinde şunu fark
 etti: araç kareye girdiği an overlay videoda ~25 km/h, birkaç kare sonra "aniden" ~65 km/h
@@ -93,6 +93,24 @@ Durum işaretleri: ⬜ Başlanmadı · 🟡 Devam ediyor · ✅ Bitti · ⛔ Eng
   yeniden hesaplanır; her hız CI + güven seviyesi taşır (çıplak sayı yok); harici ağ çağrısı yok
   (fontlar self-host).
 
+## Son Oturum (2026-09-15) — T19
+
+- **T19 tamamlandı:** Çok-işaretli tekerlek hız profili + fren/ivme analizi.
+  `src/speed/wheel_contact.py::wheel_contact_profile` — kayan pencere yumuşatma,
+  n-1 profil noktası, CI, merkezi sonlu fark ivme. `WheelSpeedProfile` + `ProfilePoint` dataclass.
+  10 yeni birim testi (sabit hız, sayım, CI, fren tespiti, negatif ivme, audit window, sınır).
+  `src/output/overlay.py::write_wheel_profile_overlay` — işaretli kare aralığında
+  interpolasyon hız etiketi (işaretli=yeşil dolu, arası=sarı kenarlı); `profile_chart_png`
+  (saf cv2/numpy, dışa bağımlılık yok).
+  Yeni endpoint'ler: `/wheel-speed-profile`, `/wheel-speed-profile-overlay`,
+  `/wheel-profile-overlay` (indirme), `/wheel-profile-chart` (PNG önizleme).
+  `regenerate_report`: `wheel_speed_profile_*.json` dosyalarını toplar.
+  `report.py`: "4d. Hız Profili — Fren/İvme" bölümü (grafik + nokta tablosu + ivme).
+  `WheelSpeedPanel.tsx`: "Tek Hız / Fren İvme Profili" mod toggle; profil modunda
+  saf SVG hız-zaman grafiği + nokta tablosu + overlay indirme + rapor güncelleme.
+  T16 özet hız birincil olarak korunur. pytest 258/258, npm build temiz.
+  Commit: `3195b07`.
+
 ## Son Oturum (2026-09-15) — T17
 
 - **T17 tamamlandı:** Kalibrasyon-dışı araç guardrail.
@@ -165,7 +183,7 @@ Durum işaretleri: ⬜ Başlanmadı · 🟡 Devam ediyor · ✅ Bitti · ⛔ Eng
   H-tabanlı hızla karşılaştırma kutusu), ResultsStep yeni "Dingil" sütunu.
   pytest 249/249, npm run build temiz. Commit: `d68a39b`.
 
-**Sıradaki:** T3/T4 (tarayıcı testleri) veya T9 (PyInstaller yeniden build).
+**Sıradaki:** T20 (otomatik tekerlek temas noktası) veya T3/T4 (tarayıcı testleri).
 T14+T15 tamamlandı — gerçek video ile bracket/transverse kılavuz denenince ek refinement yapılabilir.
 
 ## Açık İşler
