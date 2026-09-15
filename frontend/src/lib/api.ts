@@ -18,6 +18,8 @@ import type {
   VideoMeta,
   WheelSpeedRequest,
   WheelSpeedResponse,
+  WheelSpeedProfileRequest,
+  WheelSpeedProfileResponse,
 } from '@/lib/models'
 
 async function unwrap<T>(res: Response): Promise<T> {
@@ -185,6 +187,36 @@ export const api = {
       }),
     )
   },
+
+  /** T19 — Çok-işaretli hız profili (fren/ivme analizi). */
+  async wheelSpeedProfile(jobId: string, trackId: number, req: WheelSpeedProfileRequest): Promise<WheelSpeedProfileResponse> {
+    return unwrap(
+      await fetch(`/api/job/${jobId}/track/${trackId}/wheel-speed-profile`, {
+        method: 'POST',
+        headers: jsonHeaders,
+        body: JSON.stringify(req),
+      }),
+    )
+  },
+
+  /** T19 — Profil overlay videosu oluştur (uzun sürebilir). */
+  async generateProfileOverlay(jobId: string, trackId: number, req: WheelSpeedProfileRequest): Promise<{ overlay_path: string; download_url: string }> {
+    return unwrap(
+      await fetch(`/api/job/${jobId}/track/${trackId}/wheel-speed-profile-overlay`, {
+        method: 'POST',
+        headers: jsonHeaders,
+        body: JSON.stringify(req),
+      }),
+    )
+  },
+
+  /** T19 — Profil hız-zaman grafiği (PNG URL). */
+  profileChartUrl: (jobId: string, trackId: number) =>
+    `/api/job/${jobId}/track/${trackId}/wheel-profile-chart` as const,
+
+  /** T19 — Profil overlay videosu indirme URL'i. */
+  profileOverlayUrl: (jobId: string, trackId: number) =>
+    `/api/job/${jobId}/track/${trackId}/wheel-profile-overlay` as const,
 
   /** T14 — Alt-kare enterpolasyon: bracketing iki karedeki teker konumundan ara nokta hesaplar. */
   async interpolatePoint(videoId: string, req: InterpolatePointRequest): Promise<InterpolatePointResponse> {

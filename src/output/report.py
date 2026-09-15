@@ -128,6 +128,7 @@ def _build_story(
     result: PipelineResult,
     axle_checks: list[dict] | None = None,
     wheel_speeds: list[dict] | None = None,
+    wheel_speed_profiles: list[dict] | None = None,
 ) -> list:
     S = _styles()
     meta = result.video_meta
@@ -411,6 +412,98 @@ def _build_story(
                     ))
         story.append(Spacer(1, 0.5 * cm))
 
+    # 4d. Tekerlek Hız Profili / Fren Analizi (T19, isteğe bağlı)
+    if wheel_speed_profiles:
+        story.append(Paragraph("Hiz Profili — Fren / Ivme Analizi", S["SectionTitle"]))
+        story.append(Paragraph(
+            "Asagidaki profil operatorun isaretledigi birden fazla tekerlek temas "
+            "noktasindan turetilmistir. Kayan pencere yumusatma ile her segment icin "
+            "hiz ve guven araligi hesaplanmis; merkezi sonlu fark ile ivme tahmini yapilmistir. "
+            "Ham ardisik cift hizlari audit icin korunmaktadir. "
+            "Ozet (birincil) hiz T16 tek-deger yontemiyle hesaplanir ve profil hizlarina "
+            "gore onceliklidir.",
+            S["Normal"],
+        ))
+        story.append(Spacer(1, 0.2 * cm))
+
+        for prof in sorted(wheel_speed_profiles, key=lambda p: p.get("track_id", 0)):
+            track_label = f"Track #{prof.get('track_id', '?')}"
+            story.append(Paragraph(track_label, S["Heading3"] if "Heading3" in S else S["Normal"]))
+
+            # Özet tablo
+            summary_rows = [
+                ["Ozet Hiz (km/h)", f"{prof.get('summary_value_kmh', 0):.1f}"],
+                ["Guven Araligi (km/h)", f"± {prof.get('summary_ci_kmh', 0):.1f}"],
+                ["Guven Seviyesi", _CONFIDENCE_TR.get(
+                    prof.get("summary_confidence_level", ""),
+                    prof.get("summary_confidence_level", "—"),
+                )],
+                ["Isaret Sayisi", str(prof.get("summary_mark_count", "?"))],
+                ["Yumusatma Penceresi", str(prof.get("smoothing_window", "?"))],
+                ["Hesaplama Tarihi", prof.get("computed_at", "")[:19].replace("T", " ")],
+            ]
+            t_sum = Table(summary_rows, colWidths=[5 * cm, 11 * cm])
+            t_sum.setStyle(_kv_table_style())
+            story.append(t_sum)
+            story.append(Spacer(1, 0.2 * cm))
+
+            # Profil grafiği (PNG)
+            pts = prof.get("points", [])
+            if pts:
+                try:
+                    from src.speed.wheel_contact import WheelSpeedProfile, ProfilePoint, WheelSpeedResult
+                    from src.output.overlay import profile_chart_png
+                    profile_points = [
+                        ProfilePoint(
+                            t_s=p["t_s"],
+                            speed_kmh=p["speed_kmh"],
+                            ci_kmh=p["ci_kmh"],
+                            accel_ms2=p.get("accel_ms2"),
+                        )
+                        for p in pts
+                    ]
+                    mock_summary = WheelSpeedResult(
+                        value_kmh=prof.get("summary_value_kmh", 0),
+                        ci_kmh=prof.get("summary_ci_kmh", 0),
+                        confidence_level=prof.get("summary_confidence_level", "low"),
+                        mark_count=prof.get("summary_mark_count", 0),
+                        residual_kmh=prof.get("summary_residual_kmh", 0),
+                    )
+                    mock_profile = WheelSpeedProfile(
+                        points=profile_points,
+                        raw_pairwise_kmh=prof.get("raw_pairwise_kmh", []),
+                        summary=mock_summary,
+                        smoothing_window=prof.get("smoothing_window", 3),
+                    )
+                    png_bytes = profile_chart_png(mock_profile)
+                    story.append(Image(io.BytesIO(png_bytes), width=14 * cm, height=5.4 * cm))
+                    story.append(Spacer(1, 0.2 * cm))
+                except Exception:
+                    pass
+
+            # Profil noktaları tablosu
+            if pts:
+                pt_header = ["t (s)", "Hiz (km/h)", "CI (km/h)", "Ivme (m/s²)"]
+                pt_rows = [pt_header]
+                for p in pts:
+                    accel_str = f"{p['accel_ms2']:.2f}" if p.get("accel_ms2") is not None else "—"
+                    pt_rows.append([
+                        f"{p['t_s']:.2f}",
+                        f"{p['speed_kmh']:.1f}",
+                        f"± {p['ci_kmh']:.1f}",
+                        accel_str,
+                    ])
+                t_pts = Table(pt_rows, colWidths=[3 * cm, 4 * cm, 4 * cm, 5 * cm])
+                t_pts.setStyle(_header_table_style())
+                story.append(t_pts)
+                story.append(Spacer(1, 0.2 * cm))
+
+            # Uyarılar
+            for w in prof.get("warnings", []):
+                story.append(Paragraph(f"Uyari: {w}", S["Note"]))
+
+            story.append(Spacer(1, 0.4 * cm))
+
     # 5. Varsayımlar
     story.append(Paragraph("Varsayimlar ve Sinirlamalar", S["SectionTitle"]))
 
@@ -457,11 +550,13 @@ def generate_report(
     out_path: str | Path,
     axle_checks: list[dict] | None = None,
     wheel_speeds: list[dict] | None = None,
+    wheel_speed_profiles: list[dict] | None = None,
 ) -> None:
     """Adli raporu PDF olarak yaz (ReportLab).
 
     axle_checks: aks genişliği doğrulama sonuçları listesi.
     wheel_speeds: T16 operatör-tekerlek hız ölçümü sonuçları listesi (birincil).
+    wheel_speed_profiles: T19 hız profili (fren/ivme) sonuçları listesi.
     Verilirse rapora ilgili bölümler olarak eklenir.
     """
     out_path = Path(out_path)
@@ -472,4 +567,9 @@ def generate_report(
         topMargin=_MARGIN, bottomMargin=_MARGIN,
         title="Arac Hiz Tespit Raporu",
     )
-    doc.build(_build_story(result, axle_checks=axle_checks, wheel_speeds=wheel_speeds))
+    doc.build(_build_story(
+        result,
+        axle_checks=axle_checks,
+        wheel_speeds=wheel_speeds,
+        wheel_speed_profiles=wheel_speed_profiles,
+    ))

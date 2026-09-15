@@ -53,6 +53,9 @@ from .schemas import (
     VideoMetaOut,
     WheelSpeedRequest,
     WheelSpeedResponse,
+    WheelSpeedProfileRequest,
+    WheelSpeedProfileResponse,
+    ProfilePointOut,
 )
 
 import sys as _sys
@@ -666,6 +669,15 @@ async def regenerate_report(job_id: str) -> dict:
         except Exception:
             pass
 
+    # Tüm wheel_speed_profile_*.json dosyalarını topla (T19)
+    wheel_speed_profiles = []
+    for p in sorted(out_dir.glob("wheel_speed_profile_*.json")):
+        try:
+            data = json.loads(p.read_text())
+            wheel_speed_profiles.append(data)
+        except Exception:
+            pass
+
     report_v2_path = out_dir / "report_v2.pdf"
     try:
         from src.output.report import generate_report
@@ -674,6 +686,7 @@ async def regenerate_report(job_id: str) -> dict:
             report_v2_path,
             axle_checks=axle_checks or None,
             wheel_speeds=wheel_speeds or None,
+            wheel_speed_profiles=wheel_speed_profiles or None,
         )
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Rapor üretilemedi: {exc}")
@@ -683,6 +696,7 @@ async def regenerate_report(job_id: str) -> dict:
         "status": "ok",
         "axle_check_count": len(axle_checks),
         "wheel_speed_count": len(wheel_speeds),
+        "wheel_speed_profile_count": len(wheel_speed_profiles),
     }
 
 
@@ -1005,6 +1019,232 @@ async def wheel_speed(job_id: str, track_id: int, req: WheelSpeedRequest) -> Whe
         residual_kmh=result.residual_kmh,
         warnings=result.warnings,
     )
+
+
+@app.post(
+    "/api/job/{job_id}/track/{track_id}/wheel-speed-profile",
+    response_model=WheelSpeedProfileResponse,
+)
+async def wheel_speed_profile(
+    job_id: str, track_id: int, req: WheelSpeedProfileRequest
+) -> WheelSpeedProfileResponse:
+    """T19 — Çok-işaretli tekerlek temas noktalarından kayan pencere hız profili.
+
+    En az 3, tercihen 5+ işaret ile fren/ivme profili hesaplanır.
+    Sonuç diske yazılır ve audit-log'a kaydedilir.
+    T16 tek-değer özet (birincil hız) korunur.
+    """
+    from src.speed.wheel_contact import wheel_contact_profile
+
+    _get_done_job(job_id)
+
+    cal_json_path = _job_out_dir(job_id) / "calibration.json"
+    if not cal_json_path.exists():
+        raise HTTPException(status_code=404, detail="Kalibrasyon verisi bulunamadı.")
+    _, control_points_cal, (fps, _) = load_calibration(cal_json_path)
+
+    try:
+        cal_result = compute_homography(control_points_cal)
+    except CalibrationError as e:
+        raise HTTPException(status_code=422, detail=f"Kalibrasyon yeniden hesaplanamadı: {e}")
+
+    H = cal_result.homography
+    marks = [{"frame": m.frame, "pixel": list(m.pixel)} for m in req.marks]
+
+    try:
+        profile = wheel_contact_profile(marks, H, fps, req.smoothing_window)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+
+    out_dir = _job_out_dir(job_id)
+    profile_path = out_dir / f"wheel_speed_profile_{track_id}.json"
+    profile_data = {
+        "track_id": track_id,
+        "summary_value_kmh": profile.summary.value_kmh,
+        "summary_ci_kmh": profile.summary.ci_kmh,
+        "summary_confidence_level": profile.summary.confidence_level,
+        "summary_mark_count": profile.summary.mark_count,
+        "summary_residual_kmh": profile.summary.residual_kmh,
+        "points": [
+            {
+                "t_s": pt.t_s,
+                "speed_kmh": pt.speed_kmh,
+                "ci_kmh": pt.ci_kmh,
+                "accel_ms2": pt.accel_ms2,
+            }
+            for pt in profile.points
+        ],
+        "raw_pairwise_kmh": profile.raw_pairwise_kmh,
+        "smoothing_window": profile.smoothing_window,
+        "marks": marks,
+        "warnings": profile.warnings + profile.summary.warnings,
+        "computed_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+    }
+    profile_path.write_text(json.dumps(profile_data, ensure_ascii=False))
+
+    slog.append(
+        out_dir,
+        "wheel_speed_profile",
+        _job_id=job_id,
+        track_id=track_id,
+        mark_count=len(marks),
+        marks=marks,
+        smoothing_window=req.smoothing_window,
+        summary_value_kmh=profile.summary.value_kmh,
+        summary_ci_kmh=profile.summary.ci_kmh,
+        point_count=len(profile.points),
+        warnings=profile_data["warnings"],
+    )
+
+    return WheelSpeedProfileResponse(
+        summary_value_kmh=profile.summary.value_kmh,
+        summary_ci_kmh=profile.summary.ci_kmh,
+        summary_confidence_level=profile.summary.confidence_level,
+        summary_mark_count=profile.summary.mark_count,
+        summary_residual_kmh=profile.summary.residual_kmh,
+        points=[
+            ProfilePointOut(
+                t_s=pt.t_s,
+                speed_kmh=pt.speed_kmh,
+                ci_kmh=pt.ci_kmh,
+                accel_ms2=pt.accel_ms2,
+            )
+            for pt in profile.points
+        ],
+        raw_pairwise_kmh=profile.raw_pairwise_kmh,
+        smoothing_window=profile.smoothing_window,
+        warnings=profile_data["warnings"],
+    )
+
+
+@app.post(
+    "/api/job/{job_id}/track/{track_id}/wheel-speed-profile-overlay",
+)
+async def wheel_speed_profile_overlay(
+    job_id: str, track_id: int, req: WheelSpeedProfileRequest
+) -> dict:
+    """T19 — Tekerlek hız profili overlay videosu oluştur.
+
+    İşaretlenen kare aralığında kare-kare interpolasyon hız etiketleri ekler.
+    Sonuç `wheel_profile_overlay_{track_id}.mp4` olarak kaydedilir.
+    """
+    from src.speed.wheel_contact import wheel_contact_profile
+    from src.output.overlay import write_wheel_profile_overlay
+
+    job = _get_done_job(job_id)
+
+    cal_json_path = _job_out_dir(job_id) / "calibration.json"
+    if not cal_json_path.exists():
+        raise HTTPException(status_code=404, detail="Kalibrasyon verisi bulunamadı.")
+    _, control_points_cal, (fps, _) = load_calibration(cal_json_path)
+
+    try:
+        cal_result = compute_homography(control_points_cal)
+    except CalibrationError as e:
+        raise HTTPException(status_code=422, detail=f"Kalibrasyon yeniden hesaplanamadı: {e}")
+
+    H = cal_result.homography
+    marks = [{"frame": m.frame, "pixel": list(m.pixel)} for m in req.marks]
+
+    try:
+        profile = wheel_contact_profile(marks, H, fps, req.smoothing_window)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+
+    video_path = _video_store.get(job.video_id)
+    if not video_path or not video_path.exists():
+        raise HTTPException(status_code=404, detail="Video bulunamadı.")
+
+    meta = read_video_meta(str(video_path))
+    out_dir = _job_out_dir(job_id)
+    overlay_path = out_dir / f"wheel_profile_overlay_{track_id}.mp4"
+
+    try:
+        write_wheel_profile_overlay(
+            video_path=video_path,
+            out_path=overlay_path,
+            marks=marks,
+            profile=profile,
+            fps=fps,
+            width=meta.width,
+            height=meta.height,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Overlay oluşturulamadı: {e}")
+
+    slog.append(
+        out_dir,
+        "wheel_speed_profile_overlay",
+        _job_id=job_id,
+        track_id=track_id,
+        mark_count=len(marks),
+        smoothing_window=req.smoothing_window,
+        overlay_path=str(overlay_path),
+    )
+
+    return {
+        "overlay_path": str(overlay_path),
+        "download_url": f"/api/job/{job_id}/track/{track_id}/wheel-profile-overlay",
+    }
+
+
+@app.get("/api/job/{job_id}/track/{track_id}/wheel-profile-overlay")
+async def download_wheel_profile_overlay(job_id: str, track_id: int) -> FileResponse:
+    """T19 — Oluşturulan profil overlay videosunu indir."""
+    _get_done_job(job_id)
+    overlay_path = _job_out_dir(job_id) / f"wheel_profile_overlay_{track_id}.mp4"
+    if not overlay_path.exists():
+        raise HTTPException(
+            status_code=404,
+            detail="Profil overlay videosu bulunamadı. Önce oluşturma isteği gönderin.",
+        )
+    return FileResponse(str(overlay_path), media_type="video/mp4",
+                        filename=f"fren_analizi_track{track_id}.mp4")
+
+
+@app.get("/api/job/{job_id}/track/{track_id}/wheel-profile-chart")
+async def wheel_profile_chart(job_id: str, track_id: int) -> Response:
+    """T19 — Profil hız-zaman grafiğini PNG olarak döndür."""
+    from src.speed.wheel_contact import (
+        wheel_contact_profile, WheelSpeedProfile, ProfilePoint,
+    )
+    from src.output.overlay import profile_chart_png
+
+    _get_done_job(job_id)
+    profile_path = _job_out_dir(job_id) / f"wheel_speed_profile_{track_id}.json"
+    if not profile_path.exists():
+        raise HTTPException(status_code=404, detail="Profil verisi bulunamadı.")
+
+    data = json.loads(profile_path.read_text())
+    points = [
+        ProfilePoint(
+            t_s=p["t_s"],
+            speed_kmh=p["speed_kmh"],
+            ci_kmh=p["ci_kmh"],
+            accel_ms2=p.get("accel_ms2"),
+        )
+        for p in data.get("points", [])
+    ]
+
+    summary_result = __import__(
+        "src.speed.wheel_contact", fromlist=["WheelSpeedResult"]
+    ).WheelSpeedResult(
+        value_kmh=data["summary_value_kmh"],
+        ci_kmh=data["summary_ci_kmh"],
+        confidence_level=data["summary_confidence_level"],
+        mark_count=data["summary_mark_count"],
+        residual_kmh=data["summary_residual_kmh"],
+    )
+
+    mock_profile = WheelSpeedProfile(
+        points=points,
+        raw_pairwise_kmh=data.get("raw_pairwise_kmh", []),
+        summary=summary_result,
+        smoothing_window=data.get("smoothing_window", 3),
+    )
+
+    png_bytes = profile_chart_png(mock_profile)
+    return Response(content=png_bytes, media_type="image/png")
 
 
 @app.get("/api/job/{job_id}/session-log")

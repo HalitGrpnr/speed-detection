@@ -17,6 +17,24 @@ class WheelSpeedResult:
     warnings: list[str] = field(default_factory=list)
 
 
+@dataclass
+class ProfilePoint:
+    t_s: float          # saniye cinsinden zaman (segment orta noktası)
+    speed_kmh: float    # pencereleme sonrası yumuşatılmış hız
+    ci_kmh: float       # yaklaşık %95 CI (pencere std × 2 / √k)
+    accel_ms2: float | None = None  # merkezi fark ivme, sınır noktalarında None
+
+
+@dataclass
+class WheelSpeedProfile:
+    """T19 — Çok-işaretli tekerlek hız profili (kayan pencere yumuşatma)."""
+    points: list[ProfilePoint]          # yumuşatılmış profil (n-1 nokta)
+    raw_pairwise_kmh: list[float]       # ham ardışık çift hızlar (audit iz)
+    summary: WheelSpeedResult           # T16 tek-değer özet (birincil hız korunur)
+    smoothing_window: int               # audit iz: kaç segment pencerelendi
+    warnings: list[str] = field(default_factory=list)
+
+
 def wheel_contact_speed(
     marks: list[dict],
     H: np.ndarray,
@@ -95,5 +113,117 @@ def wheel_contact_speed(
         confidence_level=confidence_level,
         mark_count=n,
         residual_kmh=round(residual_kmh, 1),
+        warnings=warnings,
+    )
+
+
+def wheel_contact_profile(
+    marks: list[dict],
+    H: np.ndarray,
+    fps: float,
+    smoothing_window: int = 3,
+) -> WheelSpeedProfile:
+    """Çok-işaretli tekerlek temas noktalarından kayan pencere hız profili.
+
+    marks: [{"frame": float, "pixel": [x, y]}, ...] — profil için ≥ 3 önerilir.
+    smoothing_window: pencereleme boyutu (tek sayı önerilir; sınırlarda kırpılır).
+
+    Algoritma:
+    1. wheel_contact_speed ile tek-değer özet hesaplanır (T16 birincil hız korunur).
+    2. Her ardışık çift → segment hızı (km/h) ve segment orta nokta zamanı.
+    3. Kayan pencere (boyut=smoothing_window) ile her noktada ortalama ve std.
+    4. CI = 2 × std / √k (yaklaşık %95, k = pencere içindeki segment sayısı).
+    5. İvme: merkezi sonlu fark (sınır noktaları için None).
+
+    Tuzak (PROGRESS.md dersi): ilk örnek yapay sıfır hız pencereye GİRMEZ —
+    burada sıfır hız riski yok (tüm segment hızları gerçek ölçüm).
+    """
+    warnings: list[str] = []
+
+    # İşaretleri kare numarasına göre sırala
+    marks_sorted = sorted(marks, key=lambda m: float(m["frame"]))
+    n = len(marks_sorted)
+
+    if n < 2:
+        raise ValueError("En az 2 işaret gereklidir.")
+    if n < 3:
+        warnings.append(
+            "Profil için en az 3 işaret önerilir; 2 işaretle tek segment elde edilir, "
+            "pencereleme ve ivme hesaplanamaz."
+        )
+    elif n < 5:
+        warnings.append(
+            f"{n} işaretle profil sınırlı hassasiyet taşır; 5+ işaret önerilir."
+        )
+
+    # T16 tek-değer özet (birincil hız korunur, raporda birincil olarak kullanılır)
+    summary = wheel_contact_speed(marks_sorted, H, fps)
+
+    # Dünya koordinatları ve zaman dizisi
+    worlds = [
+        pixel_to_world(H, (float(m["pixel"][0]), float(m["pixel"][1])))
+        for m in marks_sorted
+    ]
+    times = [float(m["frame"]) / fps for m in marks_sorted]
+
+    cumulative = [0.0]
+    for i in range(1, n):
+        d = float(np.hypot(
+            worlds[i][0] - worlds[i - 1][0],
+            worlds[i][1] - worlds[i - 1][1],
+        ))
+        cumulative.append(cumulative[-1] + d)
+
+    # Ardışık çift hızları ve segment orta nokta zamanları
+    raw_pairwise_kmh: list[float] = []
+    midpoint_times: list[float] = []
+    for i in range(1, n):
+        dt = times[i] - times[i - 1]
+        if dt <= 0:
+            continue
+        v_kmh = (cumulative[i] - cumulative[i - 1]) / dt * 3.6
+        raw_pairwise_kmh.append(v_kmh)
+        midpoint_times.append((times[i] + times[i - 1]) / 2.0)
+
+    m = len(raw_pairwise_kmh)
+
+    # Kayan pencere yumuşatma
+    half_w = smoothing_window // 2
+    smoothed_speeds: list[float] = []
+    smoothed_cis: list[float] = []
+    for i in range(m):
+        lo = max(0, i - half_w)
+        hi = min(m - 1, i + half_w)
+        window = raw_pairwise_kmh[lo : hi + 1]
+        smoothed_speeds.append(float(np.mean(window)))
+        if len(window) >= 2:
+            ci = float(np.std(window, ddof=1) * 2.0 / np.sqrt(len(window)))
+        else:
+            ci = 0.0
+        smoothed_cis.append(ci)
+
+    # İvme: merkezi sonlu fark (sınır noktaları None)
+    accels: list[float | None] = [None] * m
+    for i in range(1, m - 1):
+        dt = midpoint_times[i + 1] - midpoint_times[i - 1]
+        if dt > 0:
+            dv_ms = (smoothed_speeds[i + 1] - smoothed_speeds[i - 1]) / 3.6
+            accels[i] = round(dv_ms / dt, 3)
+
+    points = [
+        ProfilePoint(
+            t_s=round(midpoint_times[i], 4),
+            speed_kmh=round(smoothed_speeds[i], 1),
+            ci_kmh=round(smoothed_cis[i], 1),
+            accel_ms2=accels[i],
+        )
+        for i in range(m)
+    ]
+
+    return WheelSpeedProfile(
+        points=points,
+        raw_pairwise_kmh=[round(v, 1) for v in raw_pairwise_kmh],
+        summary=summary,
+        smoothing_window=smoothing_window,
         warnings=warnings,
     )

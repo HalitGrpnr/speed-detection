@@ -161,3 +161,30 @@ class WheelSpeedResponse(BaseModel):
     mark_count: int
     residual_kmh: float
     warnings: list[str] = []
+
+
+# T19 — Çok-işaretli hız profili (fren/ivme analizi)
+class ProfilePointOut(BaseModel):
+    t_s: float
+    speed_kmh: float
+    ci_kmh: float
+    accel_ms2: float | None = None
+
+
+class WheelSpeedProfileRequest(BaseModel):
+    marks: list[WheelMarkIn]
+    smoothing_window: int = 3
+
+
+class WheelSpeedProfileResponse(BaseModel):
+    # Özet (T16 birincil hız — korunur, raporda birincil olarak kullanılır)
+    summary_value_kmh: float
+    summary_ci_kmh: float
+    summary_confidence_level: str
+    summary_mark_count: int
+    summary_residual_kmh: float
+    # Profil serisi
+    points: list[ProfilePointOut]
+    raw_pairwise_kmh: list[float]
+    smoothing_window: int
+    warnings: list[str] = []

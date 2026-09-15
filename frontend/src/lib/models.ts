@@ -57,3 +57,28 @@ export interface WheelSpeedResponse {
   residual_kmh: number
   warnings: string[]
 }
+
+// T19 — Çok-işaretli hız profili (fren/ivme analizi)
+export interface ProfilePoint {
+  t_s: number
+  speed_kmh: number
+  ci_kmh: number
+  accel_ms2: number | null
+}
+
+export interface WheelSpeedProfileRequest {
+  marks: WheelMark[]
+  smoothing_window?: number
+}
+
+export interface WheelSpeedProfileResponse {
+  summary_value_kmh: number
+  summary_ci_kmh: number
+  summary_confidence_level: string
+  summary_mark_count: number
+  summary_residual_kmh: number
+  points: ProfilePoint[]
+  raw_pairwise_kmh: number[]
+  smoothing_window: number
+  warnings: string[]
+}
