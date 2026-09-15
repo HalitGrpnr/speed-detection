@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { useMutation, type UseMutationResult } from '@tanstack/react-query'
-import { Activity, FileText, Loader2, Target, Trash2, Video } from 'lucide-react'
+import { Activity, Bot, CheckCheck, FileText, Loader2, Target, Trash2, Video } from 'lucide-react'
 import { api } from '@/lib/api'
-import type { ControlPoint, ProfilePoint, WheelSpeedProfileResponse, WheelSpeedResponse } from '@/lib/models'
+import type { ControlPoint, ProfilePoint, WheelMarkSource, WheelSpeedProfileResponse, WheelSpeedResponse } from '@/lib/models'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { StatusBanner } from '@/components/common/StatusBanner'
@@ -133,24 +133,31 @@ function SpeedProfileChart({ points }: { points: ProfilePoint[] }) {
 
 type Mode = 'speed' | 'profile'
 
+interface MarkEntry {
+  frame: number
+  pixel: [number, number]
+  source: WheelMarkSource
+}
+
 /**
- * T16 + T19 — Operatör-tekerlek hız ölçümü ve fren/ivme profili.
+ * T16 + T19 + T20 — Operatör-tekerlek hız ölçümü, fren/ivme profili ve otomatik temas tespiti.
  */
 export function WheelSpeedPanel({
   jobId, videoId, trackId, frameCount, onClose, onReportRegenerated,
 }: Props) {
   const [mode, setMode] = useState<Mode>('speed')
-  const [marks, setMarks] = useState<Record<number, [number, number]>>({})
+  const [marks, setMarks] = useState<Record<number, { pixel: [number, number]; source: WheelMarkSource }>>({})
   const [currentFrame, setCurrentFrame] = useState(0)
   const [frameInput, setFrameInput] = useState('')
   const [speedResult, setSpeedResult] = useState<WheelSpeedResponse | null>(null)
   const [profileResult, setProfileResult] = useState<WheelSpeedProfileResponse | null>(null)
 
-  const markEntries = Object.entries(marks)
-    .map(([f, p]) => ({ frame: Number(f), pixel: p }))
+  const markEntries: MarkEntry[] = Object.entries(marks)
+    .map(([f, m]) => ({ frame: Number(f), pixel: m.pixel, source: m.source }))
     .sort((a, b) => a.frame - b.frame)
 
-  const currentPixel = marks[currentFrame]
+  const currentMark = marks[currentFrame]
+  const currentPixel = currentMark?.pixel
   const canvasPoints: ControlPoint[] = currentPixel
     ? [{ id: 'wheel_mark', pixel: currentPixel, world_m: [0, 0], source: 'operator', held_out: false }]
     : []
@@ -161,11 +168,18 @@ export function WheelSpeedPanel({
   }
 
   const handleAdd = (pixel: [number, number]) => {
-    setMarks((prev) => ({ ...prev, [currentFrame]: pixel }))
+    setMarks((prev) => ({ ...prev, [currentFrame]: { pixel, source: 'manual' } }))
   }
 
+  // Operatör mevcut noktayı hareket ettirince → "operator-confirmed"
   const handleMove = (_id: string, pixel: [number, number]) => {
-    setMarks((prev) => ({ ...prev, [currentFrame]: pixel }))
+    setMarks((prev) => ({
+      ...prev,
+      [currentFrame]: {
+        pixel,
+        source: prev[currentFrame]?.source === 'auto' ? 'operator-confirmed' : (prev[currentFrame]?.source ?? 'manual'),
+      },
+    }))
   }
 
   const removeMark = (frame: number) => {
@@ -176,10 +190,46 @@ export function WheelSpeedPanel({
     })
   }
 
+  // T20: Auto noktayı onayla (source → operator-confirmed)
+  const confirmMark = (frame: number) => {
+    setMarks((prev) => ({
+      ...prev,
+      [frame]: { ...prev[frame], source: 'operator-confirmed' },
+    }))
+  }
+
+  // T20: Tüm auto noktaları onayla
+  const confirmAllAutoMarks = () => {
+    setMarks((prev) => {
+      const next = { ...prev }
+      for (const f of Object.keys(next)) {
+        if (next[Number(f)].source === 'auto') {
+          next[Number(f)] = { ...next[Number(f)], source: 'operator-confirmed' }
+        }
+      }
+      return next
+    })
+  }
+
+  const autoMutation = useMutation({
+    mutationFn: () => api.autoContactPoints(jobId, trackId, 8),
+    onSuccess: (data: import('@/lib/models').AutoContactPointsResponse) => {
+      setMarks((prev) => {
+        const next = { ...prev }
+        for (const m of data.marks) {
+          if (!(m.frame in next)) {
+            next[m.frame] = { pixel: m.pixel as [number, number], source: 'auto' }
+          }
+        }
+        return next
+      })
+    },
+  })
+
   const calcSpeedMutation = useMutation({
     mutationFn: () =>
       api.wheelSpeed(jobId, trackId, {
-        marks: markEntries.map((m) => ({ frame: m.frame, pixel: m.pixel })),
+        marks: markEntries.map((m) => ({ frame: m.frame, pixel: m.pixel, source: m.source })),
       }),
     onSuccess: (data) => setSpeedResult(data),
   })
@@ -187,7 +237,7 @@ export function WheelSpeedPanel({
   const calcProfileMutation = useMutation({
     mutationFn: () =>
       api.wheelSpeedProfile(jobId, trackId, {
-        marks: markEntries.map((m) => ({ frame: m.frame, pixel: m.pixel })),
+        marks: markEntries.map((m) => ({ frame: m.frame, pixel: m.pixel, source: m.source })),
       }),
     onSuccess: (data) => setProfileResult(data),
   })
@@ -195,7 +245,7 @@ export function WheelSpeedPanel({
   const overLayMutation = useMutation({
     mutationFn: () =>
       api.generateProfileOverlay(jobId, trackId, {
-        marks: markEntries.map((m) => ({ frame: m.frame, pixel: m.pixel })),
+        marks: markEntries.map((m) => ({ frame: m.frame, pixel: m.pixel, source: m.source })),
       }),
   })
 
@@ -212,7 +262,11 @@ export function WheelSpeedPanel({
     calcProfileMutation.reset()
     overLayMutation.reset()
     regenerateMutation.reset()
+    autoMutation.reset()
   }
+
+  const autoMarkCount = markEntries.filter((m) => m.source === 'auto').length
+  const confirmedCount = markEntries.filter((m) => m.source === 'operator-confirmed').length
 
   const minMarksProfile = 3
   const canCalcProfile = markEntries.length >= minMarksProfile
@@ -227,6 +281,48 @@ export function WheelSpeedPanel({
         </div>
         <Button variant="ghost" size="sm" onClick={onClose}>Kapat</Button>
       </div>
+
+      {/* T20: Auto yükle */}
+      <div className="flex items-center gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={autoMutation.isPending || autoMutation.isSuccess}
+          onClick={() => autoMutation.mutate()}
+          className="text-xs"
+        >
+          {autoMutation.isPending
+            ? <Loader2 className="size-3 animate-spin" />
+            : <Bot className="size-3" />}
+          {autoMutation.isSuccess ? 'Auto noktalar yüklendi ✓' : 'Auto Yükle'}
+        </Button>
+        {autoMarkCount > 0 && (
+          <>
+            <span className="text-xs text-amber-700">
+              {autoMarkCount} onaylanmamış auto nokta
+            </span>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 px-2 text-xs text-amber-700 hover:text-amber-900"
+              onClick={confirmAllAutoMarks}
+            >
+              <CheckCheck className="size-3 mr-1" />
+              Tümünü Onayla
+            </Button>
+          </>
+        )}
+        {confirmedCount > 0 && (
+          <span className="text-xs text-green-700">
+            {confirmedCount} onaylı
+          </span>
+        )}
+      </div>
+      {autoMutation.isError && (
+        <StatusBanner tone="error">
+          {(autoMutation.error as Error).message}
+        </StatusBanner>
+      )}
 
       {/* Mod seçimi */}
       <div className="flex rounded-md border overflow-hidden text-xs font-medium">
@@ -331,10 +427,29 @@ export function WheelSpeedPanel({
               <div
                 key={m.frame}
                 className={`flex items-center gap-1 rounded border px-2 py-0.5 text-xs cursor-pointer
-                  ${m.frame === currentFrame ? 'border-primary bg-primary/10' : 'border-border bg-card'}`}
+                  ${m.frame === currentFrame
+                    ? 'border-primary bg-primary/10'
+                    : m.source === 'auto'
+                      ? 'border-amber-400 bg-amber-50 text-amber-900'
+                      : m.source === 'operator-confirmed'
+                        ? 'border-green-400 bg-green-50 text-green-900'
+                        : 'border-border bg-card'}`}
                 onClick={() => setCurrentFrame(m.frame)}
               >
-                <span className="tabular-nums">Kare {m.frame}</span>
+                <span className="tabular-nums">
+                  {m.source === 'auto' && '⚠ '}
+                  {m.source === 'operator-confirmed' && '✓ '}
+                  Kare {m.frame}
+                </span>
+                {m.source === 'auto' && (
+                  <button
+                    className="text-amber-600 hover:text-green-700"
+                    title="Onayla"
+                    onClick={(e) => { e.stopPropagation(); confirmMark(m.frame) }}
+                  >
+                    <CheckCheck className="size-3" />
+                  </button>
+                )}
                 <button
                   className="text-muted-foreground hover:text-destructive"
                   onClick={(e) => { e.stopPropagation(); removeMark(m.frame) }}
@@ -344,6 +459,11 @@ export function WheelSpeedPanel({
               </div>
             ))}
           </div>
+          {autoMarkCount > 0 && (
+            <p className="text-[0.65rem] text-amber-700">
+              ⚠ Turuncu işaretler otomatik tespit (parallax uyarısı) — Canvas'ta düzelt veya "Onayla" düğmesine bas.
+            </p>
+          )}
         </div>
       )}
 
@@ -469,8 +589,8 @@ function ProfileResult({
   overLayMutation: UseMutationResult<{ overlay_path: string; download_url: string }, Error, void>
   regenerateMutation: UseMutationResult<unknown, Error, void>
 }) {
-  const minSpeed = Math.min(...result.points.map((p) => p.speed_kmh))
-  const maxSpeed = Math.max(...result.points.map((p) => p.speed_kmh))
+  const firstSpeed = result.points[0]?.speed_kmh ?? 0
+  const lastSpeed = result.points[result.points.length - 1]?.speed_kmh ?? 0
   const maxDecel = result.points
     .filter((p) => p.accel_ms2 !== null)
     .reduce<number | null>((min, p) => {
@@ -510,11 +630,11 @@ function ProfileResult({
       <div className="grid grid-cols-3 gap-3 text-center text-sm">
         <div className="rounded border bg-muted/40 py-2">
           <div className="text-xs text-muted-foreground">Başlangıç hızı</div>
-          <div className="font-semibold tabular-nums">{maxSpeed.toFixed(1)} km/h</div>
+          <div className="font-semibold tabular-nums">{firstSpeed.toFixed(1)} km/h</div>
         </div>
         <div className="rounded border bg-muted/40 py-2">
           <div className="text-xs text-muted-foreground">Bitiş hızı</div>
-          <div className="font-semibold tabular-nums">{minSpeed.toFixed(1)} km/h</div>
+          <div className="font-semibold tabular-nums">{lastSpeed.toFixed(1)} km/h</div>
         </div>
         <div className="rounded border bg-muted/40 py-2">
           <div className="text-xs text-muted-foreground">Maks. yavaşlama</div>

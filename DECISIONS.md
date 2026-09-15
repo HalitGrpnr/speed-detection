@@ -371,3 +371,29 @@ Format:
 - **Forensic etki:** Birincil hız artık bbox-oto değil operatör işaretli. Eski bbox değeri
   overlay videoda kalmaya devam eder (T18'de temizlenecek). PDF raporu, `/report/regenerate`
   ile wheel_speed_*.json dosyalarını okuyarak T16 hızını birincil bölüm olarak ekler.
+
+## [2026-09-15] T20 — Otomatik temas noktası tespiti: Yeni ML modeli reddedildi
+
+- **Karar:** T20 için yeni ML modeli veya harici `.pt` ağırlık indirilmedi. Mevcut YOLO bbox +
+  klasik CV (Canny kenar tespiti) + bbox yedek kullanıldı. `src/speed/wheel_auto.py`.
+- **Gerekçe:**
+  - Üçüncü parti `.pt` ağırlık pickle-deserializasyon RCE riski taşır (bkz. T11 kararı, plaka OCR
+    ertelemesi). Bu risk hesabında makul bir safetensors alternatifi bulunamadı.
+  - Klasik CV (Canny) tespit doğruluğu sınırlıdır — paralaks tamamen ortadan kalkmaz. Ancak
+    CLAUDE.md Kural 5 gereği ("Kara kutu yok") her auto nokta operatör onayına açıktır.
+  - Auto mod asıl değeri: operatör için hangi karelerin işaretleneceğini seçmek + başlangıç noktası
+    önermek. Hassas konumu operatör doğrular → "operator-confirmed" kaynak ile hesaplanır.
+  - Güvenlik ve yeniden üretilebilirlik standart kütüphane (OpenCV Canny) ile karşılanır.
+- **Güven seviyesi:**
+  - Kenar tespiti başarılı → confidence=0.5, source="auto"
+  - Bbox yedek → confidence=0.2, source="auto"
+  - Operatör onayı → source="operator-confirmed", tam güven
+- **Audit:** Her işarette source alanı wheel_speed_*.json'a yazılır. Onaylanmamış auto
+  işaretler `wheel_contact_speed` uyarısına yol açar.
+- **Alternatifler reddedildi:**
+  - Ultralytics YOLO11 pose/seg: `.pt` RCE riski, yeni model gerektiriyor.
+  - SAM (Segment Anything): Büyük model, GPU gerekliliği; adli offline senaryoyla uyumsuz.
+  - Sabit fraksiyon (y1+frac*(y2-y1)): Araç tipine bağımlı, sistematik yanlılık.
+- **Kümülatif hız uyarısı düzeltmesi:** wheel_contact_speed içindeki `if speed_ms < 0:` uyarısı
+  kaldırıldı. Kümülatif Öklid mesafesi herzaman >= 0 olduğundan slope negatif üretilemez —
+  uyarı dead code'du. Ters sıralı işaretler artık otomatik sıralanır (sort defensively).

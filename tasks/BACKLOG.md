@@ -38,7 +38,7 @@
 | T17 | Kalibrasyon-dışı araç guardrail (convex hull) | Güvenilirlik | Orta | — | ✅ |
 | T18 | Arayüz sadeleştirme + ölü özellik temizliği | UX | Orta-Büyük | T16 | ✅ |
 | T19 | Çok-işaretli hız profili + overlay (fren/ivme) | Hız çekirdeği + Çıktı | Orta-Büyük | T16 | ✅ |
-| T20 | Otomatik tekerlek-zemin temas noktası tespiti (manuel/auto) | Hız çekirdeği + Tespit | Büyük | T19, T16 | ⬜ |
+| T20 | Otomatik tekerlek-zemin temas noktası tespiti (manuel/auto) | Hız çekirdeği + Tespit | Büyük | T19, T16 | ✅ |
 
 Durum: ⬜ Başlanmadı · 🟡 Devam ediyor · ✅ Bitti · ⛔ Engellendi
 
@@ -401,3 +401,4 @@ yüklemek RCE riski taşıyor (bkz. `DECISIONS.md`).
 | 2026-09-15 | T16 | wheel_contact.py + 10 test + /wheel-speed endpoint + WheelSpeedPanel + rapor bölümü | pending |
 | 2026-09-15 | T18 | Dingil adımlama (T8/T12), M6 autoref, sparkline (T13) kaldırıldı; tablo sadeleşti; "Hızı Ölç" öne çıktı | pending |
 | 2026-09-15 | T19 | wheel_contact_profile + 10 test + /wheel-speed-profile + overlay + grafik + rapor bölümü + WheelSpeedPanel profil modu | 3195b07 |
+| 2026-09-15 | T20 | wheel_auto.py (Canny CV + bbox yedek) + auto-contact-points endpoint + WheelSpeedPanel auto UI + 18 test + code review T16-T19 düzeltmeleri | pending |

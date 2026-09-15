@@ -148,10 +148,27 @@ class TransverseGuideResponse(BaseModel):
 class WheelMarkIn(BaseModel):
     frame: float  # tam veya alt-kare (T14 bracket mod)
     pixel: tuple[float, float]
+    source: str = "manual"  # T20: "manual" | "auto" | "operator-confirmed"
 
 
 class WheelSpeedRequest(BaseModel):
     marks: list[WheelMarkIn]
+
+
+# T20 — Otomatik temas noktası önerileri
+class AutoMarkOut(BaseModel):
+    frame: int
+    pixel: tuple[float, float]
+    source: str                  # her zaman "auto"
+    confidence: float            # 0-1; kenar=0.5, bbox=0.2
+    detection_method: str        # "edge-bottom" | "bbox-heuristic"
+    note: str = ""
+
+
+class AutoContactPointsResponse(BaseModel):
+    marks: list[AutoMarkOut]
+    track_id: int
+    method_summary: str          # bilgilendirme metni
 
 
 class WheelSpeedResponse(BaseModel):

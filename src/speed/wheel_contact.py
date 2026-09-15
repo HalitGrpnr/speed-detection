@@ -63,6 +63,20 @@ def wheel_contact_speed(
             "Yalnızca 2 işaret var; güven aralığı hesaplanamaz — en az 3 önerilir."
         )
 
+    # Kare sırasına göre sırala (unsorted marks yanlış kümülatif verir)
+    marks = sorted(marks, key=lambda m: float(m["frame"]))
+
+    # T20: Onaylanmamış auto işaretler uyarı taşır
+    auto_unconfirmed = [
+        m for m in marks
+        if m.get("source", "manual") == "auto"
+    ]
+    if auto_unconfirmed:
+        warnings.append(
+            f"{len(auto_unconfirmed)} otomatik (onaylanmamış) işaret içeriyor — "
+            "operatör doğrulaması önerilir."
+        )
+
     worlds = [
         pixel_to_world(H, (float(m["pixel"][0]), float(m["pixel"][1])))
         for m in marks
@@ -79,10 +93,7 @@ def wheel_contact_speed(
 
     coeffs = np.polyfit(t_arr, d_arr, 1)
     speed_ms = float(coeffs[0])
-
-    if speed_ms < 0:
-        warnings.append("Hesaplanan hız negatif — işaretlerin kare sırasını kontrol edin.")
-
+    # Kümülatif Öklid mesafesi herzaman >= 0 olduğundan speed_ms < 0 üretilmez.
     value_kmh = abs(speed_ms) * 3.6
 
     # Ardışık çift hızları (residual tahmini)

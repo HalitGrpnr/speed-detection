@@ -40,13 +40,32 @@ export interface InterpolatePointResponse {
 }
 
 // T16 — Operatör-tekerlek hız ölçümü
+export type WheelMarkSource = 'manual' | 'auto' | 'operator-confirmed'
+
 export interface WheelMark {
   frame: number  // tam veya alt-kare (T14)
   pixel: [number, number]
+  source?: WheelMarkSource  // T20: opsiyonel, varsayılan 'manual'
 }
 
 export interface WheelSpeedRequest {
   marks: WheelMark[]
+}
+
+// T20 — Otomatik temas noktası önerileri
+export interface AutoMarkOut {
+  frame: number
+  pixel: [number, number]
+  source: 'auto'
+  confidence: number          // 0-1; kenar=0.5, bbox=0.2
+  detection_method: string    // 'edge-bottom' | 'bbox-heuristic'
+  note: string
+}
+
+export interface AutoContactPointsResponse {
+  marks: AutoMarkOut[]
+  track_id: number
+  method_summary: string
 }
 
 export interface WheelSpeedResponse {

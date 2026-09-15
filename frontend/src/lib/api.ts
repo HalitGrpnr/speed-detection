@@ -3,6 +3,7 @@
  * proxy uvicorn'a yönlendirir). Hiçbir harici servise çağrı yok (forensic, yerel).
  */
 import type {
+  AutoContactPointsResponse,
   AxleCheckRequest,
   AxleCheckResponse,
   AxleSuggestFrameResponse,
@@ -226,6 +227,19 @@ export const api = {
         headers: jsonHeaders,
         body: JSON.stringify(req),
       }),
+    )
+  },
+
+  /** T20 — Otomatik temas noktası tahminleri (klasik CV + bbox yedek). */
+  async autoContactPoints(
+    jobId: string,
+    trackId: number,
+    maxMarks: number = 8,
+  ): Promise<AutoContactPointsResponse> {
+    return unwrap(
+      await fetch(
+        `/api/job/${jobId}/track/${trackId}/auto-contact-points?max_marks=${maxMarks}`,
+      ),
     )
   },
 }

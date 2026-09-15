@@ -56,6 +56,8 @@ from .schemas import (
     WheelSpeedProfileRequest,
     WheelSpeedProfileResponse,
     ProfilePointOut,
+    AutoMarkOut,
+    AutoContactPointsResponse,
 )
 
 import sys as _sys
@@ -975,12 +977,21 @@ async def wheel_speed(job_id: str, track_id: int, req: WheelSpeedRequest) -> Whe
         raise HTTPException(status_code=422, detail=f"Kalibrasyon yeniden hesaplanamadı: {e}")
 
     H = cal_result.homography
-    marks = [{"frame": m.frame, "pixel": list(m.pixel)} for m in req.marks]
+    marks = [
+        {"frame": m.frame, "pixel": list(m.pixel), "source": m.source}
+        for m in req.marks
+    ]
 
     try:
         result = wheel_contact_speed(marks, H, fps)
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
+
+    # T20: source breakdown audit
+    source_counts = {}
+    for m in marks:
+        src = m.get("source", "manual")
+        source_counts[src] = source_counts.get(src, 0) + 1
 
     out_dir = _job_out_dir(job_id)
     wheel_path = out_dir / f"wheel_speed_{track_id}.json"
@@ -993,6 +1004,7 @@ async def wheel_speed(job_id: str, track_id: int, req: WheelSpeedRequest) -> Whe
         "residual_kmh": result.residual_kmh,
         "warnings": result.warnings,
         "marks": marks,
+        "source_counts": source_counts,
         "computed_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
     }
     wheel_path.write_text(json.dumps(wheel_data, ensure_ascii=False))
@@ -1003,7 +1015,7 @@ async def wheel_speed(job_id: str, track_id: int, req: WheelSpeedRequest) -> Whe
         _job_id=job_id,
         track_id=track_id,
         mark_count=result.mark_count,
-        marks=marks,
+        source_counts=source_counts,
         value_kmh=result.value_kmh,
         ci_kmh=result.ci_kmh,
         confidence_level=result.confidence_level,
@@ -1049,12 +1061,21 @@ async def wheel_speed_profile(
         raise HTTPException(status_code=422, detail=f"Kalibrasyon yeniden hesaplanamadı: {e}")
 
     H = cal_result.homography
-    marks = [{"frame": m.frame, "pixel": list(m.pixel)} for m in req.marks]
+    marks = [
+        {"frame": m.frame, "pixel": list(m.pixel), "source": m.source}
+        for m in req.marks
+    ]
 
     try:
         profile = wheel_contact_profile(marks, H, fps, req.smoothing_window)
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
+
+    # T20: source breakdown audit
+    source_counts = {}
+    for m in marks:
+        src = m.get("source", "manual")
+        source_counts[src] = source_counts.get(src, 0) + 1
 
     out_dir = _job_out_dir(job_id)
     profile_path = out_dir / f"wheel_speed_profile_{track_id}.json"
@@ -1077,6 +1098,7 @@ async def wheel_speed_profile(
         "raw_pairwise_kmh": profile.raw_pairwise_kmh,
         "smoothing_window": profile.smoothing_window,
         "marks": marks,
+        "source_counts": source_counts,
         "warnings": profile.warnings + profile.summary.warnings,
         "computed_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
     }
@@ -1088,7 +1110,7 @@ async def wheel_speed_profile(
         _job_id=job_id,
         track_id=track_id,
         mark_count=len(marks),
-        marks=marks,
+        source_counts=source_counts,
         smoothing_window=req.smoothing_window,
         summary_value_kmh=profile.summary.value_kmh,
         summary_ci_kmh=profile.summary.ci_kmh,
@@ -1144,16 +1166,19 @@ async def wheel_speed_profile_overlay(
         raise HTTPException(status_code=422, detail=f"Kalibrasyon yeniden hesaplanamadı: {e}")
 
     H = cal_result.homography
-    marks = [{"frame": m.frame, "pixel": list(m.pixel)} for m in req.marks]
+    marks = [
+        {"frame": m.frame, "pixel": list(m.pixel), "source": m.source}
+        for m in req.marks
+    ]
 
     try:
         profile = wheel_contact_profile(marks, H, fps, req.smoothing_window)
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
 
-    video_path = _video_store.get(job.video_id)
-    if not video_path or not video_path.exists():
+    if not job.video_path or not Path(job.video_path).exists():
         raise HTTPException(status_code=404, detail="Video bulunamadı.")
+    video_path = Path(job.video_path)
 
     meta = read_video_meta(str(video_path))
     out_dir = _job_out_dir(job_id)
@@ -1245,6 +1270,72 @@ async def wheel_profile_chart(job_id: str, track_id: int) -> Response:
 
     png_bytes = profile_chart_png(mock_profile)
     return Response(content=png_bytes, media_type="image/png")
+
+
+@app.get(
+    "/api/job/{job_id}/track/{track_id}/auto-contact-points",
+    response_model=AutoContactPointsResponse,
+)
+async def auto_contact_points(
+    job_id: str,
+    track_id: int,
+    max_marks: int = 8,
+) -> AutoContactPointsResponse:
+    """T20 — Track'in bbox'larından otomatik tekerlek temas noktası tahminleri.
+
+    Klasik CV (Canny kenar tespiti) ile her seçili karede temas noktası tahmini yapar.
+    Tespit başarısız olursa bbox alt-orta yedek olarak kullanılır.
+    Tüm noktalarda source='auto' — operatör onayı zorunlu (CLAUDE.md Kural 5).
+    """
+    from src.speed.wheel_auto import generate_auto_marks
+
+    job = _get_done_job(job_id)
+
+    tracks_path = _job_out_dir(job_id) / "tracks.json"
+    if not tracks_path.exists():
+        raise HTTPException(status_code=404, detail="Tracks verisi bulunamadı.")
+
+    from src.detection.models import load_tracks
+    all_tracks = load_tracks(tracks_path)
+    target = next((t for t in all_tracks if t.track_id == track_id), None)
+    if target is None:
+        raise HTTPException(status_code=404, detail=f"Track #{track_id} bulunamadı.")
+
+    video_path = job.video_path
+    if not video_path or not Path(video_path).exists():
+        raise HTTPException(status_code=404, detail="Orijinal video bulunamadı.")
+
+    auto_marks = generate_auto_marks(target, video_path, max_marks=max_marks)
+
+    slog.append(
+        _job_out_dir(job_id),
+        "auto_contact_points",
+        _job_id=job_id,
+        track_id=track_id,
+        generated_count=len(auto_marks),
+        max_marks=max_marks,
+        methods={m.detection_method for m in auto_marks},
+    )
+
+    return AutoContactPointsResponse(
+        marks=[
+            AutoMarkOut(
+                frame=m.frame,
+                pixel=m.pixel,
+                source=m.source,
+                confidence=round(m.confidence, 2),
+                detection_method=m.detection_method,
+                note=m.note,
+            )
+            for m in auto_marks
+        ],
+        track_id=track_id,
+        method_summary=(
+            "Klasik CV (Canny kenar tespiti) + bbox yedek. "
+            "Tüm noktalar operatör onayına açıktır. "
+            "source='operator-confirmed' olmayan noktalar düşük güven taşır."
+        ),
+    )
 
 
 @app.get("/api/job/{job_id}/session-log")

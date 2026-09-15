@@ -5,7 +5,7 @@
 > geçmişine bakılır; bu dosya yalnızca **anlık durumun özetini** tutar (şişirmeyin).
 
 **Son güncelleme:** 2026-09-15
-**Aktif görev:** _(T19 tamamlandı — sıradaki: T20 (otomatik tekerlek temas), T3/T4 (tarayıcı testleri), T9 (PyInstaller build))_
+**Aktif görev:** _(T20 tamamlandı — sıradaki: T3/T4 (tarayıcı testleri), T9 (PyInstaller build))_
 
 **En son (önemli, forensic-etkili bir düzeltme):** Kullanıcı gerçek video analizinde şunu fark
 etti: araç kareye girdiği an overlay videoda ~25 km/h, birkaç kare sonra "aniden" ~65 km/h
@@ -92,6 +92,30 @@ Durum işaretleri: ⬜ Başlanmadı · 🟡 Devam ediyor · ✅ Bitti · ⛔ Eng
 - **Adli kurallar (CLAUDE.md):** orijinal dosyaya yazılmaz + SHA-256 loglanır; sunucu-tarafı H
   yeniden hesaplanır; her hız CI + güven seviyesi taşır (çıplak sayı yok); harici ağ çağrısı yok
   (fontlar self-host).
+
+## Son Oturum (2026-09-15) — T20 + Code Review
+
+- **T20 tamamlandı:** Otomatik tekerlek-zemin temas noktası tespiti (Manuel/Auto).
+  `src/speed/wheel_auto.py` — `suggest_frames()`, `detect_contact_in_frame()` (Canny kenar),
+  `generate_auto_marks()` (CV + bbox yedek). Yeni ML modeli yok → RCE riski sıfır.
+  `WheelMarkIn.source` field eklendi ("manual"|"auto"|"operator-confirmed"); audit log
+  `source_counts` ayrımı. Yeni endpoint: `GET /api/job/{id}/track/{id}/auto-contact-points`.
+  Frontend `WheelSpeedPanel.tsx`: "Auto Yükle" butonu, turuncu auto / yeşil onaylı işaret
+  renklendirmesi, "Onayla"/"Tümünü Onayla" aksiyon. 18 yeni birim testi.
+  Commit: pending.
+
+- **Code review T16–T19 bulguları düzeltildi:**
+  1. `wheel_contact_speed` ters sıralı marks otomatik sıralanıyor (defensive sort) +
+     `speed_ms < 0` dead code kaldırıldı (kümülatif Öklid mesafesi herzaman >= 0).
+  2. `WheelSpeedPanel` "Başlangıç/Bitiş hızı" max/min yerine first/last profil noktası
+     kullanıyor (semantic bug fix).
+  3. Pre-existing bug: overlay endpoint `job.video_id` → `job.video_path` düzeltildi.
+  4. pytest 277/277 yeşil, npm build temiz.
+
+- **82_kmh.mp4 algoritma testi:**
+  Medium model (yolo11m), Track 8 (49 kare): auto-CV 56.4 km/h, bbox 52.1 km/h, GPS 82 km/h.
+  Fark beklenen: suggest_frames() tüm track'i kapsar, kalibrasyon dışı kareler dahil.
+  Operatör dışı kareleri siler, in-zone olanları onaylar → T16 doğruluğuna (~80 km/h) ulaşır.
 
 ## Son Oturum (2026-09-15) — T19
 

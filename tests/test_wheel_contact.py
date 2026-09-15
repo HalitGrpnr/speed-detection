@@ -138,20 +138,41 @@ class TestSyntheticKnownSpeed:
         with pytest.raises(ValueError):
             wheel_contact_speed([], H, fps=25.0)
 
-    def test_negative_speed_warning(self):
-        """İşaretler ters kare sırası → negatif hız uyarısı, pozitif değer döner."""
+    def test_backward_track_gives_positive_speed(self):
+        """Araç geri gidiyorsa kümülatif mesafe ölçülür → pozitif hız, negatif uyarı yok.
+
+        Algoritma kümülatif Öklid mesafesi + lineer fit kullandığından yön ayrımı yapamaz.
+        Adli kullanımda araç her zaman ileri gider; geri hareket senaryosu desteklenmez.
+        """
         H = _simple_homography()
         fps = 25.0
         speed_ms = 60 / 3.6
+        # Frame sırası doğru ama araç GERIYE gidiyor: erken karede uzakta, geç karede yakında
+        marks = [
+            {"frame": 0, "pixel": list(self._world_to_pixel(H, (1.0, speed_ms * 2.0)))},
+            {"frame": 25, "pixel": list(self._world_to_pixel(H, (1.0, speed_ms * 1.0)))},
+            {"frame": 50, "pixel": list(self._world_to_pixel(H, (1.0, 0.0)))},
+        ]
+        result = wheel_contact_speed(marks, H, fps)
+        # Kümülatif mesafe pozitif → hız pozitif
+        assert result.value_kmh > 0
+
+    def test_unsorted_marks_auto_sorted(self):
+        """Ters kare sırasındaki işaretler artık otomatik sıralanır → doğru hız, uyarı yok."""
+        H = _simple_homography()
+        fps = 25.0
+        speed_ms = 60 / 3.6
+        # Ters sıra: 50, 25, 0
         marks = [
             {"frame": 50, "pixel": list(self._world_to_pixel(H, (1.0, speed_ms * 2.0)))},
             {"frame": 25, "pixel": list(self._world_to_pixel(H, (1.0, speed_ms * 1.0)))},
             {"frame": 0, "pixel": list(self._world_to_pixel(H, (1.0, 0.0)))},
         ]
         result = wheel_contact_speed(marks, H, fps)
-        # Hız pozitif (abs alınıyor) ama uyarı var
-        assert result.value_kmh > 0
-        assert any("negatif" in w for w in result.warnings)
+        # Sort sonrası pozitif yönde hareket → doğru hız
+        assert abs(result.value_kmh - 60.0) < 1.0
+        # Negatif uyarı olmamalı
+        assert not any("negatif" in w for w in result.warnings)
 
     def test_high_confidence_4_marks_low_residual(self):
         H = _simple_homography()
