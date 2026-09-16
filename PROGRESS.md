@@ -4,8 +4,8 @@
 > "Nerede kaldık" sorusunun cevabı burası + `git log`'tur. Oturum-oturum detay için git
 > geçmişine bakılır; bu dosya yalnızca **anlık durumun özetini** tutar (şişirmeyin).
 
-**Son güncelleme:** 2026-09-15
-**Aktif görev:** _(T20 tamamlandı — sıradaki: T3/T4 (tarayıcı testleri), T9 (PyInstaller build))_
+**Son güncelleme:** 2026-09-16
+**Aktif görev:** _(T23 tamamlandı — sıradaki: T21 (tekerlek hızı UI yeniden düzenleme), T3/T4 (tarayıcı testleri), T9 (PyInstaller build))_
 
 **En son (önemli, forensic-etkili bir düzeltme):** Kullanıcı gerçek video analizinde şunu fark
 etti: araç kareye girdiği an overlay videoda ~25 km/h, birkaç kare sonra "aniden" ~65 km/h
@@ -92,6 +92,21 @@ Durum işaretleri: ⬜ Başlanmadı · 🟡 Devam ediyor · ✅ Bitti · ⛔ Eng
 - **Adli kurallar (CLAUDE.md):** orijinal dosyaya yazılmaz + SHA-256 loglanır; sunucu-tarafı H
   yeniden hesaplanır; her hız CI + güven seviyesi taşır (çıplak sayı yok); harici ağ çağrısı yok
   (fontlar self-host).
+
+## Son Oturum (2026-09-16) — T23
+
+- **T23 tamamlandı:** YOLO-seg temas noktası POC — KARAR: KALMA.
+  `poc/t23_seg_contact_poc.py` — `yolo11n-seg.pt` (Ultralytics resmi, SHA-256 pinli),
+  araç maskesi alt-%15 centroid temas noktası. 82_kmh.mp4 Track 8, 21 kalibrasyon
+  bölgesi karesi üzerinde:
+  - SEG model: **73.3 km/h** (GPS farkı −8.7 km/h) — eşik aşıldı
+  - T20 Canny: **77.4 km/h** (GPS farkı −4.6 km/h) — SEG'den daha iyi
+  - Bbox bottom: 70.1 km/h (GPS farkı −11.9 km/h)
+  Kök neden: araç kameraya yaklaşınca mask x-centroid gövde kenarına kayıyor,
+  yatay hata (50–200 px) hız hesabını bozuyor. T20 yükseltme yapılmayacak.
+  `docs/t23-poc-bulgu.md` + `DECISIONS.md` güncellendi.
+
+---
 
 ## Son Oturum (2026-09-15) — T20 + Code Review
 

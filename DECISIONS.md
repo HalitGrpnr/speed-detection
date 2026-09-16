@@ -397,3 +397,19 @@ Format:
 - **Kümülatif hız uyarısı düzeltmesi:** wheel_contact_speed içindeki `if speed_ms < 0:` uyarısı
   kaldırıldı. Kümülatif Öklid mesafesi herzaman >= 0 olduğundan slope negatif üretilemez —
   uyarı dead code'du. Ters sıralı işaretler artık otomatik sıralanır (sort defensively).
+
+## [2026-09-16] T23 — YOLO-seg temas noktası POC: "KALMA" kararı
+- **Karar:** `yolo11n-seg.pt` ile araç segmentasyon maskesi alt-%15 temas noktası
+  yaklaşımı T20 Canny'den daha iyi performans göstermiyor; T20 yükseltilmeyecek.
+- **Gerekçe:** 82_kmh.mp4 Track 8, kalibrasyon bölgesi 21 kare üzerinde:
+  Canny −4.6 km/h GPS farkı, SEG model −8.7 km/h GPS farkı. Önceden tanımlı
+  5 km/h eşiği aşıldı → KALMA. Detay: `docs/t23-poc-bulgu.md`.
+- **Kök neden:** Araç kameraya yaklaşınca YOLO-seg maskesi tüm araç genişliğini
+  kapsar; alt-%15 centroid'i arka tampona değil gövde kenarına denk gelir.
+  Yatay x-sapması (50–200 px) dünya koordinatlarına bozuk hareket vektörü aktarır.
+  Canny ise alt bbox içinde kenar tespit ettiğinden yatay hata daha küçük kalır.
+- **Alternatifler / neden seçilmedi:**
+  - Daha büyük seg model (yolo11s/m-seg): CPU yükü artar, iyileşme garantisi yok.
+  - Alt-%2 (iki tekerlek kümesi): post-processing karmaşıklığı artar, ayrı görev gerekir.
+  - Tekerlek-özel fine-tune: SafeTensors + doğrulanmış model gerektirir; kapsam dışı.
+- **SHA-256 pin:** `yolo11n-seg.pt` = `55ed65c56c91713d23e8402371c6c49a6fd84f257f7dce452e8d70e41dcbe152`
