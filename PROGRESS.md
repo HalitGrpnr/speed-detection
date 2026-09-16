@@ -4,8 +4,8 @@
 > "Nerede kaldık" sorusunun cevabı burası + `git log`'tur. Oturum-oturum detay için git
 > geçmişine bakılır; bu dosya yalnızca **anlık durumun özetini** tutar (şişirmeyin).
 
-**Son güncelleme:** 2026-09-16
-**Aktif görev:** _(T23 tamamlandı — sıradaki: T21 (tekerlek hızı UI yeniden düzenleme), T3/T4 (tarayıcı testleri), T9 (PyInstaller build))_
+**Son güncelleme:** 2026-09-17
+**Aktif görev:** _(T21 tamamlandı — sıradaki: T22 (vanishing-point kalibrasyon önerisi), T3/T4 (tarayıcı testleri), T9 (PyInstaller build))_
 
 **En son (önemli, forensic-etkili bir düzeltme):** Kullanıcı gerçek video analizinde şunu fark
 etti: araç kareye girdiği an overlay videoda ~25 km/h, birkaç kare sonra "aniden" ~65 km/h
@@ -92,6 +92,24 @@ Durum işaretleri: ⬜ Başlanmadı · 🟡 Devam ediyor · ✅ Bitti · ⛔ Eng
 - **Adli kurallar (CLAUDE.md):** orijinal dosyaya yazılmaz + SHA-256 loglanır; sunucu-tarafı H
   yeniden hesaplanır; her hız CI + güven seviyesi taşır (çıplak sayı yok); harici ağ çağrısı yok
   (fontlar self-host).
+
+## Son Oturum (2026-09-17) — T21
+
+- **T21 tamamlandı:** Tekerlek hızı birincil akış UI yeniden düzenlemesi.
+  `WheelSpeedPanel.tsx`: `useEffect` + `useRef` ile panel açılınca auto marklar otomatik
+  yükleniyor (operatör "Auto Yükle" butona tıklamak zorunda kalmıyor). "Yeniden Yükle"
+  butonu retry için kalıyor. `onWheelSpeedResult(trackId, result)` yeni callback prop'u
+  — hem `speed` hem `profile` modunda hesap yapılınca çağrılıyor.
+  `ResultsStep.tsx`: `wheelSpeedResults: Record<number, WheelSpeedResponse>` state ile
+  tablo yeniden düzenlendi — tekerlek hızı varsa büyük/koyu + bbox küçük/gri; yoksa
+  bbox normal + amber "Tekerlek ölçümü önerilir" hint. Güven CI/badge tekerlek
+  sonucundan alınıyor. PDF indirme butonu interceptor'a bağlandı: tekerlek ölçümü
+  yoksa uyarı modal'ı çıkıyor, "Yine de İndir" ile devam edilebiliyor (bloklama yok).
+  `report.py`: bbox speed tablosu sonuna "Tekerlek hız doğrulaması: YAPILDI/YAPILMADI"
+  notu eklendi (forensic şeffaflık).
+  pytest 277/277, npm build temiz.
+
+---
 
 ## Son Oturum (2026-09-16) — T23
 

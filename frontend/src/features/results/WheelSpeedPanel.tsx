@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useMutation, type UseMutationResult } from '@tanstack/react-query'
 import { Activity, Bot, CheckCheck, FileText, Loader2, Target, Trash2, Video } from 'lucide-react'
 import { api } from '@/lib/api'
@@ -16,6 +16,7 @@ interface Props {
   frameCount: number
   onClose: () => void
   onReportRegenerated?: () => void
+  onWheelSpeedResult?: (trackId: number, result: WheelSpeedResponse) => void
 }
 
 // ── Hız-zaman profil grafiği (saf SVG, bağımlılık yok) ─────────────────────
@@ -143,7 +144,7 @@ interface MarkEntry {
  * T16 + T19 + T20 — Operatör-tekerlek hız ölçümü, fren/ivme profili ve otomatik temas tespiti.
  */
 export function WheelSpeedPanel({
-  jobId, videoId, trackId, frameCount, onClose, onReportRegenerated,
+  jobId, videoId, trackId, frameCount, onClose, onReportRegenerated, onWheelSpeedResult,
 }: Props) {
   const [mode, setMode] = useState<Mode>('speed')
   const [marks, setMarks] = useState<Record<number, { pixel: [number, number]; source: WheelMarkSource }>>({})
@@ -226,12 +227,25 @@ export function WheelSpeedPanel({
     },
   })
 
+  // T21: Panel açılır açılmaz auto markları yükle (operatör butona tıklamak zorunda kalmasın)
+  const autoLoadFired = useRef(false)
+  useEffect(() => {
+    if (!autoLoadFired.current) {
+      autoLoadFired.current = true
+      autoMutation.mutate()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   const calcSpeedMutation = useMutation({
     mutationFn: () =>
       api.wheelSpeed(jobId, trackId, {
         marks: markEntries.map((m) => ({ frame: m.frame, pixel: m.pixel, source: m.source })),
       }),
-    onSuccess: (data) => setSpeedResult(data),
+    onSuccess: (data) => {
+      setSpeedResult(data)
+      onWheelSpeedResult?.(trackId, data)
+    },
   })
 
   const calcProfileMutation = useMutation({
@@ -239,7 +253,18 @@ export function WheelSpeedPanel({
       api.wheelSpeedProfile(jobId, trackId, {
         marks: markEntries.map((m) => ({ frame: m.frame, pixel: m.pixel, source: m.source })),
       }),
-    onSuccess: (data) => setProfileResult(data),
+    onSuccess: (data) => {
+      setProfileResult(data)
+      // Profil özet değerlerini WheelSpeedResponse formatında ilet (T21)
+      onWheelSpeedResult?.(trackId, {
+        value_kmh: data.summary_value_kmh,
+        ci_kmh: data.summary_ci_kmh,
+        confidence_level: data.summary_confidence_level,
+        mark_count: data.summary_mark_count,
+        residual_kmh: data.summary_residual_kmh,
+        warnings: data.warnings,
+      })
+    },
   })
 
   const overLayMutation = useMutation({
@@ -282,19 +307,25 @@ export function WheelSpeedPanel({
         <Button variant="ghost" size="sm" onClick={onClose}>Kapat</Button>
       </div>
 
-      {/* T20: Auto yükle */}
+      {/* T20/T21: Auto noktalar mount'ta otomatik yüklenir; bu buton yeniden yükleme içindir */}
       <div className="flex items-center gap-2">
         <Button
           variant="outline"
           size="sm"
-          disabled={autoMutation.isPending || autoMutation.isSuccess}
+          disabled={autoMutation.isPending}
           onClick={() => autoMutation.mutate()}
           className="text-xs"
         >
           {autoMutation.isPending
             ? <Loader2 className="size-3 animate-spin" />
             : <Bot className="size-3" />}
-          {autoMutation.isSuccess ? 'Auto noktalar yüklendi ✓' : 'Auto Yükle'}
+          {autoMutation.isPending
+            ? 'Yükleniyor…'
+            : autoMutation.isSuccess
+              ? 'Yeniden Yükle'
+              : autoMutation.isError
+                ? 'Tekrar Dene'
+                : 'Yükleniyor…'}
         </Button>
         {autoMarkCount > 0 && (
           <>

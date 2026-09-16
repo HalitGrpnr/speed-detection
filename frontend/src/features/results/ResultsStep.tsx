@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Download, FileText, Loader2, Map, Ruler, RotateCcw, Target } from 'lucide-react'
 import { api } from '@/lib/api'
+import type { WheelSpeedResponse } from '@/lib/models'
 import { useWizard } from '@/store/wizard'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -25,6 +26,11 @@ export function ResultsStep() {
   const [wheelTrackId, setWheelTrackId] = useState<number | null>(null)
   const [showPlanView, setShowPlanView] = useState(false)
   const [hasV2Report, setHasV2Report] = useState(false)
+  // T21: Track başına tekerlek hız sonuçları
+  const [wheelSpeedResults, setWheelSpeedResults] = useState<Record<number, WheelSpeedResponse>>({})
+  // T21: Rapor indirme uyarı modal
+  const [showReportWarning, setShowReportWarning] = useState(false)
+  const [pendingDownloadUrl, setPendingDownloadUrl] = useState<string | null>(null)
 
   const resultsQuery = useQuery({
     queryKey: ['jobResults', jobId],
@@ -81,7 +87,66 @@ export function ResultsStep() {
 
   const result = resultsQuery.data
 
+  // T21: Tekerlek hız sonucunu kaydet
+  const handleWheelSpeedResult = (trackId: number, res: WheelSpeedResponse) => {
+    setWheelSpeedResults((prev) => ({ ...prev, [trackId]: res }))
+  }
+
+  // T21: PDF indirme — tekerlek ölçümü yoksa uyarı göster
+  const handleReportDownload = (url: string) => {
+    if (Object.keys(wheelSpeedResults).length === 0) {
+      setPendingDownloadUrl(url)
+      setShowReportWarning(true)
+    } else {
+      triggerDownload(url)
+    }
+  }
+
+  const triggerDownload = (url: string) => {
+    const a = document.createElement('a')
+    a.href = url
+    a.download = ''
+    a.click()
+  }
+
+  const handleDownloadAnyway = () => {
+    if (pendingDownloadUrl) triggerDownload(pendingDownloadUrl)
+    setShowReportWarning(false)
+    setPendingDownloadUrl(null)
+  }
+
   return (
+    <>
+    {/* T21: Tekerlek ölçümü yapılmadan rapor indirme uyarı modal'ı */}
+    {showReportWarning && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+        <div className="bg-background rounded-lg border shadow-xl p-6 max-w-md w-full mx-4 space-y-4">
+          <div className="flex items-start gap-3">
+            <span className="text-2xl">⚠️</span>
+            <div>
+              <h3 className="font-semibold text-base">Tekerlek doğrulaması yapılmadı</h3>
+              <p className="text-sm text-muted-foreground mt-1">
+                Hiçbir araç için tekerlek-zemin temas noktası ölçümü yapılmadı. Raporda
+                yalnızca homografi tabanlı ön tahminler (bbox) bulunacak — bu değerler
+                sistematik olarak düşük olabilir (~%8, GPS doğrulamasında gözlemlendi).
+              </p>
+              <p className="text-sm text-muted-foreground mt-1">
+                Birincil hız için her araç satırındaki <strong>"Hızı Ölç"</strong> butonunu
+                kullanmanız önerilir. Raporu şimdi indirmek istiyorsanız devam edebilirsiniz.
+              </p>
+            </div>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => { setShowReportWarning(false); setPendingDownloadUrl(null) }}>
+              İptal
+            </Button>
+            <Button variant="default" onClick={handleDownloadAnyway}>
+              Yine de İndir
+            </Button>
+          </div>
+        </div>
+      </div>
+    )}
     <Card>
       <CardHeader>
         <CardTitle>Adım 6 — Sonuçlar</CardTitle>
@@ -130,20 +195,20 @@ export function ResultsStep() {
                     </th>
                     <th className="px-3 py-2 text-right font-medium">
                       <span className="flex items-center justify-end gap-1">
-                        Ön Tahmin (km/h)
-                        <InfoHint text="Homografi tabanlı otomatik ön tahmin — yanlı olabilir (±%10). Birincil hız için 'Hızı Ölç' butonunu kullanın." />
+                        Hız (km/h)
+                        <InfoHint text="Tekerlek ölçümü yapıldıysa birincil hız büyük/koyu gösterilir; ön tahmin (bbox) grileşir. Tekerlek yoksa ön tahmin gösterilir." />
                       </span>
                     </th>
                     <th className="px-3 py-2 text-right font-medium">
                       <span className="flex items-center justify-end gap-1">
                         Güven Aralığı
-                        <InfoHint text="±değer: ön tahmin için %95 güven aralığı yarı genişliği." />
+                        <InfoHint text="±değer: tekerlek ölçümü varsa onun CI'ı, yoksa ön tahminin %95 CI yarı genişliği." />
                       </span>
                     </th>
                     <th className="px-3 py-2 font-medium">
                       <span className="flex items-center gap-1">
                         Güven
-                        <InfoHint text="Tahminin genel güvenilirlik seviyesi: HIGH, MEDIUM veya LOW." />
+                        <InfoHint text="Tekerlek ölçümü varsa onun güven seviyesi; yoksa ön tahminin güven seviyesi. HIGH, MEDIUM veya LOW." />
                       </span>
                     </th>
                     <th className="px-3 py-2 text-right font-medium">
@@ -184,22 +249,37 @@ export function ResultsStep() {
                           </span>
                         )}
                       </td>
-                      <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">
-                        {e.speed_kmh.toFixed(1)}
-                        {!e.out_of_calibration_zone && (e.hull_inside_fraction ?? 1) < 0.8 && (
-                          <span
-                            className="ml-1 text-[9px] text-amber-500"
-                            title={`Hull-içi: ${((e.hull_inside_fraction ?? 0) * 100).toFixed(0)}% — bazı kareler kalibrasyon bölgesi dışında`}
-                          >
-                            ⚠
-                          </span>
+                      <td className="px-3 py-2 text-right">
+                        {wheelSpeedResults[e.track_id] ? (
+                          <div className="space-y-0.5">
+                            <div className="text-base font-bold tabular-nums leading-none">
+                              {wheelSpeedResults[e.track_id].value_kmh.toFixed(1)}
+                              <span className="text-xs font-normal text-muted-foreground ml-0.5">km/h</span>
+                            </div>
+                            <div className="text-[10px] text-muted-foreground tabular-nums">
+                              ön: {e.speed_kmh.toFixed(1)}
+                              {!e.out_of_calibration_zone && (e.hull_inside_fraction ?? 1) < 0.8 && (
+                                <span className="ml-0.5 text-amber-500" title="Bazı kareler kalibrasyon dışı">⚠</span>
+                              )}
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="space-y-0.5">
+                            <div className="tabular-nums text-muted-foreground">
+                              {e.speed_kmh.toFixed(1)}
+                              {!e.out_of_calibration_zone && (e.hull_inside_fraction ?? 1) < 0.8 && (
+                                <span className="ml-1 text-[9px] text-amber-500" title={`Hull-içi: ${((e.hull_inside_fraction ?? 0) * 100).toFixed(0)}%`}>⚠</span>
+                              )}
+                            </div>
+                            <div className="text-[10px] text-amber-600 whitespace-nowrap">Tekerlek ölçümü önerilir</div>
+                          </div>
                         )}
                       </td>
                       <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">
-                        ± {e.ci_kmh.toFixed(1)}
+                        ± {(wheelSpeedResults[e.track_id]?.ci_kmh ?? e.ci_kmh).toFixed(1)}
                       </td>
                       <td className="px-3 py-2">
-                        <ConfidenceBadge level={e.confidence_level} />
+                        <ConfidenceBadge level={wheelSpeedResults[e.track_id]?.confidence_level ?? e.confidence_level} />
                       </td>
                       <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">
                         {e.frame_count}
@@ -218,14 +298,15 @@ export function ResultsStep() {
                       </td>
                       <td className="px-3 py-2 text-right">
                         <Button
-                          variant={wheelTrackId === e.track_id ? 'default' : 'outline'}
+                          variant={wheelTrackId === e.track_id ? 'default' : (wheelSpeedResults[e.track_id] ? 'secondary' : 'outline')}
                           size="sm"
                           onClick={() => {
                             setWheelTrackId(wheelTrackId === e.track_id ? null : e.track_id)
                             if (axleTrackId === e.track_id) setAxleTrackId(null)
                           }}
                         >
-                          <Target className="size-3.5" /> Hızı Ölç
+                          <Target className="size-3.5" />
+                          {wheelSpeedResults[e.track_id] ? 'Güncelle' : 'Hızı Ölç'}
                         </Button>
                       </td>
                     </tr>
@@ -255,6 +336,7 @@ export function ResultsStep() {
             frameCount={videoMeta.frame_count}
             onClose={() => setWheelTrackId(null)}
             onReportRegenerated={() => setHasV2Report(true)}
+            onWheelSpeedResult={handleWheelSpeedResult}
           />
         )}
 
@@ -316,9 +398,12 @@ export function ResultsStep() {
 
         {/* İndirmeler */}
         <div className="flex flex-wrap gap-3">
-          <a href={api.reportUrl(jobId)} download className={buttonVariants({ variant: 'outline' })}>
+          <Button
+            variant="outline"
+            onClick={() => handleReportDownload(api.reportUrl(jobId))}
+          >
             <FileText /> PDF Raporu İndir
-          </a>
+          </Button>
           {hasV2Report && jobId && (
             <a href={api.reportV2Url(jobId)} download className={buttonVariants({ variant: 'default' })}>
               <FileText /> Güncellenmiş Raporu İndir (v2)
@@ -347,5 +432,6 @@ export function ResultsStep() {
         </div>
       </CardContent>
     </Card>
+    </>
   )
 }

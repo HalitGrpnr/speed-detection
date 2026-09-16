@@ -39,7 +39,7 @@
 | T18 | Arayüz sadeleştirme + ölü özellik temizliği | UX | Orta-Büyük | T16 | ✅ |
 | T19 | Çok-işaretli hız profili + overlay (fren/ivme) | Hız çekirdeği + Çıktı | Orta-Büyük | T16 | ✅ |
 | T20 | Otomatik tekerlek-zemin temas noktası tespiti (manuel/auto) | Hız çekirdeği + Tespit | Büyük | T19, T16 | ✅ |
-| T21 | Tekerlek hızı birincil akış: UI yeniden düzenlemesi | UX + Hız çekirdeği | Orta | T16, T20 | ⬜ |
+| T21 | Tekerlek hızı birincil akış: UI yeniden düzenlemesi | UX + Hız çekirdeği | Orta | T16, T20 | ✅ |
 | T22 | Otomatik kalibrasyon önerisi (vanishing-point → onay) | Kalibrasyon + UX | Büyük | — | ⬜ |
 | T23 | POC: ML pose modeli ile temas noktası (doğruluk kanıtı) | Tespit + Doğrulama | Orta | T20 | ✅ |
 
@@ -405,4 +405,5 @@ yüklemek RCE riski taşıyor (bkz. `DECISIONS.md`).
 | 2026-09-15 | T18 | Dingil adımlama (T8/T12), M6 autoref, sparkline (T13) kaldırıldı; tablo sadeleşti; "Hızı Ölç" öne çıktı | pending |
 | 2026-09-15 | T19 | wheel_contact_profile + 10 test + /wheel-speed-profile + overlay + grafik + rapor bölümü + WheelSpeedPanel profil modu | 3195b07 |
 | 2026-09-15 | T20 | wheel_auto.py (Canny CV + bbox yedek) + auto-contact-points endpoint + WheelSpeedPanel auto UI + 18 test + code review T16-T19 düzeltmeleri | 16344e7 |
-| 2026-09-16 | T23 | yolo11n-seg POC: KALMA kararı — SEG −8.7 km/h, Canny −4.6 km/h GPS farkı; x-offset kök neden | pending |
+| 2026-09-16 | T23 | yolo11n-seg POC: KALMA kararı — SEG −8.7 km/h, Canny −4.6 km/h GPS farkı; x-offset kök neden | c619746 |
+| 2026-09-17 | T21 | WheelSpeedPanel auto-load on mount + callback; tablo yeniden düzenleme; rapor uyarı modal; PDF tekerlek durumu notu | pending |

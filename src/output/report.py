@@ -296,6 +296,23 @@ def _build_story(
             "Bu sonuclar guvenilmez olabilir.",
             S["Note"],
         ))
+
+    # T21: Tekerlek hız doğrulaması durumu (forensic şeffaflık)
+    wheel_done = bool(wheel_speeds or wheel_speed_profiles)
+    if wheel_done:
+        wheel_status = (
+            "YAPILDI — Tekerlek temas noktasi olcumu tamamlandi. "
+            "Birincil hiz asagidaki 'Operator-Tekerlek Hiz Olcumu' bolumundedir."
+        )
+    else:
+        wheel_status = (
+            "YAPILMADI — Bu tablodaki degerler homografi tabanli on tahminlerdir (bbox). "
+            "Paralaks hatasi nedeniyle sistematik olarak dusuk olabilir (~%%8). "
+            "Bilirkisi raporunda birincil hiz icin tekerlek temas noktasi "
+            "dogrulamasi yapilmasi onem tasir (bkz. GPS dogrulama bulgulari)."
+        )
+    story.append(Spacer(1, 0.2 * cm))
+    story.append(Paragraph(f"Tekerlek hiz dogrulamasi: {wheel_status}", S["Note"]))
     story.append(Spacer(1, 0.5 * cm))
 
     # 4. Güven Seviyesi Kriterleri
