@@ -372,14 +372,6 @@ async def auto_calibrate(video_id: str, req: AutoCalibrateRequest) -> AutoCalibr
         for p in proposal.proposed_points
     ]
 
-    slog.append(video_id, "auto_calibrate_proposal", {
-        "frame_n": req.frame_n,
-        "lane_width_m": req.lane_width_m,
-        "quality_gate_passed": proposal.quality_gate_passed,
-        "quality_reason": proposal.quality_reason,
-        "estimated_rms_m": proposal.estimated_rms_m,
-    })
-
     return AutoCalibrateResponse(
         vanishing_point=proposal.vanishing_point,
         left_line_pts=proposal.left_line_pts,
