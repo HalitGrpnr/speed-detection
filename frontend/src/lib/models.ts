@@ -101,3 +101,27 @@ export interface WheelSpeedProfileResponse {
   smoothing_window: number
   warnings: string[]
 }
+
+// T22 — Otomatik kalibrasyon önerisi (vanishing-point)
+export interface AutoCalibrateRequest {
+  frame_n: number
+  lane_width_m: number
+}
+
+export interface AutoCalibratePointOut {
+  id: string
+  pixel: [number, number]
+  world_m: [number, number]
+  source: 'auto-vanishing'
+}
+
+export interface AutoCalibrateResponse {
+  vanishing_point: [number, number] | null
+  left_line_pts: [[number, number], [number, number]] | null
+  right_line_pts: [[number, number], [number, number]] | null
+  proposed_points: AutoCalibratePointOut[]
+  quality_gate_passed: boolean
+  quality_reason: string
+  estimated_rms_m: number | null
+  warning: string | null
+}

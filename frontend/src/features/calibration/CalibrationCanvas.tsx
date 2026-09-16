@@ -12,6 +12,7 @@ const COLORS: Record<ControlPointSource, string> = {
   auto: '#60a5fa',
   site_measurement: '#34d399',
   interpolated: '#a3e635',
+  'auto-vanishing': '#c084fc',  // mor — T22
 }
 const SELECT = '#ef4444'
 const REJECTED = '#f97316'
@@ -49,6 +50,12 @@ interface Props {
   transverseDir?: [number, number] | null
   /** T15: İmleç konumu kılavuz çizgisi için (canvas koordinatları, skalasız) */
   cursorImagePx?: [number, number] | null
+  /** T22: Yakınsama noktası (vanishing point) — mor artı işareti olarak gösterilir */
+  vanishingPoint?: [number, number] | null
+  /** T22: Sol şerit görselleştirme uç noktaları [bot, top] görüntü koordinatları */
+  laneLineLeft?: [[number, number], [number, number]] | null
+  /** T22: Sağ şerit görselleştirme uç noktaları */
+  laneLineRight?: [[number, number], [number, number]] | null
   onAdd: (pixel: [number, number]) => void
   onMove: (id: string, pixel: [number, number]) => void
   onSelect: (id: string | null) => void
@@ -60,6 +67,7 @@ export function CalibrationCanvas({
   imageUrl, points, selectedId, rejectedIds,
   mode = 'point', quadCorners,
   ghostTarget, bracketPoints, roadAnchors, transverseDir, cursorImagePx,
+  vanishingPoint, laneLineLeft, laneLineRight,
   onAdd, onMove, onSelect, onMoveQuadCorner, onCursorMove,
 }: Props) {
   const wrapRef = useRef<HTMLDivElement>(null)
@@ -351,7 +359,54 @@ export function CalibrationCanvas({
         ctx.fillText(labels[i], cx, cy)
       })
     }
-  }, [points, selectedId, rejectedIds, scale, ready, quadCorners, ghostTarget, bracketPoints, roadAnchors, transverseDir, cursorImagePx])
+    // T22: Şerit çizgisi overlay (tespit edilen yol çizgileri)
+    const drawLaneLine = (pts: [[number,number],[number,number]] | null, color: string) => {
+      if (!pts) return
+      ctx.save()
+      ctx.globalAlpha = 0.65
+      ctx.strokeStyle = color
+      ctx.lineWidth = 2.5
+      ctx.setLineDash([10, 6])
+      ctx.beginPath()
+      ctx.moveTo(pts[0][0] * scale, pts[0][1] * scale)
+      ctx.lineTo(pts[1][0] * scale, pts[1][1] * scale)
+      ctx.stroke()
+      ctx.setLineDash([])
+      ctx.restore()
+    }
+    drawLaneLine(laneLineLeft ?? null, '#22d3ee')    // cyan — sol şerit
+    drawLaneLine(laneLineRight ?? null, '#86efac')   // açık yeşil — sağ şerit
+
+    // T22: Yakınsama noktası (VP) işareti
+    if (vanishingPoint) {
+      const [vpx, vpy] = [vanishingPoint[0] * scale, vanishingPoint[1] * scale]
+      const vr = 14
+      ctx.save()
+      ctx.globalAlpha = 0.85
+      ctx.strokeStyle = '#c084fc'
+      ctx.lineWidth = 2.5
+      // Büyük artı işareti
+      ctx.beginPath()
+      ctx.moveTo(vpx - vr, vpy); ctx.lineTo(vpx + vr, vpy)
+      ctx.moveTo(vpx, vpy - vr); ctx.lineTo(vpx, vpy + vr)
+      ctx.stroke()
+      // Daire
+      ctx.beginPath()
+      ctx.arc(vpx, vpy, vr * 0.5, 0, Math.PI * 2)
+      ctx.strokeStyle = '#c084fc'
+      ctx.lineWidth = 1.5
+      ctx.stroke()
+      ctx.restore()
+      // Etiket (görüntü sınırları içindeyse)
+      if (vanishingPoint[0] >= 0 && vanishingPoint[1] >= 0) {
+        ctx.font = '10px sans-serif'
+        ctx.fillStyle = '#c084fc'
+        ctx.textAlign = 'left'
+        ctx.textBaseline = 'bottom'
+        ctx.fillText('VP', vpx + vr + 3, vpy - 2)
+      }
+    }
+  }, [points, selectedId, rejectedIds, scale, ready, quadCorners, ghostTarget, bracketPoints, roadAnchors, transverseDir, cursorImagePx, vanishingPoint, laneLineLeft, laneLineRight])
 
   useEffect(() => {
     const wrap = wrapRef.current

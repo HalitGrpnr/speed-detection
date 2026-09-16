@@ -8,6 +8,7 @@ const SOURCE_DOT: Record<ControlPointSource, string> = {
   auto: 'bg-blue-400',
   site_measurement: 'bg-emerald-400',
   interpolated: 'bg-lime-400',
+  'auto-vanishing': 'bg-violet-400',
 }
 
 type RejectedPoint = CalibrateResponse['rejected_points'][number]

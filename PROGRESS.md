@@ -5,7 +5,7 @@
 > geçmişine bakılır; bu dosya yalnızca **anlık durumun özetini** tutar (şişirmeyin).
 
 **Son güncelleme:** 2026-09-17
-**Aktif görev:** _(T21 tamamlandı — sıradaki: T22 (vanishing-point kalibrasyon önerisi), T3/T4 (tarayıcı testleri), T9 (PyInstaller build))_
+**Aktif görev:** _(T22 tamamlandı — sıradaki: T3/T4 (tarayıcı testleri), T9 (PyInstaller build))_
 
 **En son (önemli, forensic-etkili bir düzeltme):** Kullanıcı gerçek video analizinde şunu fark
 etti: araç kareye girdiği an overlay videoda ~25 km/h, birkaç kare sonra "aniden" ~65 km/h
@@ -76,7 +76,7 @@ H ile kaba dünya konumuna oturtup bilinen genişliğe göre düzeltiyor. Yeni e
 
 Durum işaretleri: ⬜ Başlanmadı · 🟡 Devam ediyor · ✅ Bitti · ⛔ Engellendi
 
-**Test durumu:** `pytest` **248/248 yeşil** (T17: 13 yeni hull testi). `frontend/` `npm run build` temiz. PyInstaller paketi
+**Test durumu:** `pytest` **290/290 yeşil** (T22: 13 yeni vanishing-point testi). `frontend/` `npm run build` temiz. PyInstaller paketi
 (`dist/SpeedDetection/`, ~772 MB arm64) T18 sonrası yeniden build edilmedi — bir sonraki paketleme öncesi kontrol edilmeli.
 
 ---
@@ -92,6 +92,23 @@ Durum işaretleri: ⬜ Başlanmadı · 🟡 Devam ediyor · ✅ Bitti · ⛔ Eng
 - **Adli kurallar (CLAUDE.md):** orijinal dosyaya yazılmaz + SHA-256 loglanır; sunucu-tarafı H
   yeniden hesaplanır; her hız CI + güven seviyesi taşır (çıplak sayı yok); harici ağ çağrısı yok
   (fontlar self-host).
+
+## Son Oturum (2026-09-17) — T22
+
+- **T22 tamamlandı:** Otomatik kalibrasyon önerisi — vanishing-point tabanlı.
+  `src/calibration/vanishing.py`: `detect_vanishing_point()` (Canny+Hough+RANSAC,
+  açı filtresi, sol/sağ küme ayrımı, RANSAC doğru fit, kesişim); `propose_calibration()`
+  (VP kalite kapısı × 3: VP sınır dışı / paralel eğim / yüksek RMS; izotropik y-ölçeği
+  tahmini ile 2·n_pairs kontrol noktası önerisi; uyarı + audit-log).
+  `auto-vanishing` kaynak tipi tüm zincire eklendi (`models.py`, `schemas.py`, `types.ts`,
+  `CalibrationCanvas` renk paleti, `PointsTable` renk).
+  Yeni endpoint: `POST /api/video/{id}/auto-calibrate` (session log + operatör onay akışı).
+  Frontend `CalibrationStep.tsx`: "Otomatik Kalibrasyon (T22)" paneli — şerit genişliği
+  girişi, yükle/önizle/kabul/iptal akışı; kalite kapısı geçemezse hata açıklaması.
+  `CalibrationCanvas.tsx`: mor VP artı işareti + cyan/yeşil şerit çizgisi overlay.
+  13 yeni birim testi (`test_vanishing.py`). pytest 290/290, npm build temiz.
+
+---
 
 ## Son Oturum (2026-09-17) — T21
 

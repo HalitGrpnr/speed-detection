@@ -3,6 +3,8 @@
  * proxy uvicorn'a yönlendirir). Hiçbir harici servise çağrı yok (forensic, yerel).
  */
 import type {
+  AutoCalibrateRequest,
+  AutoCalibrateResponse,
   AutoContactPointsResponse,
   AxleCheckRequest,
   AxleCheckResponse,
@@ -223,6 +225,17 @@ export const api = {
   async interpolatePoint(videoId: string, req: InterpolatePointRequest): Promise<InterpolatePointResponse> {
     return unwrap(
       await fetch(`/api/video/${videoId}/interpolate-point`, {
+        method: 'POST',
+        headers: jsonHeaders,
+        body: JSON.stringify(req),
+      }),
+    )
+  },
+
+  /** T22 — Vanishing-point tabanlı otomatik kalibrasyon önerisi. */
+  async autoCalibrate(videoId: string, req: AutoCalibrateRequest): Promise<AutoCalibrateResponse> {
+    return unwrap(
+      await fetch(`/api/video/${videoId}/auto-calibrate`, {
         method: 'POST',
         headers: jsonHeaders,
         body: JSON.stringify(req),

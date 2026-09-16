@@ -418,7 +418,7 @@ export interface components {
              * @default operator
              * @enum {string}
              */
-            source: "operator" | "site_measurement" | "auto" | "interpolated";
+            source: "operator" | "site_measurement" | "auto" | "interpolated" | "auto-vanishing";
             /**
              * Held Out
              * @default false

@@ -19,7 +19,7 @@ class ControlPointIn(BaseModel):
     id: str
     pixel: tuple[float, float]
     world_m: tuple[float, float]
-    source: Literal["operator", "site_measurement", "auto", "interpolated"] = "operator"
+    source: Literal["operator", "site_measurement", "auto", "interpolated", "auto-vanishing"] = "operator"
     held_out: bool = False
     interpolation_meta: dict | None = None
 
@@ -205,3 +205,28 @@ class WheelSpeedProfileResponse(BaseModel):
     raw_pairwise_kmh: list[float]
     smoothing_window: int
     warnings: list[str] = []
+
+
+# ── T22 — Otomatik kalibrasyon önerisi (vanishing-point) ─────────────────────
+
+class AutoCalibrateRequest(BaseModel):
+    frame_n: int
+    lane_width_m: float = 3.5
+
+
+class AutoCalibratePointOut(BaseModel):
+    id: str
+    pixel: tuple[float, float]
+    world_m: tuple[float, float]
+    source: str = "auto-vanishing"
+
+
+class AutoCalibrateResponse(BaseModel):
+    vanishing_point: tuple[float, float] | None
+    left_line_pts: list[tuple[float, float]] | None    # [bot_pt, top_pt]
+    right_line_pts: list[tuple[float, float]] | None
+    proposed_points: list[AutoCalibratePointOut]
+    quality_gate_passed: bool
+    quality_reason: str
+    estimated_rms_m: float | None
+    warning: str | None

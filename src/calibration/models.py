@@ -11,7 +11,7 @@ class ControlPoint:
     id: str
     pixel: tuple[float, float]
     world_m: tuple[float, float]
-    source: Literal["operator", "site_measurement", "auto", "interpolated"]
+    source: Literal["operator", "site_measurement", "auto", "interpolated", "auto-vanishing"]
     held_out: bool = False
     interpolation_meta: dict | None = None  # T14: audit trail for sub-frame interpolated points
 

@@ -58,6 +58,9 @@ from .schemas import (
     ProfilePointOut,
     AutoMarkOut,
     AutoContactPointsResponse,
+    AutoCalibrateRequest,
+    AutoCalibratePointOut,
+    AutoCalibrateResponse,
 )
 
 import sys as _sys
@@ -343,6 +346,50 @@ async def transverse_guide(video_id: str, req: TransverseGuideRequest) -> Transv
     if req.wheel_px is not None:
         p1, p2 = guide_line_endpoints(req.wheel_px, d, req.canvas_w, req.canvas_h)
     return TransverseGuideResponse(transverse_dir=d, guide_p1=p1, guide_p2=p2)
+
+
+# ── T22: Otomatik kalibrasyon önerisi (vanishing-point) ──────────────────────
+
+@app.post("/api/video/{video_id}/auto-calibrate", response_model=AutoCalibrateResponse)
+async def auto_calibrate(video_id: str, req: AutoCalibrateRequest) -> AutoCalibrateResponse:
+    """T22 — Yol şerit çizgilerinden VP tabanlı otomatik kalibrasyon noktası önerisi.
+
+    Operatör onayına sunulur; asla doğrudan pipeline'a girmez (kara kutu değil).
+    """
+    path = _get_video_path(video_id)
+    frame = _read_frame(path, req.frame_n)
+
+    from src.calibration.vanishing import propose_calibration
+    proposal = propose_calibration(frame, req.lane_width_m)
+
+    pts_out = [
+        AutoCalibratePointOut(
+            id=p.id,
+            pixel=p.pixel,
+            world_m=p.world_m,
+            source=p.source,
+        )
+        for p in proposal.proposed_points
+    ]
+
+    slog.append(video_id, "auto_calibrate_proposal", {
+        "frame_n": req.frame_n,
+        "lane_width_m": req.lane_width_m,
+        "quality_gate_passed": proposal.quality_gate_passed,
+        "quality_reason": proposal.quality_reason,
+        "estimated_rms_m": proposal.estimated_rms_m,
+    })
+
+    return AutoCalibrateResponse(
+        vanishing_point=proposal.vanishing_point,
+        left_line_pts=proposal.left_line_pts,
+        right_line_pts=proposal.right_line_pts,
+        proposed_points=pts_out,
+        quality_gate_passed=proposal.quality_gate_passed,
+        quality_reason=proposal.quality_reason,
+        estimated_rms_m=proposal.estimated_rms_m,
+        warning=proposal.warning,
+    )
 
 
 # ── Pipeline endpoints ────────────────────────────────────────────────────────
@@ -1314,7 +1361,7 @@ async def auto_contact_points(
         track_id=track_id,
         generated_count=len(auto_marks),
         max_marks=max_marks,
-        methods={m.detection_method for m in auto_marks},
+        methods=list({m.detection_method for m in auto_marks}),
     )
 
     return AutoContactPointsResponse(

@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
-import { ChevronLeft, ChevronRight, CheckSquare, Loader2, Square, Trash2, Target, Navigation, GitBranch } from 'lucide-react'
+import { ChevronLeft, ChevronRight, CheckSquare, Loader2, Square, Trash2, Target, Navigation, GitBranch, Wand2 } from 'lucide-react'
 import { api } from '@/lib/api'
 import type {
+  AutoCalibrateResponse,
   CalibrateResponse, ControlPoint, ControlPointSource, InterpolatePointResponse,
 } from '@/lib/models'
 import { useWizard } from '@/store/wizard'
@@ -50,6 +51,15 @@ export function CalibrationStep() {
   const [roadAnchors, setRoadAnchors] = useState<[number,number][]>([])
   const [transverseDir, setTransverseDir] = useState<[number,number] | null>(null)
   const [cursorImagePx, setCursorImagePx] = useState<[number,number] | null>(null)
+
+  // T22: Otomatik kalibrasyon önerisi
+  type AutoCalibState =
+    | { status: 'idle' }
+    | { status: 'loading' }
+    | { status: 'ok'; data: AutoCalibrateResponse }
+    | { status: 'error'; message: string }
+  const [autoCalib, setAutoCalib] = useState<AutoCalibState>({ status: 'idle' })
+  const [autoCalibLaneWidth, setAutoCalibLaneWidth] = useState(3.5)
 
   // T14: Bracket mode
   // Faz sırası: rear_n → rear_n1 → front_n → front_n1 → hesapla
@@ -203,6 +213,36 @@ export function CalibrationStep() {
     setQuadDimDialog(false)
     cancelQuad()
   }
+
+  // ── T22: Otomatik kalibrasyon ─────────────────────────────────────────────
+  const runAutoCalib = async () => {
+    if (!videoMeta) return
+    setAutoCalib({ status: 'loading' })
+    try {
+      const res = await api.autoCalibrate(videoMeta.video_id, {
+        frame_n: localFrame,
+        lane_width_m: autoCalibLaneWidth,
+      })
+      setAutoCalib({ status: 'ok', data: res })
+    } catch (e) {
+      setAutoCalib({ status: 'error', message: (e as Error).message })
+    }
+  }
+
+  const acceptAutoCalib = () => {
+    if (autoCalib.status !== 'ok') return
+    const newPts: ControlPoint[] = autoCalib.data.proposed_points.map((p) => ({
+      id: p.id,
+      pixel: p.pixel,
+      world_m: p.world_m,
+      source: 'auto-vanishing' as ControlPointSource,
+      held_out: false,
+    }))
+    setControlPoints([...points, ...newPts])
+    setAutoCalib({ status: 'idle' })
+  }
+
+  const dismissAutoCalib = () => setAutoCalib({ status: 'idle' })
 
   // ── T15: Yol yönü anchor ─────────────────────────────────────────────────
   const startRoadAnchor = () => {
@@ -369,6 +409,9 @@ export function CalibrationStep() {
               roadAnchors={roadAnchors.length > 0 ? roadAnchors : undefined}
               transverseDir={transverseDir}
               cursorImagePx={cursorImagePx}
+              vanishingPoint={autoCalib.status === 'ok' ? (autoCalib.data.vanishing_point ?? null) : null}
+              laneLineLeft={autoCalib.status === 'ok' ? (autoCalib.data.left_line_pts as [[number,number],[number,number]] | null) : null}
+              laneLineRight={autoCalib.status === 'ok' ? (autoCalib.data.right_line_pts as [[number,number],[number,number]] | null) : null}
               onAdd={addPoint}
               onMove={movePoint}
               onSelect={setSelectedId}
@@ -395,6 +438,7 @@ export function CalibrationStep() {
                   <span className="text-blue-400">mavi otomatik</span>,{' '}
                   <span className="text-emerald-400">yeşil saha</span>,{' '}
                   <span className="text-lime-400">yeşil enterp.</span>,{' '}
+                  <span className="text-violet-400">mor VP önerisi</span>,{' '}
                   <span className="text-orange-500">turuncu ✕ = dışlanan</span>.
                 </>
               )}
@@ -597,6 +641,104 @@ export function CalibrationStep() {
                   <Target className="size-3.5" /> Bracket Enterpolasyon
                 </Button>
               )
+            )}
+
+            {/* ── T22: Otomatik Kalibrasyon ── */}
+            {canvasMode === 'point' && (
+              <div className="rounded-lg border border-violet-500/30 bg-violet-500/5 p-3 space-y-2">
+                <div className="flex items-center gap-1.5">
+                  <Wand2 className="size-3.5 text-violet-400" />
+                  <span className="text-xs font-medium text-violet-400">Otomatik Kalibrasyon (T22)</span>
+                </div>
+
+                {autoCalib.status === 'idle' && (
+                  <>
+                    <p className="text-xs text-muted-foreground">
+                      Şerit çizgilerini otomatik tespit eder, kontrol noktası önerir.
+                      Operatör her noktayı düzelterek kabul eder.
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <label className="text-xs whitespace-nowrap text-muted-foreground">Şerit genişliği (m)</label>
+                      <input
+                        type="number"
+                        min="1" max="10" step="0.1"
+                        value={autoCalibLaneWidth}
+                        onChange={(e) => setAutoCalibLaneWidth(parseFloat(e.target.value) || 3.5)}
+                        className="w-20 rounded border border-white/20 bg-white/5 px-2 py-0.5 text-xs text-foreground"
+                      />
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full border-violet-500/50 text-violet-300 hover:bg-violet-500/10"
+                      onClick={runAutoCalib}
+                    >
+                      <Wand2 className="size-3.5" /> Otomatik Kalibrasyon Dene
+                    </Button>
+                  </>
+                )}
+
+                {autoCalib.status === 'loading' && (
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Loader2 className="size-3.5 animate-spin" />
+                    Şerit çizgileri tespit ediliyor…
+                  </div>
+                )}
+
+                {autoCalib.status === 'error' && (
+                  <>
+                    <p className="text-xs text-red-400">{autoCalib.message}</p>
+                    <Button variant="ghost" size="sm" className="w-full text-muted-foreground" onClick={dismissAutoCalib}>
+                      Kapat
+                    </Button>
+                  </>
+                )}
+
+                {autoCalib.status === 'ok' && (
+                  <>
+                    {autoCalib.data.quality_gate_passed ? (
+                      <div className="rounded bg-violet-500/10 border border-violet-500/30 px-2 py-1.5 space-y-1">
+                        <p className="text-xs font-medium text-violet-300">
+                          {autoCalib.data.proposed_points.length} nokta önerildi
+                          {autoCalib.data.estimated_rms_m != null && (
+                            <span className="ml-1 text-violet-400/70">
+                              (RMS~{autoCalib.data.estimated_rms_m.toFixed(3)} m)
+                            </span>
+                          )}
+                        </p>
+                        {autoCalib.data.warning && (
+                          <p className="text-xs text-amber-400/80">⚠ {autoCalib.data.warning}</p>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="rounded bg-red-500/10 border border-red-500/30 px-2 py-1.5">
+                        <p className="text-xs text-red-400 font-medium">Otomatik öneri üretilemedi</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">{autoCalib.data.warning}</p>
+                      </div>
+                    )}
+
+                    <div className="flex gap-2">
+                      {autoCalib.data.quality_gate_passed && (
+                        <Button
+                          size="sm"
+                          className="flex-1 bg-violet-600 hover:bg-violet-500 text-white"
+                          onClick={acceptAutoCalib}
+                        >
+                          Noktaları Ekle
+                        </Button>
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className={`${autoCalib.data.quality_gate_passed ? '' : 'w-full'} text-muted-foreground`}
+                        onClick={dismissAutoCalib}
+                      >
+                        {autoCalib.data.quality_gate_passed ? 'İptal' : 'Kapat'}
+                      </Button>
+                    </div>
+                  </>
+                )}
+              </div>
             )}
 
             {/* ── Dörtgen araçları ── */}
