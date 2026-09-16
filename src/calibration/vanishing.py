@@ -116,7 +116,7 @@ def _clamp_line_to_image(
 
 def detect_vanishing_point(
     frame: np.ndarray,
-    roi_top_frac: float = 0.40,
+    roi_top_frac: float = 0.20,
 ) -> tuple[tuple[float, float], tuple[float, float], tuple[float, float]] | None:
     """
     Görüntüden yol yakınsama noktasını ve iki şerit çizgisini tespit eder.
@@ -124,7 +124,12 @@ def detect_vanishing_point(
     Döner: (vp, left_line, right_line) — her doğru (a, b) katsayı çifti şeklinde.
     Tespit başarısız olursa None döner.
 
-    Algoritma: Canny + HoughLinesP → açı filtresi → sol/sağ küme → RANSAC fit → kesişim.
+    Algoritma: Canny + HoughLinesP → açı filtresi → yakın-satır x pozisyonuna göre
+    sol/sağ küme → RANSAC fit → kesişim.
+
+    Kümeleme eğim işaretine değil yakın satırdaki x pozisyonuna dayanır; bu sayede
+    çapraz monte kameralar (her iki şerit de aynı eğim işaretine sahip olabilir) ve
+    perspektif açısı geniş kameralar için de çalışır.
     """
     h, w = frame.shape[:2]
     roi_y = int(h * roi_top_frac)
@@ -141,29 +146,48 @@ def detect_vanishing_point(
     if lines_raw is None:
         return None
 
-    left_segs: list[tuple[float, float, float, float]] = []
-    right_segs: list[tuple[float, float, float, float]] = []
+    # Yakın satır: görüntünün alt %88'i — kümeleme referansı
+    y_ref = float(h * 0.88)
+    valid_segs: list[tuple[float, float, float, float, float]] = []  # x1,y1,x2,y2,x_ref
 
     for seg in lines_raw:
         x1, y1, x2, y2 = [float(v) for v in seg[0]]
-        y1 += roi_y  # ROI offsetini geri ekle
+        y1 += roi_y
         y2 += roi_y
 
         dx = x2 - x1
         dy = y2 - y1
-        if abs(dx) < 1e-3:
+        length = float(np.hypot(dx, dy))
+        if length < 1e-3:
             continue
 
         angle_deg = float(abs(np.degrees(np.arctan2(abs(dy), abs(dx)))))
-        if not (10.0 <= angle_deg <= 75.0):
+        if not (5.0 <= angle_deg <= 80.0):
             continue
 
-        slope = dy / dx
-        # Negatif eğim → sol şerit (sol-altan VP'ye çıkar); pozitif → sağ şerit
-        if slope < 0:
-            left_segs.append((x1, y1, x2, y2))
+        # Yakın satır (y_ref) üzerindeki x konumu — kümeleme için
+        if abs(dy) < 1e-3:
+            x_ref = (x1 + x2) / 2.0
         else:
-            right_segs.append((x1, y1, x2, y2))
+            t = (y_ref - y1) / (y2 - y1)
+            x_ref = x1 + t * (x2 - x1)
+
+        valid_segs.append((x1, y1, x2, y2, x_ref))
+
+    if len(valid_segs) < 4:
+        return None
+
+    # Yakın satır x pozisyonuna göre sol/sağ küme (görüntü merkezini eşik al)
+    cx = w / 2.0
+    left_segs = [(x1, y1, x2, y2) for x1, y1, x2, y2, xr in valid_segs if xr < cx]
+    right_segs = [(x1, y1, x2, y2) for x1, y1, x2, y2, xr in valid_segs if xr >= cx]
+
+    # Fallback: eğer eşik çok dengesiz dağılıyorsa medyan tabanlı bölme
+    if len(left_segs) < 2 or len(right_segs) < 2:
+        x_refs = sorted(s[4] for s in valid_segs)
+        split = x_refs[len(x_refs) // 2]
+        left_segs = [(x1, y1, x2, y2) for x1, y1, x2, y2, xr in valid_segs if xr < split]
+        right_segs = [(x1, y1, x2, y2) for x1, y1, x2, y2, xr in valid_segs if xr >= split]
 
     if len(left_segs) < 2 or len(right_segs) < 2:
         return None
@@ -215,10 +239,12 @@ def propose_calibration(
     vp, left_line, right_line = detection
     vx, vy = vp
 
-    # Kalite kapısı 1: VP görüntü içinde (±%40 tolerans) ve ufuk çizgisinin üzerinde
-    margin_x = 0.4 * w
-    margin_y = 0.4 * h
-    if not ((-margin_x <= vx <= w + margin_x) and (-margin_y <= vy <= h * 0.60)):
+    # Kalite kapısı 1: VP yakın satırın üzerinde olmalı (yani perspektifin doğru yönde
+    # yakınsaması — VP aşağıda olsaydı şeritler ters yönde ıraksıyor demektir).
+    # X sınırı geniş (±2×genişlik): çapraz kameralarda VP görüntü dışına çıkabilir.
+    y_near_ref = h * 0.88
+    margin_x = 2.0 * w
+    if not ((-margin_x <= vx <= w + margin_x) and (vy < y_near_ref)):
         return AutoCalibProposal(
             vanishing_point=vp,
             left_line_pts=None,
@@ -227,7 +253,7 @@ def propose_calibration(
             quality_gate_passed=False,
             quality_reason='vp_out_of_bounds',
             estimated_rms_m=None,
-            warning="Yakınsama noktası görüntü dışında — düz yol yok veya kamera açısı çok büyük.",
+            warning="Yakınsama noktası beklenen konumda değil — şerit çizgileri net görünür mü?",
         )
 
     # Kalite kapısı 2: eğimler çok yakın değil (neredeyse paralel)
@@ -245,11 +271,12 @@ def propose_calibration(
             warning="Şerit çizgileri neredeyse paralel — yakınsama noktası belirlenemedi.",
         )
 
-    # n_pairs y seviyesini yakın satırdan (alt) uzak satıra (üst/VP yönünde) örnekle
+    # n_pairs y seviyesini yakın satırdan (alt) uzak satıra (üst) örnekle.
+    # VP görüntü içindeyse en az 40px altında kal; değilse görüntünün %35'ine in.
     y_near = h * 0.88
-    # VP'nin en fazla %75'ine yaklaş (VP'den en az %25 mesafe kalmalı)
-    y_far_min = vy + (y_near - vy) * 0.25
-    y_far = max(y_far_min, vy + 40.0)
+    y_far = h * 0.35
+    if vy > 0:
+        y_far = max(y_far, vy + 40.0)
     if y_far >= y_near:
         y_far = y_near - 40.0
 
@@ -274,13 +301,22 @@ def propose_calibration(
 
     scale_near = lane_width_m / pixel_width_near  # m/px
 
+    # Perspektif-aware y katsayısı: VP'den uzaklık ters orantılıdır.
+    # world_y = K * (1/(y - vy) - 1/(y_near - vy))
+    # K, yakın satırdaki izotropik ölçekten türetilir: K = scale_near * (y_near - vy)^2
+    y_near_depth = y_near - vy  # VP'den yakın satıra olan piksel derinliği
+    perspective_K = scale_near * (y_near_depth ** 2)
+
     proposed: list[ControlPoint] = []
     suffix = uuid.uuid4().hex[:4]
     for k, y in enumerate(y_levels):
         xl = _line_x_at_y(left_line, y)
         xr = _line_x_at_y(right_line, y)
-        # Y=0 yakın satırda, uzaklaştıkça artar (izotropik yaklaşım)
-        world_y = float((y_levels[0] - y) * scale_near)
+        # Perspektif y: 1/(y-vy) terimiyle derinliği doğru modeller
+        depth = y - vy
+        if abs(depth) < 1e-3:
+            depth = 1.0
+        world_y = float(perspective_K * (1.0 / depth - 1.0 / y_near_depth))
         proposed.append(ControlPoint(
             id=f"av-L{k}-{suffix}",
             pixel=(float(xl), float(y)),
@@ -327,8 +363,8 @@ def propose_calibration(
             "Y-koordinatlarını düzeltin veya elle kalibrasyon yapın."
         )
 
-    # Görselleştirme için şerit çizgisi uç noktaları
-    y_vis_top = max(0.0, vy)
+    # Görselleştirme için şerit çizgisi uç noktaları (VP görüntü dışındaysa üstten başla)
+    y_vis_top = max(0.0, min(vy, h * 0.30))
     left_pts = _clamp_line_to_image(left_line, h, w, y_vis_top, float(h - 1))
     right_pts = _clamp_line_to_image(right_line, h, w, y_vis_top, float(h - 1))
 
