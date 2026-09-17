@@ -91,7 +91,10 @@ export function FrameStep() {
             max={maxFrame}
             value={frame}
             onChange={(e) => update(Number(e.target.value))}
-            className="flex-1 h-1.5 cursor-pointer rounded-full appearance-none bg-muted outline-none
+            style={{
+              background: `linear-gradient(to right, hsl(var(--primary)) 0%, hsl(var(--primary)) ${(frame / maxFrame) * 100}%, hsl(var(--muted)) ${(frame / maxFrame) * 100}%, hsl(var(--muted)) 100%)`,
+            }}
+            className="flex-1 h-1.5 cursor-pointer rounded-full appearance-none outline-none
               [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:size-4
               [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary
               [&::-webkit-slider-thumb]:shadow-sm [&::-webkit-slider-thumb]:cursor-pointer

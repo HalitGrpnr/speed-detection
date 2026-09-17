@@ -9,17 +9,14 @@ function AnalysisStatusBar() {
   const videoMeta = useWizard((s) => s.videoMeta)
   const cal = useWizard((s) => s.calibration)
   const jobId = useWizard((s) => s.jobId)
+  const step = useWizard((s) => s.step)
 
   if (!videoMeta) return null
 
   const items: { label: string; value: string; ok: boolean }[] = []
 
-  if (videoMeta) {
-    const name = videoMeta.sha256
-      ? videoMeta.sha256.slice(0, 6) + '…'
-      : '—'
-    items.push({ label: 'Video', value: name, ok: true })
-  }
+  const name = videoMeta.sha256 ? videoMeta.sha256.slice(0, 6) + '…' : '—'
+  items.push({ label: 'Video', value: name, ok: true })
 
   if (cal) {
     const rmsOk = cal.rms_m * 100 < 5
@@ -30,7 +27,7 @@ function AnalysisStatusBar() {
     })
   }
 
-  if (jobId) {
+  if (jobId && step >= 6) {
     items.push({ label: 'Analiz', value: 'tamamlandı', ok: true })
   }
 

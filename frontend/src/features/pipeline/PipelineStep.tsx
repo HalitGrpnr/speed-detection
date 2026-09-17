@@ -61,6 +61,8 @@ export function PipelineStep() {
   const errorState = status?.state === 'error' || statusQuery.isError
   const active = !!jobId && !doneState && !errorState
 
+  const [advancedOpen, setAdvancedOpen] = useState(false)
+
   // Tamamlanınca sonuç adımına geç.
   useEffect(() => {
     if (doneState) goTo(6)
@@ -80,7 +82,6 @@ export function PipelineStep() {
     )
   }
 
-  const [advancedOpen, setAdvancedOpen] = useState(false)
   const locked = active || start.isPending
   const reset = () => {
     setJobId(null)
