@@ -9,6 +9,8 @@ import type {
   AxleCheckRequest,
   AxleCheckResponse,
   AxleSuggestFrameResponse,
+  AxleTimingRequest,
+  AxleTimingResponse,
   CalibrateRequest,
   CalibrateResponse,
   ControlPoint,
@@ -277,6 +279,17 @@ export const api = {
   /** T25 — Tekerlek hızı overlay video URL'i (inline oynatma). */
   wheelOverlayUrl: (jobId: string, trackId: number) =>
     `/api/job/${jobId}/track/${trackId}/wheel-overlay` as const,
+
+  /** T27 — H-bağımsız dingil adımlama ile hız hesapla. */
+  async axleTiming(jobId: string, trackId: number, req: AxleTimingRequest): Promise<AxleTimingResponse> {
+    return unwrap(
+      await fetch(`/api/job/${jobId}/track/${trackId}/axle-timing`, {
+        method: 'POST',
+        headers: jsonHeaders,
+        body: JSON.stringify(req),
+      }),
+    )
+  },
 
   /** T24 — Geçmiş analizlerin listesi (en yeniden en eskiye). */
   async listJobs(): Promise<JobSummary[]> {

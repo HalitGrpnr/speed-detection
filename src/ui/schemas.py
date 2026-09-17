@@ -228,6 +228,36 @@ class WheelSpeedProfileResponse(BaseModel):
     warnings: list[str] = []
 
 
+# ── T27 — H-bağımsız dingil adımlama (axle timing) ──────────────────────────
+
+class AxleTimingCrossing(BaseModel):
+    """Tek bir geçiş olayı — ön + arka tekerlek bracket kareleri ve referans noktası."""
+    front_frame_n: int
+    front_pixel_n: tuple[float, float]
+    front_frame_n1: int
+    front_pixel_n1: tuple[float, float]
+    rear_frame_n: int
+    rear_pixel_n: tuple[float, float]
+    rear_frame_n1: int
+    rear_pixel_n1: tuple[float, float]
+    target_px: tuple[float, float]   # yol referans noktası (sabit görünür özellik)
+
+
+class AxleTimingRequest(BaseModel):
+    crossings: list[AxleTimingCrossing]
+    wheelbase_m: float = 2.65
+
+
+class AxleTimingResponse(BaseModel):
+    speed_kmh: float
+    ci_kmh: float
+    confidence_level: str
+    crossing_count: int
+    crossing_speeds_kmh: list[float]
+    delta_t_per_crossing_s: list[float]
+    warnings: list[str] = []
+
+
 # ── T22 — Otomatik kalibrasyon önerisi (vanishing-point) ─────────────────────
 
 class AutoCalibrateRequest(BaseModel):

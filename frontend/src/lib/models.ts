@@ -125,6 +125,34 @@ export interface JobSummary {
   video_id: string | null
 }
 
+// T27 — H-bağımsız dingil adımlama (axle timing)
+export interface AxleTimingCrossing {
+  front_frame_n: number
+  front_pixel_n: [number, number]
+  front_frame_n1: number
+  front_pixel_n1: [number, number]
+  rear_frame_n: number
+  rear_pixel_n: [number, number]
+  rear_frame_n1: number
+  rear_pixel_n1: [number, number]
+  target_px: [number, number]
+}
+
+export interface AxleTimingRequest {
+  crossings: AxleTimingCrossing[]
+  wheelbase_m: number
+}
+
+export interface AxleTimingResponse {
+  speed_kmh: number
+  ci_kmh: number
+  confidence_level: string
+  crossing_count: number
+  crossing_speeds_kmh: number[]
+  delta_t_per_crossing_s: number[]
+  warnings: string[]
+}
+
 // T22 — Otomatik kalibrasyon önerisi (vanishing-point)
 export interface AutoCalibrateRequest {
   frame_n: number

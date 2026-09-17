@@ -62,6 +62,8 @@ from .schemas import (
     AutoCalibrateRequest,
     AutoCalibratePointOut,
     AutoCalibrateResponse,
+    AxleTimingRequest,
+    AxleTimingResponse,
     WheelOverlayRequest,
 )
 
@@ -1568,6 +1570,86 @@ async def auto_contact_points(
             "Tüm noktalar operatör onayına açıktır. "
             "source='operator-confirmed' olmayan noktalar düşük güven taşır."
         ),
+    )
+
+
+@app.post(
+    "/api/job/{job_id}/track/{track_id}/axle-timing",
+    response_model=AxleTimingResponse,
+)
+async def axle_timing(job_id: str, track_id: int, req: AxleTimingRequest) -> AxleTimingResponse:
+    """T27 — H-bağımsız dingil adımlama ile hız hesapla.
+
+    Mesafe bilinen dingil uzunluğundan gelir (H'ye bağımlı değil).
+    Her geçiş olayı ön + arka tekerlek bracket kareleri ve yol referans noktası içerir.
+    """
+    from src.speed.axle_timing import axle_timing_speed
+
+    _get_done_job(job_id)
+
+    cal_json_path = _job_out_dir(job_id) / "calibration.json"
+    if not cal_json_path.exists():
+        raise HTTPException(status_code=404, detail="Kalibrasyon verisi bulunamadı.")
+    _, _, (fps, _) = load_calibration(cal_json_path)
+
+    crossings = [
+        {
+            "front_frame_n":   c.front_frame_n,
+            "front_pixel_n":   list(c.front_pixel_n),
+            "front_frame_n1":  c.front_frame_n1,
+            "front_pixel_n1":  list(c.front_pixel_n1),
+            "rear_frame_n":    c.rear_frame_n,
+            "rear_pixel_n":    list(c.rear_pixel_n),
+            "rear_frame_n1":   c.rear_frame_n1,
+            "rear_pixel_n1":   list(c.rear_pixel_n1),
+            "target_px":       list(c.target_px),
+        }
+        for c in req.crossings
+    ]
+
+    try:
+        result = axle_timing_speed(crossings, req.wheelbase_m, fps)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+
+    out_dir = _job_out_dir(job_id)
+    timing_path = out_dir / f"axle_timing_{track_id}.json"
+    timing_data = {
+        "track_id": track_id,
+        "speed_kmh": result.speed_kmh,
+        "ci_kmh": result.ci_kmh,
+        "confidence_level": result.confidence_level,
+        "crossing_count": result.crossing_count,
+        "crossing_speeds_kmh": result.crossing_speeds_kmh,
+        "delta_t_per_crossing_s": result.delta_t_per_crossing_s,
+        "wheelbase_m": req.wheelbase_m,
+        "warnings": result.warnings,
+        "crossings": crossings,
+        "computed_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+    }
+    timing_path.write_text(json.dumps(timing_data, ensure_ascii=False))
+
+    slog.append(
+        out_dir,
+        "axle_timing",
+        _job_id=job_id,
+        track_id=track_id,
+        crossing_count=result.crossing_count,
+        wheelbase_m=req.wheelbase_m,
+        speed_kmh=result.speed_kmh,
+        ci_kmh=result.ci_kmh,
+        confidence_level=result.confidence_level,
+        warnings=result.warnings,
+    )
+
+    return AxleTimingResponse(
+        speed_kmh=result.speed_kmh,
+        ci_kmh=result.ci_kmh,
+        confidence_level=result.confidence_level,
+        crossing_count=result.crossing_count,
+        crossing_speeds_kmh=result.crossing_speeds_kmh,
+        delta_t_per_crossing_s=result.delta_t_per_crossing_s,
+        warnings=result.warnings,
     )
 
 

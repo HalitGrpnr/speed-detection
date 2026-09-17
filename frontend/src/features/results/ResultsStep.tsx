@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { AlertTriangle, Download, FileText, Loader2, Map, RotateCcw, Ruler, Target } from 'lucide-react'
+import { AlertTriangle, Crosshair, Download, FileText, Loader2, Map, RotateCcw, Ruler, Target } from 'lucide-react'
 import { api } from '@/lib/api'
 import type { SpeedEstimate, WheelSpeedResponse } from '@/lib/models'
 import { useWizard } from '@/store/wizard'
@@ -9,14 +9,16 @@ import { Button, buttonVariants } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 import { ConfidenceBadge } from '@/components/common/ConfidenceBadge'
-import { MethodInfoCard } from '@/components/common/MethodInfoCard'
 import { StatusBanner } from '@/components/common/StatusBanner'
 import { StepFooter } from '@/components/common/StepFooter'
 import { AxleCheckPanel } from './AxleCheckPanel'
+import { AxleTimingPanel } from './AxleTimingPanel'
 import { SessionLogPanel } from './SessionLogPanel'
 import { WheelSpeedPanel } from './WheelSpeedPanel'
 
-type ActivePanel = 'axle' | 'wheel'
+type ActivePanel = 'axle' | 'wheel' | 'timing'
+// 'bbox' | 'profile-{trackId}'
+type OverlayKey = 'bbox' | string
 
 interface VehicleCardProps {
   estimate: SpeedEstimate
@@ -25,6 +27,7 @@ interface VehicleCardProps {
   activePanelType: ActivePanel | null
   onSelectAxle: () => void
   onSelectWheel: () => void
+  onSelectTiming: () => void
 }
 
 function VehicleCard({
@@ -34,96 +37,71 @@ function VehicleCard({
   activePanelType,
   onSelectAxle,
   onSelectWheel,
+  onSelectTiming,
 }: VehicleCardProps) {
   const hasWheel = !!wheelResult
+  const speed = hasWheel ? wheelResult.value_kmh : e.speed_kmh
+  const ci = hasWheel ? wheelResult.ci_kmh : e.ci_kmh
+  const confidence = hasWheel ? wheelResult.confidence_level : e.confidence_level
+
   return (
     <div
       className={cn(
-        'rounded-lg border p-4 space-y-3 transition-colors',
+        'rounded-lg border px-3 py-2 transition-colors',
         isSelected ? 'border-primary bg-primary/5' : 'bg-card hover:border-primary/40',
         e.out_of_calibration_zone ? 'border-red-700/40 bg-red-950/10' : '',
       )}
     >
-      {/* Header */}
-      <div className="flex items-center gap-2 flex-wrap">
-        <span className="text-xs font-mono text-muted-foreground">#{e.track_id}</span>
-        <span className="text-sm font-medium">{e.vehicle_class}</span>
-        <span className="text-xs text-muted-foreground">{e.frame_count} kare</span>
+      <div className="flex items-center gap-2 min-w-0">
+        {/* Track + sınıf */}
+        <span className="text-[10px] font-mono text-muted-foreground shrink-0">#{e.track_id}</span>
+        <span className="text-xs font-medium truncate">{e.vehicle_class}</span>
+
+        {/* Uyarılar */}
         {e.out_of_calibration_zone && (
-          <span
-            className="rounded px-1.5 py-0.5 text-[10px] font-bold bg-red-900/60 text-red-300 border border-red-700/60"
-            title={`Kalibrasyon dışı — hull-içi: ${((e.hull_inside_fraction ?? 0) * 100).toFixed(0)}%`}
-          >
-            KAL. DIŞI
+          <span className="shrink-0 rounded px-1 py-0.5 text-[9px] font-bold bg-red-900/60 text-red-300 border border-red-700/60"
+            title={`Kal. dışı — hull-içi: ${((e.hull_inside_fraction ?? 0) * 100).toFixed(0)}%`}>
+            KAL.DIŞI
           </span>
         )}
         {!e.out_of_calibration_zone && (e.hull_inside_fraction ?? 1) < 0.8 && (
-          <span
-            className="text-xs text-amber-500"
-            title={`Hull-içi kare oranı: ${((e.hull_inside_fraction ?? 0) * 100).toFixed(0)}%`}
-          >
-            ⚠ kısmi
+          <span className="shrink-0 text-[10px] text-amber-500"
+            title={`Hull-içi: ${((e.hull_inside_fraction ?? 0) * 100).toFixed(0)}%`}>⚠</span>
+        )}
+
+        {/* Hız */}
+        <div className="ml-auto shrink-0 flex items-baseline gap-1">
+          <span className={cn('tabular-nums font-bold text-sm', hasWheel ? 'text-success' : '')}>
+            {speed.toFixed(1)}
           </span>
-        )}
-        <div className="ml-auto">
-          <ConfidenceBadge
-            level={hasWheel ? wheelResult.confidence_level : e.confidence_level}
-          />
+          <span className="text-[10px] text-muted-foreground">km/h ±{ci.toFixed(1)}</span>
         </div>
+        <ConfidenceBadge level={confidence} />
       </div>
 
-      {/* Hız kutuları */}
-      <div className="grid grid-cols-2 gap-2">
-        <div className="rounded-md bg-muted/40 px-3 py-2.5">
-          <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">Ön Tahmin</p>
-          <p className={cn('tabular-nums', hasWheel ? 'text-sm text-muted-foreground' : 'text-xl font-bold')}>
-            {e.speed_kmh.toFixed(1)}
-            <span className="text-xs font-normal ml-0.5">km/h</span>
-          </p>
-          <p className="text-[10px] text-muted-foreground mt-0.5">±{e.ci_kmh.toFixed(1)}</p>
-        </div>
-
-        {hasWheel ? (
-          <div className="rounded-md bg-success/10 border border-success/30 px-3 py-2.5">
-            <p className="text-[10px] uppercase tracking-wide text-success mb-1">Birincil Hız ✓</p>
-            <p className="text-xl font-bold tabular-nums">
-              {wheelResult.value_kmh.toFixed(1)}
-              <span className="text-xs font-normal ml-0.5">km/h</span>
-            </p>
-            <p className="text-[10px] text-muted-foreground mt-0.5">±{wheelResult.ci_kmh.toFixed(1)}</p>
-          </div>
-        ) : (
-          <div className="rounded-md bg-warning/10 border border-warning/20 px-3 py-2.5">
-            <p className="text-[10px] uppercase tracking-wide text-warning mb-1">Birincil Hız</p>
-            <p className="text-sm text-muted-foreground">Ölçüm önerilir</p>
-          </div>
-        )}
-      </div>
-
-      {/* Aksiyon butonları */}
-      <div className="flex gap-2">
+      {/* Butonlar */}
+      <div className="flex gap-1.5 mt-1.5">
         <Button
           variant={isSelected && activePanelType === 'axle' ? 'default' : 'outline'}
-          size="sm"
-          className="flex-1 text-xs"
+          size="sm" className="flex-1 h-7 text-xs"
           onClick={onSelectAxle}
         >
-          <Ruler className="size-3.5" /> Aks Doğrula
+          <Ruler className="size-3" /> Aks
         </Button>
         <Button
-          variant={
-            isSelected && activePanelType === 'wheel'
-              ? 'default'
-              : hasWheel
-                ? 'secondary'
-                : 'outline'
-          }
-          size="sm"
-          className="flex-1 text-xs"
+          variant={isSelected && activePanelType === 'wheel' ? 'default' : hasWheel ? 'secondary' : 'outline'}
+          size="sm" className="flex-1 h-7 text-xs"
           onClick={onSelectWheel}
         >
-          <Target className="size-3.5" />
-          {hasWheel ? 'Güncelle' : 'Hızı Ölç'}
+          <Target className="size-3" />
+          {hasWheel ? 'Güncelle' : 'Fren Profili'}
+        </Button>
+        <Button
+          variant={isSelected && activePanelType === 'timing' ? 'default' : 'outline'}
+          size="sm" className="flex-1 h-7 text-xs"
+          onClick={onSelectTiming}
+        >
+          <Crosshair className="size-3" /> Dingil
         </Button>
       </div>
     </div>
@@ -137,6 +115,9 @@ export function ResultsStep() {
   const controlPoints = useWizard((s) => s.controlPoints)
   const reset = useWizard((s) => s.reset)
 
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const fps = videoMeta?.fps ?? 25
+
   const [selectedTrackId, setSelectedTrackId] = useState<number | null>(null)
   const [activePanelType, setActivePanelType] = useState<ActivePanel | null>(null)
   const [showPlanView, setShowPlanView] = useState(false)
@@ -144,8 +125,8 @@ export function ResultsStep() {
   const [wheelSpeedResults, setWheelSpeedResults] = useState<Record<number, WheelSpeedResponse>>({})
   const [showReportWarning, setShowReportWarning] = useState(false)
   const [pendingDownloadUrl, setPendingDownloadUrl] = useState<string | null>(null)
-  const [wheelOverlayTracks, setWheelOverlayTracks] = useState<Set<number>>(new Set())
-  const [activeOverlay, setActiveOverlay] = useState<'bbox' | number>('bbox')
+  const [profileOverlayTracks, setProfileOverlayTracks] = useState<Set<number>>(new Set())
+  const [activeOverlay, setActiveOverlay] = useState<OverlayKey>('bbox')
 
   const resultsQuery = useQuery({
     queryKey: ['jobResults', jobId],
@@ -205,6 +186,17 @@ export function ResultsStep() {
   const handleWheelSpeedResult = (trackId: number, res: WheelSpeedResponse) =>
     setWheelSpeedResults((prev) => ({ ...prev, [trackId]: res }))
 
+  const handleProfileOverlayReady = (trackId: number) => {
+    setProfileOverlayTracks((prev) => new Set([...prev, trackId]))
+    setActiveOverlay(`profile-${trackId}`)
+  }
+
+  const handleSeekToFrame = (frame: number) => {
+    if (videoRef.current) {
+      videoRef.current.currentTime = frame / fps
+    }
+  }
+
   const handleReportDownload = (url: string) => {
     if (Object.keys(wheelSpeedResults).length === 0) {
       setPendingDownloadUrl(url)
@@ -258,7 +250,7 @@ export function ResultsStep() {
                 </p>
                 <p className="text-sm text-muted-foreground mt-1">
                   Birincil hız için araç kartlarındaki{' '}
-                  <strong>"Hızı Ölç"</strong> butonunu kullanın.
+                  <strong>"Fren Profili"</strong> butonunu kullanın.
                 </p>
               </div>
             </div>
@@ -284,8 +276,8 @@ export function ResultsStep() {
         <CardHeader>
           <CardTitle>Adım 6 — Sonuçlar</CardTitle>
           <CardDescription>
-            {result.vehicle_count} araç tespit edildi. Birincil hızı ölçmek için bir araç
-            kartındaki <strong>"Hızı Ölç"</strong> butonunu kullanın.
+            {result.vehicle_count} araç tespit edildi. Fren/ivme profili için bir araç
+            kartındaki <strong>"Fren Profili"</strong> butonunu kullanın.
           </CardDescription>
         </CardHeader>
 
@@ -305,8 +297,8 @@ export function ResultsStep() {
             </StatusBanner>
           ) : (
             <div className="grid gap-5 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
-              {/* Sol: Araç kart listesi */}
-              <div className="space-y-3">
+              {/* Sol: Araç kart listesi (kendi içinde kaydırılır) */}
+              <div className="space-y-3 max-h-[calc(100vh-5rem)] overflow-y-auto pr-0.5">
                 <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
                   Tespit Edilen Araçlar
                 </p>
@@ -319,12 +311,13 @@ export function ResultsStep() {
                     activePanelType={selectedTrackId === e.track_id ? activePanelType : null}
                     onSelectAxle={() => selectPanel(e.track_id, 'axle')}
                     onSelectWheel={() => selectPanel(e.track_id, 'wheel')}
+                    onSelectTiming={() => selectPanel(e.track_id, 'timing')}
                   />
                 ))}
               </div>
 
-              {/* Sağ: Video + aktif panel */}
-              <div className="space-y-3">
+              {/* Sağ: sticky — video + aktif panel her zaman ekranda */}
+              <div className="sticky top-4 self-start max-h-[calc(100vh-5rem)] overflow-y-auto space-y-3 pr-0.5">
                 {/* Overlay sekme seçici */}
                 <div className="flex overflow-hidden rounded-md border text-xs font-medium">
                   <button
@@ -338,44 +331,35 @@ export function ResultsStep() {
                   >
                     Ön Tahmin (bbox)
                   </button>
-                  {[...wheelOverlayTracks].map((tid) => (
+                  {[...profileOverlayTracks].map((tid) => (
                     <button
                       key={tid}
                       className={cn(
                         'flex-1 border-l px-3 py-2 transition-colors',
-                        activeOverlay === tid
+                        activeOverlay === `profile-${tid}`
                           ? 'bg-success text-success-foreground'
                           : 'bg-card text-muted-foreground hover:bg-muted',
                       )}
-                      onClick={() => setActiveOverlay(tid)}
+                      onClick={() => setActiveOverlay(`profile-${tid}`)}
                     >
-                      Tekerlek #{tid}
+                      Fren #{tid}
                     </button>
                   ))}
                 </div>
 
                 <video
-                  key={
-                    activeOverlay === 'bbox'
-                      ? `bbox-${jobId}`
-                      : `wheel-${activeOverlay}-${jobId}`
-                  }
+                  ref={videoRef}
+                  key={activeOverlay === 'bbox' ? `bbox-${jobId}` : `${activeOverlay}-${jobId}`}
                   controls
                   src={
                     activeOverlay === 'bbox'
                       ? api.overlayUrl(jobId)
-                      : api.wheelOverlayUrl(jobId, activeOverlay as number)
+                      : api.profileOverlayUrl(jobId, parseInt(activeOverlay.split('-')[1]))
                   }
                   className="w-full rounded-lg border bg-canvas"
                 >
                   Tarayıcınız video oynatmayı desteklemiyor.
                 </video>
-
-                {wheelOverlayTracks.size === 0 && (
-                  <p className="text-xs text-muted-foreground">
-                    "Hızı Ölç" → "Bu Hızla Overlay Oluştur" ile tekerlek overlay'i ekleyin.
-                  </p>
-                )}
 
                 {selectedTrackId != null &&
                   activePanelType === 'axle' &&
@@ -403,25 +387,35 @@ export function ResultsStep() {
                       onClose={() => setActivePanelType(null)}
                       onReportRegenerated={() => setHasV2Report(true)}
                       onWheelSpeedResult={handleWheelSpeedResult}
-                      onWheelOverlayReady={(tid) => {
-                        setWheelOverlayTracks((prev) => new Set([...prev, tid]))
-                        setActiveOverlay(tid)
-                      }}
+                      onProfileOverlayReady={handleProfileOverlayReady}
+                      onSeekToFrame={handleSeekToFrame}
+                    />
+                  )}
+
+                {selectedTrackId != null &&
+                  activePanelType === 'timing' &&
+                  jobId &&
+                  videoMeta && (
+                    <AxleTimingPanel
+                      jobId={jobId}
+                      videoId={videoMeta.video_id}
+                      trackId={selectedTrackId}
+                      frameCount={videoMeta.frame_count}
+                      onClose={() => setActivePanelType(null)}
                     />
                   )}
 
                 {selectedTrackId == null && (
                   <div className="rounded-lg border border-dashed bg-muted/20 px-4 py-8 text-center text-sm text-muted-foreground">
                     Bir araç kartından{' '}
-                    <strong>"Hızı Ölç"</strong> veya <strong>"Aks Doğrula"</strong> ile
-                    ölçüm başlatın.
+                    <strong>"Fren/İvme Profili"</strong>,{' '}
+                    <strong>"Aks Doğrula"</strong> veya{' '}
+                    <strong>"Dingil"</strong> ile ölçüm başlatın.
                   </div>
                 )}
               </div>
             </div>
           )}
-
-          <MethodInfoCard />
 
           {/* Kuş bakışı */}
           <div className="space-y-2">
