@@ -352,15 +352,22 @@ Analiz başladıktan sonra kullanıcı durduramıyor. Uzun analiz (büyük video
 
 ### 6.3 Öneriler
 
-**Ö6.A — FPS override ayrı satır**
+**Ö6.A — Parametreleri "Gelişmiş Ayarlar" accordion'ına göm**
+
+Adım 5'in mevcut 3-sütun parametre grid'i çoğu kullanıcı için gereksiz sürtünme. Başlat butonu öne çıksın, parametreler gizlensin:
 
 ```
-FPS Geçersiz Kıl (VFR video için)
-[Aktif] toggle  →  [25.00 fps input]
-Açıklama metni
+[▶ Analizi Başlat]
+
+▼ Gelişmiş ayarlar
+  Model: [Medium ▾]   Kare Adımı: [1 ▾]
+  FPS Geçersiz Kıl: [□]  [25.00]
 ```
 
-FPS section kendi başına bir küçük form alanı olsun, 3-sütun grid'in parçası değil.
+- **Default model: Medium** (en doğru tespit; adli sonuç kalitesi hız önceliğinin üzerinde).
+- Accordion varsayılan kapalı; açılınca parametreler değiştirilebilir.
+- Analiz başlayınca parametreler kilitlenir (disabled), accordion kapanır ve özet satır gösterilir:
+  `Medium · Kare adımı 1 · FPS: konteynerden (25.00)`
 
 **Ö6.B — Aşamalı ilerleme metni**
 
@@ -618,7 +625,7 @@ Ortak bir `EmptyStep` bileşeni oluşturulabilir.
 8. **shadow-card** — Tüm kartlara uygula
 
 ### Orta
-9. **Adım 5 FPS override** — Form düzeni düzelt
+9. **Adım 5 parametre accordion** — Gelişmiş ayarlar gizle, default model=Medium
 10. **Analiz durum çubuğu** — Üst bar (video → kalibrasyon → analiz → ölçüm)
 11. **Stepper durum ikonları** — loading / uyarı / hata
 12. **Token temizliği** — emerald → success, tabular-nums tutarlılığı
