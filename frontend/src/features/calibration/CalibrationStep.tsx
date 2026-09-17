@@ -534,7 +534,7 @@ export function CalibrationStep() {
               <div className="rounded-lg border border-sky-500/30 bg-sky-500/5 p-3 space-y-2">
                 <div className="flex items-center gap-1.5">
                   <Navigation className="size-3.5 text-sky-400" />
-                  <span className="text-xs font-medium text-sky-400">Transverse Kılavuz (T15)</span>
+                  <span className="text-xs font-medium text-sky-400">Yol Yönü Kılavuzu</span>
                 </div>
                 {transverseDir ? (
                   <>
@@ -694,7 +694,7 @@ export function CalibrationStep() {
               <div className="rounded-lg border border-violet-500/30 bg-violet-500/5 p-3 space-y-2">
                 <div className="flex items-center gap-1.5">
                   <Wand2 className="size-3.5 text-violet-400" />
-                  <span className="text-xs font-medium text-violet-400">Otomatik Kalibrasyon (T22)</span>
+                  <span className="text-xs font-medium text-violet-400">Otomatik Kalibrasyon</span>
                 </div>
 
                 {autoCalib.status === 'idle' && (

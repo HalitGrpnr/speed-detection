@@ -675,7 +675,7 @@ function ProfileResult({
       {/* Özet */}
       <div>
         <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
-          Özet (birincil, T16 yöntemi)
+          Birincil Hız Özeti
         </div>
         <div className="flex items-center gap-3 flex-wrap">
           <div>

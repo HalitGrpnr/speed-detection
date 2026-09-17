@@ -36,7 +36,7 @@ export function PointsTable({
   if (points.length === 0) {
     return (
       <p className="rounded-lg border border-dashed p-4 text-center text-sm text-muted-foreground">
-        Henüz nokta yok. Canvas'a tıklayarak veya M6 otomatik öneriyle nokta ekleyin.
+        Henüz nokta yok. Canvas'a tıklayarak veya otomatik kalibrasyon önerisiyle nokta ekleyin.
       </p>
     )
   }
