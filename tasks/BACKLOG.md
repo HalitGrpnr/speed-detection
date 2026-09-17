@@ -42,6 +42,9 @@
 | T21 | Tekerlek hızı birincil akış: UI yeniden düzenlemesi | UX + Hız çekirdeği | Orta | T16, T20 | ✅ |
 | T22 | Otomatik kalibrasyon önerisi (vanishing-point → onay) | Kalibrasyon + UX | Büyük | — | ✅ |
 | T23 | POC: ML pose modeli ile temas noktası (doğruluk kanıtı) | Tespit + Doğrulama | Orta | T20 | ✅ |
+| T24 | Kalıcı analiz geçmişi (disk-based job storage) | Backend + UI | Orta | — | ✅ |
+| T25 | Tekerlek hızı overlay + bbox/tekerlek video toggle | UI + Backend | Orta | T16 | ✅ |
+| T26 | Kapsamlı UI/UX yeniden tasarımı | UI | Büyük | T24, T25 | ⬜ |
 
 Durum: ⬜ Başlanmadı · 🟡 Devam ediyor · ✅ Bitti · ⛔ Engellendi
 
@@ -408,3 +411,6 @@ yüklemek RCE riski taşıyor (bkz. `DECISIONS.md`).
 | 2026-09-16 | T23 | yolo11n-seg POC: KALMA kararı — SEG −8.7 km/h, Canny −4.6 km/h GPS farkı; x-offset kök neden | c619746 |
 | 2026-09-17 | T21 | WheelSpeedPanel auto-load on mount + callback; tablo yeniden düzenleme; rapor uyarı modal; PDF tekerlek durumu notu | pending |
 | 2026-09-17 | T22 | vanishing.py (RANSAC VP + izotropik öneri) + 13 test; /auto-calibrate endpoint; CalibrationStep panel + canvas overlay; auto-vanishing kaynak tipi | pending |
+| 2026-09-17 | T24 | Kalıcı job storage (~/.speed_detection/), job_meta.json, /api/jobs listesi, geçmiş analiz yükleme (HistoryPanel) | pending |
+| 2026-09-17 | T25 | speed_overrides param + wheel-overlay endpoint + bbox/tekerlek toggle (ResultsStep) | pending |
+| 2026-09-17 | T26 | Görev kartı + kapsamlı UI/UX analiz belgesi (docs/uiux-analiz.md) oluşturuldu | — |
