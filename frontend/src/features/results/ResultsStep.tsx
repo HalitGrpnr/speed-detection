@@ -31,6 +31,9 @@ export function ResultsStep() {
   // T21: Rapor indirme uyarı modal
   const [showReportWarning, setShowReportWarning] = useState(false)
   const [pendingDownloadUrl, setPendingDownloadUrl] = useState<string | null>(null)
+  // T25: Tekerlek overlay hazır olan track'ler + aktif overlay seçimi
+  const [wheelOverlayTracks, setWheelOverlayTracks] = useState<Set<number>>(new Set())
+  const [activeOverlay, setActiveOverlay] = useState<'bbox' | number>('bbox')
 
   const resultsQuery = useQuery({
     queryKey: ['jobResults', jobId],
@@ -337,19 +340,20 @@ export function ResultsStep() {
             onClose={() => setWheelTrackId(null)}
             onReportRegenerated={() => setHasV2Report(true)}
             onWheelSpeedResult={handleWheelSpeedResult}
+            onWheelOverlayReady={(tid) => {
+              setWheelOverlayTracks((prev) => new Set([...prev, tid]))
+              setActiveOverlay(tid)
+            }}
           />
         )}
 
         <MethodInfoCard />
 
-        {/* Overlay video */}
+        {/* Overlay video — T25: bbox / tekerlek toggle */}
         <div className="space-y-2">
-          <div className="flex items-start justify-between gap-2">
+          <div className="flex items-start justify-between gap-2 flex-wrap">
             <h3 className="text-sm font-medium">Overlay Video</h3>
             <div className="flex flex-col items-end gap-1">
-              <span className="rounded bg-muted px-2 py-0.5 text-xs text-muted-foreground font-mono">
-                Ön tahmin · Job: {jobId}
-              </span>
               {sourceJobId && (
                 <span className="rounded bg-amber-100 px-2 py-0.5 text-xs text-amber-700 font-medium">
                   ⟳ Yeniden kalibrasyon uygulandı (kaynak: {sourceJobId})
@@ -357,16 +361,52 @@ export function ResultsStep() {
               )}
             </div>
           </div>
+
+          {/* Toggle — birden fazla overlay varsa seçici göster */}
+          {wheelOverlayTracks.size > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              <button
+                className={`rounded border px-3 py-1 text-xs font-medium transition-colors ${
+                  activeOverlay === 'bbox'
+                    ? 'bg-primary text-primary-foreground border-primary'
+                    : 'bg-card text-muted-foreground hover:bg-muted'
+                }`}
+                onClick={() => setActiveOverlay('bbox')}
+              >
+                Ön Tahmin (bbox)
+              </button>
+              {[...wheelOverlayTracks].map((tid) => (
+                <button
+                  key={tid}
+                  className={`rounded border px-3 py-1 text-xs font-medium transition-colors ${
+                    activeOverlay === tid
+                      ? 'bg-emerald-600 text-white border-emerald-600'
+                      : 'bg-card text-muted-foreground hover:bg-muted'
+                  }`}
+                  onClick={() => setActiveOverlay(tid)}
+                >
+                  Tekerlek #{tid}
+                </button>
+              ))}
+            </div>
+          )}
+
           <video
-            key={jobId}
+            key={activeOverlay === 'bbox' ? `bbox-${jobId}` : `wheel-${activeOverlay}-${jobId}`}
             controls
-            src={api.overlayUrl(jobId)}
+            src={
+              activeOverlay === 'bbox'
+                ? api.overlayUrl(jobId)
+                : api.wheelOverlayUrl(jobId, activeOverlay as number)
+            }
             className="w-full rounded-lg border bg-canvas"
           >
             Tarayıcınız video oynatmayı desteklemiyor.
           </video>
           <p className="text-xs text-muted-foreground">
-            Videodaki anlık hız değerleri ön tahmindir. Birincil hız için "Hızı Ölç" adımını kullanın.
+            {activeOverlay === 'bbox'
+              ? 'Ön tahmin: bbox hız değerleri. "Hızı Ölç" → "Bu Hızla Overlay Oluştur" ile tekerlek overlay\'ini oluşturun.'
+              : `Tekerlek hızı overlay: Track #${activeOverlay} için operatör ölçüm değeri (* ile işaretli). Diğer araçlar bbox hızıyla gösterilir.`}
           </p>
         </div>
 

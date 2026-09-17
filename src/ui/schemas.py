@@ -103,6 +103,12 @@ class JobSummaryOut(BaseModel):
     video_id: str | None = None
 
 
+class WheelOverlayRequest(BaseModel):
+    value_kmh: float
+    ci_kmh: float
+    confidence_level: str
+
+
 class AxleSuggestFrameResponse(BaseModel):
     frame_n: int | None = None
 

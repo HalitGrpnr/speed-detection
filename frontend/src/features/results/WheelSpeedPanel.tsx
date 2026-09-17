@@ -3,6 +3,7 @@ import { useMutation, type UseMutationResult } from '@tanstack/react-query'
 import { Activity, Bot, CheckCheck, FileText, Loader2, Target, Trash2, Video } from 'lucide-react'
 import { api } from '@/lib/api'
 import type { ControlPoint, ProfilePoint, WheelMarkSource, WheelSpeedProfileResponse, WheelSpeedResponse } from '@/lib/models'
+import type { WheelOverlayRequest } from '@/lib/models'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { StatusBanner } from '@/components/common/StatusBanner'
@@ -17,6 +18,7 @@ interface Props {
   onClose: () => void
   onReportRegenerated?: () => void
   onWheelSpeedResult?: (trackId: number, result: WheelSpeedResponse) => void
+  onWheelOverlayReady?: (trackId: number) => void
 }
 
 // ── Hız-zaman profil grafiği (saf SVG, bağımlılık yok) ─────────────────────
@@ -144,7 +146,7 @@ interface MarkEntry {
  * T16 + T19 + T20 — Operatör-tekerlek hız ölçümü, fren/ivme profili ve otomatik temas tespiti.
  */
 export function WheelSpeedPanel({
-  jobId, videoId, trackId, frameCount, onClose, onReportRegenerated, onWheelSpeedResult,
+  jobId, videoId, trackId, frameCount, onClose, onReportRegenerated, onWheelSpeedResult, onWheelOverlayReady,
 }: Props) {
   const [mode, setMode] = useState<Mode>('speed')
   const [marks, setMarks] = useState<Record<number, { pixel: [number, number]; source: WheelMarkSource }>>({})
@@ -539,7 +541,10 @@ export function WheelSpeedPanel({
       {mode === 'speed' && speedResult && (
         <SpeedResult
           result={speedResult}
+          jobId={jobId}
+          trackId={trackId}
           regenerateMutation={regenerateMutation}
+          onOverlayReady={onWheelOverlayReady ? () => onWheelOverlayReady(trackId) : undefined}
         />
       )}
 
@@ -561,11 +566,26 @@ export function WheelSpeedPanel({
 
 function SpeedResult({
   result,
+  jobId,
+  trackId,
   regenerateMutation,
+  onOverlayReady,
 }: {
   result: WheelSpeedResponse
+  jobId: string
+  trackId: number
   regenerateMutation: UseMutationResult<unknown, Error, void>
+  onOverlayReady?: () => void
 }) {
+  const overlayMutation = useMutation({
+    mutationFn: () => api.generateWheelOverlay(jobId, trackId, {
+      value_kmh: result.value_kmh,
+      ci_kmh: result.ci_kmh,
+      confidence_level: result.confidence_level,
+    } satisfies WheelOverlayRequest),
+    onSuccess: () => onOverlayReady?.(),
+  })
+
   return (
     <div className="rounded-lg border bg-card p-4 space-y-3">
       <div className="flex items-center gap-3 flex-wrap">
@@ -598,6 +618,27 @@ function SpeedResult({
 
       <div className="text-[0.7rem] text-muted-foreground">
         Residual: {result.residual_kmh.toFixed(1)} km/h — ardışık çift hız std'si.
+      </div>
+
+      {/* T25 — Tekerlek hızı overlay */}
+      <div className="border-t pt-3 flex flex-wrap gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={overlayMutation.isPending || overlayMutation.isSuccess}
+          onClick={() => overlayMutation.mutate()}
+        >
+          {overlayMutation.isPending ? <Loader2 className="animate-spin" /> : <Video />}
+          {overlayMutation.isSuccess ? 'Overlay hazır ✓' : 'Bu Hızla Overlay Oluştur'}
+        </Button>
+        {overlayMutation.isError && (
+          <StatusBanner tone="error">{(overlayMutation.error as Error).message}</StatusBanner>
+        )}
+        {overlayMutation.isSuccess && (
+          <p className="w-full text-[0.7rem] text-muted-foreground">
+            Overlay oluşturuldu. Sonuç ekranındaki video seçicide "Tekerlek #{trackId}" seçeneği aktif oldu.
+          </p>
+        )}
       </div>
 
       <ReportButton regenerateMutation={regenerateMutation} />

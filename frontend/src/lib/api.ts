@@ -21,6 +21,7 @@ import type {
   PlanViewRequest,
   RecalibrateRequest,
   VideoMeta,
+  WheelOverlayRequest,
   WheelSpeedRequest,
   WheelSpeedResponse,
   WheelSpeedProfileRequest,
@@ -257,6 +258,21 @@ export const api = {
       ),
     )
   },
+
+  /** T25 — Tekerlek hızı overlay videosu oluştur. */
+  async generateWheelOverlay(jobId: string, trackId: number, req: WheelOverlayRequest): Promise<{ download_url: string }> {
+    return unwrap(
+      await fetch(`/api/job/${jobId}/track/${trackId}/wheel-overlay`, {
+        method: 'POST',
+        headers: jsonHeaders,
+        body: JSON.stringify(req),
+      }),
+    )
+  },
+
+  /** T25 — Tekerlek hızı overlay video URL'i (inline oynatma). */
+  wheelOverlayUrl: (jobId: string, trackId: number) =>
+    `/api/job/${jobId}/track/${trackId}/wheel-overlay` as const,
 
   /** T24 — Geçmiş analizlerin listesi (en yeniden en eskiye). */
   async listJobs(): Promise<JobSummary[]> {

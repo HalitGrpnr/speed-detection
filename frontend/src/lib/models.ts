@@ -102,6 +102,13 @@ export interface WheelSpeedProfileResponse {
   warnings: string[]
 }
 
+// T25 — Tekerlek hızı overlay isteği
+export interface WheelOverlayRequest {
+  value_kmh: number
+  ci_kmh: number
+  confidence_level: string
+}
+
 // T24 — Geçmiş analiz özeti
 export interface JobSummary {
   job_id: string

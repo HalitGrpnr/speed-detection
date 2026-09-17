@@ -47,11 +47,12 @@ def draw_frame(
     speed_estimates: list[SpeedEstimate],
     tracks: list[Track],
     frame_step: int = 1,
+    speed_overrides: dict[int, float] | None = None,
 ) -> np.ndarray:
     """Tek kareye overlay çiz — bbox, track ID, anlık hız, güven rengi.
 
-    Her SpeedEstimate için eşleşen Track bulunur; son noktası frame_step
-    içindeyse aktif kabul edilir ve bbox çizilir.
+    speed_overrides: {track_id: km/h} — belirtilen track'ler için anlık hız
+    yerine sabit override değeri gösterilir (tekerlek hızı overlay'i için).
     """
     out = frame.copy()
     track_map = {t.track_id: t for t in tracks}
@@ -75,8 +76,12 @@ def draw_frame(
 
         cv2.rectangle(out, (x1, y1), (x2, y2), color, _THICK)
 
-        speed_now = _instant_speed(est, frame_idx)
-        label = f"#{est.track_id} {speed_now:.0f} km/h"
+        if speed_overrides and est.track_id in speed_overrides:
+            speed_now = speed_overrides[est.track_id]
+            label = f"#{est.track_id} {speed_now:.0f} km/h*"   # * = tekerlek hızı
+        else:
+            speed_now = _instant_speed(est, frame_idx)
+            label = f"#{est.track_id} {speed_now:.0f} km/h"
         (tw, th), bl = cv2.getTextSize(label, _FONT, _FONT_SCALE, _THIN)
         bg_y1 = max(0, y1 - th - bl - 4)
         cv2.rectangle(out, (x1, bg_y1), (x1 + tw + 4, y1), color, -1)
@@ -110,8 +115,12 @@ def _open_writer(
 def write_overlay_video(
     result: PipelineResult,
     out_path: str | Path,
+    speed_overrides: dict[int, float] | None = None,
 ) -> None:
-    """Giriş videosunun her karesine overlay çizerek yeni video yaz."""
+    """Giriş videosunun her karesine overlay çizerek yeni video yaz.
+
+    speed_overrides: {track_id: km/h} — T25 tekerlek hızı overlay'i için.
+    """
     out_path = Path(out_path)
     meta = result.video_meta
 
@@ -123,6 +132,7 @@ def write_overlay_video(
                 frame, frame_idx,
                 result.speed_estimates, result.tracks,
                 result.frame_step,
+                speed_overrides=speed_overrides,
             )
             writer.write(out_frame)
     finally:

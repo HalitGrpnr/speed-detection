@@ -22,6 +22,7 @@ from src.calibration.models import CalibrationError, CalibrationResult, ControlP
 from src.calibration.planview import compute_plan_view
 from src.detection.models import load_tracks, save_tracks
 from src.detection.video import read_video_meta
+from src.output.overlay import write_overlay_video
 from src.output.pipeline import run_pipeline
 from src.output.serialization import write_result_data, read_result_data
 from src.reliability.axle_check import (
@@ -61,6 +62,7 @@ from .schemas import (
     AutoCalibrateRequest,
     AutoCalibratePointOut,
     AutoCalibrateResponse,
+    WheelOverlayRequest,
 )
 
 import sys as _sys
@@ -1400,6 +1402,56 @@ async def download_wheel_profile_overlay(job_id: str, track_id: int) -> FileResp
         )
     return FileResponse(str(overlay_path), media_type="video/mp4",
                         filename=f"fren_analizi_track{track_id}.mp4")
+
+
+@app.post("/api/job/{job_id}/track/{track_id}/wheel-overlay", status_code=200)
+async def generate_wheel_overlay(job_id: str, track_id: int, req: WheelOverlayRequest) -> dict:
+    """T25 — Tekerlek hızı ile overlay video üret.
+
+    Seçilen track'in hızı sabit tekerlek değeriyle (value_kmh*) override edilir;
+    diğer track'ler bbox hızıyla gösterilir. Bbox overlay değişmez (forensic bütünlük).
+    """
+    job = _get_done_job(job_id)
+    out_dir = _job_out_dir(job_id)
+
+    if not (out_dir / "result_data.json").exists():
+        raise HTTPException(status_code=404, detail="result_data.json bulunamadı.")
+
+    try:
+        result = read_result_data(out_dir)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Analiz verisi okunamadı: {exc}")
+
+    overlay_path = out_dir / f"overlay_wheel_{track_id}.mp4"
+    try:
+        write_overlay_video(
+            result,
+            overlay_path,
+            speed_overrides={track_id: req.value_kmh},
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Overlay oluşturulamadı: {exc}")
+
+    slog.append(
+        out_dir,
+        "wheel_overlay_generated",
+        _job_id=job_id,
+        track_id=track_id,
+        value_kmh=req.value_kmh,
+    )
+
+    return {"download_url": f"/api/job/{job_id}/track/{track_id}/wheel-overlay"}
+
+
+@app.get("/api/job/{job_id}/track/{track_id}/wheel-overlay")
+async def stream_wheel_overlay(job_id: str, track_id: int) -> FileResponse:
+    """T25 — Tekerlek hızı overlay videosunu oynat."""
+    _get_done_job(job_id)
+    overlay_path = _job_out_dir(job_id) / f"overlay_wheel_{track_id}.mp4"
+    if not overlay_path.exists():
+        raise HTTPException(status_code=404, detail="Overlay henüz oluşturulmadı.")
+    return FileResponse(str(overlay_path), media_type="video/mp4",
+                        content_disposition_type="inline")
 
 
 @app.get("/api/job/{job_id}/track/{track_id}/wheel-profile-chart")
