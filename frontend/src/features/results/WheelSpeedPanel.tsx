@@ -280,7 +280,7 @@ export function WheelSpeedPanel({
   })
 
   const regenerateMutation = useMutation({
-    mutationFn: () => api.regenerateReport(jobId),
+    mutationFn: (speedLimitKmh?: number) => api.regenerateReport(jobId, speedLimitKmh),
     onSuccess: () => onReportRegenerated?.(),
   })
 
@@ -579,7 +579,7 @@ function SpeedResult({
   result: WheelSpeedResponse
   jobId: string
   trackId: number
-  regenerateMutation: UseMutationResult<unknown, Error, void>
+  regenerateMutation: UseMutationResult<unknown, Error, number | undefined>
   onOverlayReady?: () => void
 }) {
   const overlayMutation = useMutation({
@@ -668,7 +668,7 @@ function ProfileResult({
   fps: number
   onGoToFrame: (frame: number) => void
   overLayMutation: UseMutationResult<{ overlay_path: string; download_url: string }, Error, void>
-  regenerateMutation: UseMutationResult<unknown, Error, void>
+  regenerateMutation: UseMutationResult<unknown, Error, number | undefined>
 }) {
   const firstSpeed = result.points[0]?.speed_kmh ?? 0
   const lastSpeed = result.points[result.points.length - 1]?.speed_kmh ?? 0
@@ -836,15 +836,42 @@ function ProfileResult({
 function ReportButton({
   regenerateMutation,
 }: {
-  regenerateMutation: UseMutationResult<unknown, Error, void>
+  regenerateMutation: UseMutationResult<unknown, Error, number | undefined>
 }) {
+  const [speedLimit, setSpeedLimit] = useState<string>('')
+
+  const handleGenerate = () => {
+    const val = speedLimit.trim() === '' ? undefined : parseFloat(speedLimit)
+    regenerateMutation.mutate(val && !isNaN(val) && val > 0 ? val : undefined)
+  }
+
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
+      {/* Hız limiti girişi */}
+      <div className="flex items-center gap-2">
+        <label className="text-xs text-muted-foreground whitespace-nowrap">
+          Mahaldeki hız limiti (km/h):
+        </label>
+        <input
+          type="number"
+          min="0"
+          max="300"
+          placeholder="örn. 50"
+          value={speedLimit}
+          onChange={(e) => {
+            setSpeedLimit(e.target.value)
+            if (regenerateMutation.isSuccess) regenerateMutation.reset()
+          }}
+          className="w-20 rounded border border-input bg-background px-2 py-1 text-xs"
+        />
+        <span className="text-xs text-muted-foreground">(boş bırakılırsa eklenmez)</span>
+      </div>
+
       <Button
         variant="outline"
         size="sm"
         disabled={regenerateMutation.isPending || regenerateMutation.isSuccess}
-        onClick={() => regenerateMutation.mutate()}
+        onClick={handleGenerate}
       >
         {regenerateMutation.isPending ? <Loader2 className="animate-spin" /> : <FileText />}
         {regenerateMutation.isSuccess ? 'Rapor güncellendi ✓' : 'Sonucu PDF Raporuna Ekle'}

@@ -4,11 +4,15 @@ import io
 import os
 from pathlib import Path
 
+import cv2
+import numpy as np
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import cm
 from reportlab.lib.utils import ImageReader
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.platypus import (
     SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image,
 )
@@ -21,25 +25,38 @@ from src.reliability.confidence import (
 from .models import PipelineResult
 
 _MARGIN = 2 * cm
+_FONTS_DIR = Path(__file__).parent / "fonts"
 
-# Bilirkişiye yönelik yüksek seviye yöntem anlatımı (PDF + audit metni ortak kaynak).
-# Gövde metni konvansiyonuna uyarak ASCII-Türkçe (font/encoding güvenli).
-_METHOD_SUMMARY = [
-    "Sistem once videodaki yolu bir referans duzlemi olarak kalibre eder: operator, "
-    "goruntude gercek dunya mesafesi bilinen noktalari (serit genisligi ~3.5 m, plaka "
-    "520x110 mm gibi) isaretler. Bu eslesmelerden, goruntudeki pikseller ile yoldaki "
-    "gercek metreler arasinda matematiksel bir donusum (homografi) kurulur; boylece "
-    "ekrandaki her noktanin yolda kac metreye karsilik geldigi bilinir.",
-    "Arac, kareler boyunca otomatik takip edilir; olcum icin aracin tekerlek-zemin temas "
-    "noktasi kullanilir (kutle merkezi degil, cunku kamera acisi nedeniyle paralaks hatasi "
-    "uretir). Bu nokta her karede gercek dunya koordinatina cevrilir; iki kare arasinda kat "
-    "edilen metre, videonun kare hizi (FPS) ile birlestirilerek hiza cevrilir ve km/h "
-    "cinsinden verilir.",
-    "Hicbir hiz ciplak tek sayi olarak sunulmaz: her sonuc bir guven araligi "
-    "(orn. 52 +/- 3 km/h) ve guven seviyesi tasir. Kalibrasyon kalitesi (hata payi) olculur "
-    "ve operator onayindan gecer; tum adimlar ile dosya butunlugu (SHA-256) loglanir, boylece "
-    "sonuc bagimsiz olarak dogrulanabilir.",
-]
+# ReportLab standart fontları Türkçe karakterleri desteklemez.
+# DejaVuSans TTF kayıt edilir; tüm paragraflar bu fontu kullanır.
+_FONT_NORMAL = "DejaVuSans"
+_FONT_BOLD = "DejaVuSans-Bold"
+
+def _register_fonts() -> None:
+    global _FONT_NORMAL, _FONT_BOLD  # noqa: PLW0603
+    regular = _FONTS_DIR / "DejaVuSans.ttf"
+    bold = _FONTS_DIR / "DejaVuSans-Bold.ttf"
+    if regular.exists():
+        pdfmetrics.registerFont(TTFont(_FONT_NORMAL, str(regular)))
+        if bold.exists():
+            pdfmetrics.registerFont(TTFont(_FONT_BOLD, str(bold)))
+        else:
+            _FONT_BOLD = _FONT_NORMAL
+    else:
+        # Geliştirme ortamında matplotlib üzerinden bul
+        try:
+            import matplotlib
+            ml_dir = Path(matplotlib.__file__).parent / "mpl-data" / "fonts" / "ttf"
+            pdfmetrics.registerFont(TTFont(_FONT_NORMAL, str(ml_dir / "DejaVuSans.ttf")))
+            pdfmetrics.registerFont(TTFont(_FONT_BOLD, str(ml_dir / "DejaVuSans-Bold.ttf")))
+            return
+        except Exception:
+            pass
+        # Son çare: sistem fontuna geri dön (Türkçe karakterler kırık olabilir)
+        _FONT_NORMAL = "Helvetica"
+        _FONT_BOLD = "Helvetica-Bold"
+
+_register_fonts()
 
 _CONFIDENCE_TR = {"high": "Yüksek", "medium": "Orta", "low": "Düşük"}
 _LAYER_TR = {
@@ -48,23 +65,48 @@ _LAYER_TR = {
     "site_measurement": "Saha Ölçümü",
 }
 
+# Durma mesafesi sabitleri (kuru asfalt, standart araç)
+_REACTION_TIME_S = 1.0     # saniye
+_DECELERATION_MS2 = 7.5    # m/s²
+
+
+def _stopping_distance_m(speed_kmh: float) -> float:
+    """v km/h'de toplam durma mesafesi (m): tepki yolu + frenleme yolu."""
+    v = speed_kmh / 3.6  # m/s
+    d_reaction = v * _REACTION_TIME_S
+    d_brake = v**2 / (2 * _DECELERATION_MS2)
+    return d_reaction + d_brake
+
 
 def _styles():
     s = getSampleStyleSheet()
-    s.add(ParagraphStyle(
-        "SectionTitle", parent=s["Heading2"],
-        spaceBefore=14, spaceAfter=6, textColor=colors.HexColor("#1a1a6e"),
-    ))
-    s.add(ParagraphStyle(
-        "Note", parent=s["Normal"],
-        fontSize=8, textColor=colors.gray, spaceAfter=4,
-    ))
+
+    def _add(name, parent_name, **kwargs):
+        parent = s[parent_name]
+        # fontName gelen kwargs'da yoksa default _FONT_NORMAL ekle
+        kwargs.setdefault("fontName", _FONT_NORMAL)
+        s.add(ParagraphStyle(name, parent=parent, **kwargs))
+
+    # Mevcut stilleri fontName ile override et
+    for style_name in ("Normal", "BodyText", "Italic", "Heading1", "Heading2",
+                       "Heading3", "Title", "Bullet"):
+        if style_name in s:
+            s[style_name].fontName = _FONT_NORMAL
+
+    _add("SectionTitle", "Heading2",
+         spaceBefore=14, spaceAfter=6, textColor=colors.HexColor("#1a1a6e"),
+         fontName=_FONT_BOLD)
+    _add("Note", "Normal",
+         fontSize=8, textColor=colors.gray, spaceAfter=4)
+    _add("Bold", "Normal",
+         fontName=_FONT_BOLD)
     return s
 
 
 def _kv_table_style() -> TableStyle:
     return TableStyle([
-        ("FONTNAME",  (0, 0), (0, -1), "Helvetica-Bold"),
+        ("FONTNAME",  (0, 0), (0, -1), _FONT_BOLD),
+        ("FONTNAME",  (1, 0), (1, -1), _FONT_NORMAL),
         ("FONTSIZE",  (0, 0), (-1, -1), 8),
         ("GRID",      (0, 0), (-1, -1), 0.3, colors.HexColor("#cccccc")),
         ("ROWBACKGROUNDS", (0, 0), (-1, -1), [colors.white, colors.HexColor("#f5f5f5")]),
@@ -77,7 +119,8 @@ def _header_table_style() -> TableStyle:
     return TableStyle([
         ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1a1a6e")),
         ("TEXTCOLOR",  (0, 0), (-1, 0), colors.white),
-        ("FONTNAME",   (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTNAME",   (0, 0), (-1, 0), _FONT_BOLD),
+        ("FONTNAME",   (0, 1), (-1, -1), _FONT_NORMAL),
         ("FONTSIZE",   (0, 0), (-1, 0), 9),
         ("FONTSIZE",   (0, 1), (-1, -1), 8),
         ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f2f2f8")]),
@@ -95,6 +138,50 @@ def _class_for_track(track_id: int, result: PipelineResult) -> str:
     return "—"
 
 
+def _capture_annotated_frame(video_path: str, control_points: list) -> bytes | None:
+    """Video'dan bir kare al, kontrol noktalarını üzerine çiz, PNG bytes döndür."""
+    try:
+        cap = cv2.VideoCapture(video_path)
+        if not cap.isOpened():
+            return None
+        ok, frame = cap.read()
+        cap.release()
+        if not ok or frame is None:
+            return None
+
+        h, w = frame.shape[:2]
+
+        # Kontrol noktalarını üzerine çiz
+        colors_bgr = [
+            (0, 200, 0),    # yeşil
+            (0, 100, 255),  # turuncu
+            (255, 0, 0),    # mavi
+            (0, 0, 220),    # kırmızı
+            (200, 200, 0),  # cyan
+            (255, 0, 255),  # mor
+            (0, 165, 255),  # turuncu-2
+            (0, 255, 255),  # sarı
+        ]
+        for i, cp in enumerate(control_points):
+            px, py = int(cp.pixel[0]), int(cp.pixel[1])
+            if 0 <= px < w and 0 <= py < h:
+                c = colors_bgr[i % len(colors_bgr)]
+                cv2.circle(frame, (px, py), 8, c, -1)
+                cv2.circle(frame, (px, py), 10, (255, 255, 255), 2)
+                label = f"{cp.id}"
+                cv2.putText(frame, label, (px + 13, py + 5),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 255, 255), 2, cv2.LINE_AA)
+                cv2.putText(frame, label, (px + 13, py + 5),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.55, c, 1, cv2.LINE_AA)
+
+        ok2, buf = cv2.imencode(".png", frame)
+        if ok2:
+            return bytes(buf)
+        return None
+    except Exception:
+        return None
+
+
 def collect_report_texts(result: PipelineResult) -> list[str]:
     """Raporda yer alacak tüm metin bloklarını döndür (test ve audit için)."""
     meta = result.video_meta
@@ -102,7 +189,7 @@ def collect_report_texts(result: PipelineResult) -> list[str]:
     point_count = len(cal.used_point_ids)
     texts = [
         "Araç Hız Tespit Raporu",
-        "Yontem Ozeti — Hiz Nasil Hesaplanir",
+        "Yöntem Özeti",
         "Kalibrasyon",
         "Hız Sonuçları",
         "Varsayımlar ve Sınırlamalar",
@@ -129,6 +216,7 @@ def _build_story(
     axle_checks: list[dict] | None = None,
     wheel_speeds: list[dict] | None = None,
     wheel_speed_profiles: list[dict] | None = None,
+    speed_limit_kmh: float | None = None,
 ) -> list:
     S = _styles()
     meta = result.video_meta
@@ -137,7 +225,7 @@ def _build_story(
     dur_s = meta.frame_count / meta.fps if meta.fps > 0 else 0.0
     story = []
 
-    # 1. Başlık
+    # ── 1. Başlık ve Meta ──────────────────────────────────────────────────────
     story.append(Paragraph("Araç Hız Tespit Raporu", S["Title"]))
     story.append(Spacer(1, 0.3 * cm))
 
@@ -147,8 +235,8 @@ def _build_story(
         ["Çözünürlük", f"{meta.width} x {meta.height} piksel"],
         ["FPS", f"{meta.fps:.3f} ({meta.fps_source})"],
         ["Toplam Kare", str(meta.frame_count)],
-        ["Video Suresi", f"{dur_s:.2f} sn"],
-        ["Isleme Adimi", f"frame_step = {result.frame_step}"],
+        ["Video Süresi", f"{dur_s:.2f} sn"],
+        ["İşleme Adımı", f"frame_step = {result.frame_step}"],
         ["Model", result.model_name],
     ]
     if result.video_sha256:
@@ -158,19 +246,64 @@ def _build_story(
     story.append(t)
     story.append(Spacer(1, 0.5 * cm))
 
-    # 1b. Yöntem Özeti (bilirkişi için yüksek seviye anlatım)
-    story.append(Paragraph("Yontem Ozeti — Hiz Nasil Hesaplanir", S["SectionTitle"]))
-    for para in _METHOD_SUMMARY:
+    # ── 1b. Video Karesi + Kontrol Noktaları ──────────────────────────────────
+    frame_png = _capture_annotated_frame(result.video_path, result.control_points)
+    if frame_png:
+        story.append(Paragraph("Video — Kalibrasyon Kontrol Noktaları", S["SectionTitle"]))
+        story.append(Paragraph(
+            "Aşağıdaki görsel videonun ilk karesini göstermektedir. Renkli noktalar, "
+            "operatörün görüntü koordinatı ile gerçek dünya mesafesini eşleştirdiği "
+            "kalibrasyon kontrol noktalarını temsil etmektedir.",
+            S["Normal"],
+        ))
+        story.append(Spacer(1, 0.2 * cm))
+        img_reader = ImageReader(io.BytesIO(frame_png))
+        iw, ih = img_reader.getSize()
+        max_w = A4[0] - 2 * _MARGIN
+        max_h = 8 * cm
+        scale = min(max_w / iw, max_h / ih, 1.0)
+        story.append(Image(io.BytesIO(frame_png), width=iw * scale, height=ih * scale))
+        story.append(Spacer(1, 0.4 * cm))
+
+    # ── 1c. Yöntem Özeti ──────────────────────────────────────────────────────
+    story.append(Paragraph("Yöntem Özeti — Hız Nasıl Hesaplanır?", S["SectionTitle"]))
+
+    method_paragraphs = [
+        (
+            "Kalibrasyonda operatör, videodaki yolu bir referans düzlemi olarak tanımlar. "
+            "Gerçek dünya mesafesi bilinen noktalar (şerit genişliği ~3,5 m; araç plakası "
+            "520 × 110 mm gibi) görüntü üzerinde işaretlenerek görüntü piksel koordinatları "
+            "ile yol üzerindeki gerçek metrik koordinatlar arasında bir homografi matrisi (H) "
+            "kurulur. H sayesinde görüntüdeki herhangi bir noktanın yolda kaç metreye karşılık "
+            "geldiği bilinir."
+        ),
+        (
+            "Araç tespiti ve takibi YOLO + ByteTrack algoritması ile gerçekleştirilir. "
+            "Hız hesabında aracın kütlemerkezi değil, tekerlek-zemin temas noktası kullanılır; "
+            "çünkü kamera açısından kaynaklanan paralaks hatası kütlemerkezini yanlı kılar. "
+            "Temas noktası her karede H matrisi ile gerçek dünya koordinatına dönüştürülür; "
+            "iki ardışık kare arasında kat edilen mesafe (m), videonun kare hızı (FPS) ile "
+            "birleştirilerek km/h cinsinden hız elde edilir."
+        ),
+        (
+            "Ölçüm kalitesi: Her hız tahmini bir güven aralığı (örn. 52 ± 3 km/h) ve güven "
+            "seviyesi (Yüksek / Orta / Düşük) taşır. Kalibrasyon hatası re-projeksiyon RMS "
+            "(cm cinsinden) ve bırak-bir-çıkar (LOO) çapraz doğrulama ile ölçülür. "
+            "Tüm adımlar, operatör kararları ve dosya bütünlüğü (SHA-256) kayıt altına alınır; "
+            "sonuç bağımsız olarak doğrulanabilir."
+        ),
+    ]
+    for para in method_paragraphs:
         story.append(Paragraph(para, S["Normal"]))
         story.append(Spacer(1, 0.15 * cm))
     story.append(Spacer(1, 0.35 * cm))
 
-    # 2. Kalibrasyon
+    # ── 2. Kalibrasyon ────────────────────────────────────────────────────────
     story.append(Paragraph("Kalibrasyon", S["SectionTitle"]))
 
     rms_m = cal.reprojection_rms_m
     if cal.planarity_warning:
-        planarity_str = "UYARI - yuzey egimi/duzlemsellik sorunu tespit edildi"
+        planarity_str = "UYARI — yüzey eğimi / düzlemsellik sorunu tespit edildi"
     elif not cal.planarity_evaluated:
         planarity_str = "Değerlendirilemedi (yetersiz nokta veya derinlik çeşitliliği yok)"
     else:
@@ -185,27 +318,35 @@ def _build_story(
         else ("Yetersiz nokta (< 5)" if not redundancy_ok else "—")
     )
     redundancy_str = (
-        "Yeterli (>= 6 nokta)"
+        "Yeterli (≥ 6 nokta)"
         if redundancy_ok
-        else f"UYARI — yalnizca {point_count} nokta. 4-nokta cozumunde RMS ≈ 0 anlamsizdir."
+        else f"UYARI — yalnızca {point_count} nokta. 4-nokta çözümünde RMS ≈ 0 anlamsızdır."
     )
 
+    # Referans mesafeleri: kontrol noktalarının dünya koordinat aralığı
+    world_xs = [cp.world_m[0] for cp in result.control_points]
+    world_ys = [cp.world_m[1] for cp in result.control_points]
+    calib_range_x = max(world_xs) - min(world_xs) if world_xs else 0.0
+    calib_range_y = max(world_ys) - min(world_ys) if world_ys else 0.0
+
     cal_rows = [
-        ["Guven Katmani", _LAYER_TR.get(cal.confidence_layer, cal.confidence_layer)],
-        ["Re-projeksiyon RMS", f"{rms_m * 100:.1f} cm  ({rms_m:.4f} m)"],
-        ["LOO Capraz Dogrulama RMS", loo_str],
+        ["Güven Katmanı", _LAYER_TR.get(cal.confidence_layer, cal.confidence_layer)],
+        ["Re-projeksiyon RMS (ölçüm hata payı)", f"{rms_m * 100:.1f} cm  ({rms_m:.4f} m)"],
+        ["LOO Çapraz Doğrulama RMS", loo_str],
         ["Kalibrasyon Redundancy", redundancy_str],
-        ["Duzlemsellik Uyarisi", planarity_str],
-        ["Kullanilan Nokta Sayisi", str(point_count)],
+        ["Düzlemsellik Uyarısı", planarity_str],
+        ["Kullanılan Nokta Sayısı", str(point_count)],
+        ["Kalibrasyon Alanı (enine)", f"{calib_range_x:.2f} m"],
+        ["Kalibrasyon Alanı (boyuna)", f"{calib_range_y:.2f} m"],
     ]
-    t2 = Table(cal_rows, colWidths=[5 * cm, 11 * cm])
+    t2 = Table(cal_rows, colWidths=[6 * cm, 10 * cm])
     t2.setStyle(_kv_table_style())
     story.append(t2)
 
     if cal.holdout_rows:
         story.append(Spacer(1, 0.2 * cm))
-        story.append(Paragraph("Held-out Dogrulama Noktalari", S["Heading3"]))
-        ho_header = ["Nokta ID", "Olculen (m)", "Tahmin (m)", "Hata (m)"]
+        story.append(Paragraph("Held-out Doğrulama Noktaları", S["Heading3"]))
+        ho_header = ["Nokta ID", "Ölçülen (m)", "Tahmin (m)", "Hata (m)"]
         ho_rows = [ho_header]
         for row in cal.holdout_rows:
             meas = row.get("measured_m", (0, 0))
@@ -222,8 +363,8 @@ def _build_story(
 
     story.append(Spacer(1, 0.3 * cm))
 
-    story.append(Paragraph("Kontrol Noktalari", S["Heading3"]))
-    cp_header = ["ID", "Piksel (u, v)", "Dunya (X m, Y m)", "Kaynak", "Hold-out"]
+    story.append(Paragraph("Kontrol Noktaları", S["Heading3"]))
+    cp_header = ["ID", "Piksel (u, v)", "Dünya (X m, Y m)", "Kaynak", "Hold-out"]
     cp_rows = [cp_header]
     for cp in result.control_points:
         cp_rows.append([
@@ -238,13 +379,13 @@ def _build_story(
     story.append(t3)
     story.append(Spacer(1, 0.5 * cm))
 
-    # 2c. Kus Bakisi Gorunum (DTP karsilastirmasi §5) — ikincil, ureilemezse atlanir.
+    # ── 2c. Kuş Bakışı Plan Görünüm ───────────────────────────────────────────
     if result.plan_view_png:
-        story.append(Paragraph("Kus Bakisi Gorunum (Plan View)", S["SectionTitle"]))
+        story.append(Paragraph("Kuş Bakışı Görünüm (Plan View)", S["SectionTitle"]))
         story.append(Paragraph(
-            "Asagidaki gorsel, kalibre edilen yol duzleminin tepeden bir projeksiyonudur "
-            "— gercek bir havadan fotograf degildir. Yalnizca kontrol noktalarinin kapsadigi "
-            "bolge guvenilir olcek tasir; ince gri cizgiler 1 metre araliklidir.",
+            "Aşağıdaki görsel, kalibre edilen yol düzleminin tepeden bir projeksiyonudur — "
+            "gerçek bir havadan fotoğraf değildir. Yalnızca kontrol noktalarının kapsadığı "
+            "bölge güvenilir ölçek taşır; ince gri çizgiler 1 metre aralıklıdır.",
             S["Normal"],
         ))
         story.append(Spacer(1, 0.2 * cm))
@@ -256,12 +397,12 @@ def _build_story(
         story.append(Image(io.BytesIO(result.plan_view_png), width=iw * scale, height=ih * scale))
         story.append(Spacer(1, 0.5 * cm))
 
-    # 3. Hız Sonuçları
-    story.append(Paragraph("Hiz Sonuclari", S["SectionTitle"]))
+    # ── 3. Hız Sonuçları ──────────────────────────────────────────────────────
+    story.append(Paragraph("Hız Sonuçları", S["SectionTitle"]))
 
     speed_header = [
-        "Track ID", "Arac Tipi", "Hiz (km/h)", "CI (km/h)",
-        "Guven", "Kare Sayisi", "Okluzon",
+        "Track ID", "Araç Tipi", "Hız (km/h)", "CI ± (km/h)",
+        "Güven", "Kare Sayısı", "Oklüzyon",
     ]
     speed_rows = [speed_header]
     low_frame_ids = []
@@ -272,7 +413,7 @@ def _build_story(
             f"#{est.track_id}",
             _class_for_track(est.track_id, result),
             f"{est.value_kmh:.1f}",
-            f"{est.ci_kmh:.1f}",
+            f"± {est.ci_kmh:.1f}",
             _CONFIDENCE_TR[est.confidence_level],
             str(frames),
             "Var" if est.track_quality.has_occlusion else "-",
@@ -292,8 +433,8 @@ def _build_story(
         ids_str = ", ".join(f"#{i}" for i in low_frame_ids)
         story.append(Spacer(1, 0.2 * cm))
         story.append(Paragraph(
-            f"Not: Track(ler) {ids_str} yetersiz kare sayisina sahip (< 5). "
-            "Bu sonuclar guvenilmez olabilir.",
+            f"Not: Track(ler) {ids_str} yetersiz kare sayısına sahip (< 5). "
+            "Bu sonuçlar güvenilmez olabilir.",
             S["Note"],
         ))
 
@@ -301,41 +442,106 @@ def _build_story(
     wheel_done = bool(wheel_speeds or wheel_speed_profiles)
     if wheel_done:
         wheel_status = (
-            "YAPILDI — Tekerlek temas noktasi olcumu tamamlandi. "
-            "Birincil hiz asagidaki 'Operator-Tekerlek Hiz Olcumu' bolumundedir."
+            "YAPILDI — Tekerlek temas noktası ölçümü tamamlandı. "
+            "Birincil hız aşağıdaki 'Operatör-Tekerlek Hız Ölçümü' bölümündedir."
         )
     else:
         wheel_status = (
-            "YAPILMADI — Bu tablodaki degerler homografi tabanli on tahminlerdir (bbox). "
-            "Paralaks hatasi nedeniyle sistematik olarak dusuk olabilir (~%%8). "
-            "Bilirkisi raporunda birincil hiz icin tekerlek temas noktasi "
-            "dogrulamasi yapilmasi onem tasir (bkz. GPS dogrulama bulgulari)."
+            "YAPILMADI — Bu tablodaki değerler homografi tabanlı ön tahminlerdir (bbox). "
+            "Paralaks hatası nedeniyle sistematik olarak düşük olabilir (~%8). "
+            "Bilirkişi raporunda birincil hız için tekerlek temas noktası "
+            "doğrulaması yapılması önem taşır."
         )
     story.append(Spacer(1, 0.2 * cm))
-    story.append(Paragraph(f"Tekerlek hiz dogrulamasi: {wheel_status}", S["Note"]))
+    story.append(Paragraph(f"Tekerlek hız doğrulaması: {wheel_status}", S["Note"]))
     story.append(Spacer(1, 0.5 * cm))
 
-    # 4. Güven Seviyesi Kriterleri
-    story.append(Paragraph("Guven Seviyesi Kriterleri", S["SectionTitle"]))
+    # ── 3b. Hız Limiti Karşılaştırması ───────────────────────────────────────
+    if speed_limit_kmh is not None and speed_limit_kmh > 0:
+        story.append(Paragraph("Hız Limiti Karşılaştırması ve Durma Mesafesi", S["SectionTitle"]))
+        story.append(Paragraph(
+            "Aşağıdaki tablo, tespit edilen hızı mahallin hız limitiyle karşılaştırmaktadır. "
+            "Durma mesafesi hesabı standart trafik mühendisliği formülüne göre yapılmıştır: "
+            f"d = v·t_r + v²/(2·a) — tepki süresi t_r = {_REACTION_TIME_S:.1f} sn, "
+            f"yavaşlama a = {_DECELERATION_MS2:.1f} m/s² (kuru asfalt, standart araç).",
+            S["Normal"],
+        ))
+        story.append(Spacer(1, 0.2 * cm))
+
+        # Birincil hızı belirle: tekerlek hızı varsa onu, yoksa bbox hızını kullan
+        primary_speeds: list[tuple[str, float, float]] = []  # (label, speed_kmh, ci_kmh)
+        if wheel_speeds:
+            for ws in sorted(wheel_speeds, key=lambda w: w.get("track_id", 0)):
+                label = f"Track #{ws.get('track_id', '?')} (tekerlek)"
+                primary_speeds.append((label, ws.get("value_kmh", 0.0), ws.get("ci_kmh", 0.0)))
+        elif wheel_speed_profiles:
+            for prof in sorted(wheel_speed_profiles, key=lambda p: p.get("track_id", 0)):
+                label = f"Track #{prof.get('track_id', '?')} (profil)"
+                primary_speeds.append((
+                    label,
+                    prof.get("summary_value_kmh", 0.0),
+                    prof.get("summary_ci_kmh", 0.0),
+                ))
+        else:
+            for est in sorted(result.speed_estimates, key=lambda e: e.track_id):
+                label = f"Track #{est.track_id} (bbox)"
+                primary_speeds.append((label, est.value_kmh, est.ci_kmh))
+
+        limit_d = _stopping_distance_m(speed_limit_kmh)
+
+        limit_row_header = ["Ölçüm", "Tespit (km/h)", "Limit (km/h)", "Aşım (km/h)",
+                            "Durma — Tespit (m)", "Durma — Limit (m)", "Fark (m)"]
+        limit_rows = [limit_row_header]
+        for label, spd, ci in primary_speeds:
+            spd_d = _stopping_distance_m(spd)
+            excess = spd - speed_limit_kmh
+            excess_str = f"+ {excess:.1f}" if excess > 0 else f"{excess:.1f}"
+            limit_rows.append([
+                label,
+                f"{spd:.1f} ± {ci:.1f}",
+                f"{speed_limit_kmh:.0f}",
+                excess_str,
+                f"{spd_d:.1f}",
+                f"{limit_d:.1f}",
+                f"+ {spd_d - limit_d:.1f}" if spd_d > limit_d else f"{spd_d - limit_d:.1f}",
+            ])
+
+        t_lim = Table(
+            limit_rows,
+            colWidths=[3.5 * cm, 2.2 * cm, 2.0 * cm, 2.0 * cm, 2.5 * cm, 2.5 * cm, 2.3 * cm],
+        )
+        t_lim.setStyle(_header_table_style())
+        story.append(t_lim)
+        story.append(Spacer(1, 0.15 * cm))
+        story.append(Paragraph(
+            "Not: Durma mesafesi hesabı istatistiksel bir kıyaslama amacı taşır ve "
+            "sürücünün gerçek tepki süresi ile yol koşullarına bağlı olarak değişebilir. "
+            "Bu değer bilirkişi raporunda yardımcı bağlam olarak kullanılmalıdır.",
+            S["Note"],
+        ))
+        story.append(Spacer(1, 0.5 * cm))
+
+    # ── 4. Güven Seviyesi Kriterleri ──────────────────────────────────────────
+    story.append(Paragraph("Güven Seviyesi Kriterleri", S["SectionTitle"]))
 
     crit_rows = [
-        ["Seviye", "Kalibrasyon", "RMS", "Min. Kare", "CI/Hiz", "Smooth/Hiz"],
+        ["Seviye", "Kalibrasyon", "RMS", "Min. Kare", "CI/Hız", "Smooth/Hız"],
         [
-            "Yuksek", "Saha Olcumu",
+            "Yüksek", "Saha Ölçümü",
             f"< {int(_HIGH_RMS_M * 100)} cm",
             f">= {_HIGH_FRAME}",
             f"< %{int(_REL_CI_HIGH * 100)}",
             f"< %{int(_REL_SMOOTH_LOW * 100)}",
         ],
         [
-            "Orta", "Operator/Saha",
+            "Orta", "Operatör/Saha",
             f"< {int(_MEDIUM_RMS_M * 100)} cm",
             f">= {_MEDIUM_FRAME}",
             f"< %{int(_REL_CI_LOW * 100)}",
             "-",
         ],
         [
-            "Dusuk", "Diger/Std.",
+            "Düşük", "Diğer/Std.",
             f">= {int(_MEDIUM_RMS_M * 100)} cm",
             f"< {_MEDIUM_FRAME}",
             f">= %{int(_REL_CI_LOW * 100)}",
@@ -347,28 +553,28 @@ def _build_story(
     story.append(t5)
     story.append(Spacer(1, 0.2 * cm))
     story.append(Paragraph(
-        f"CI/Hiz: guven araliginin hiz tahminine orani. Smooth/Hiz: duzlestirilmis "
-        f"kalinti orani (yalnizca Yuksek seviyeyi engeller). "
-        f"Duzlemsellik uyarisi varliginda guven seviyesi bir kademe dusurulur "
-        f"(Yuksek -> Orta, Orta -> Dusuk). "
-        f"Esikler: RMS_H={int(_HIGH_RMS_M*100)}cm / RMS_M={int(_MEDIUM_RMS_M*100)}cm, "
+        f"CI/Hız: güven aralığının hız tahminine oranı. Smooth/Hız: düzleştirilmiş "
+        f"kalıntı oranı (yalnızca Yüksek seviyeyi engeller). "
+        f"Düzlemsellik uyarısı varlığında güven seviyesi bir kademe düşürülür "
+        f"(Yüksek → Orta, Orta → Düşük). "
+        f"Eşikler: RMS_H={int(_HIGH_RMS_M*100)} cm / RMS_M={int(_MEDIUM_RMS_M*100)} cm, "
         f"CI_H={int(_REL_CI_HIGH*100)}% / CI_L={int(_REL_CI_LOW*100)}%.",
         S["Note"],
     ))
     story.append(Spacer(1, 0.5 * cm))
 
-    # 4b. Aks Genişliği Doğrulama (isteğe bağlı — rapor regenerate edilince eklenir)
+    # ── 4b. Aks Genişliği Doğrulama ───────────────────────────────────────────
     if axle_checks:
-        story.append(Paragraph("Aks Genisligi Capraz Dogrulama", S["SectionTitle"]))
+        story.append(Paragraph("Aks Genişliği Çapraz Doğrulama", S["SectionTitle"]))
         story.append(Paragraph(
-            "Asagidaki sonuclar operatorun isgaret ettigi tekerlek piksel noktalarindan "
-            "hesaplanmis aks genisliginin bilinen referans degeriyle karsilastirilmasidir. "
-            "Bu deger guven seviyesi hesabina dahil edilmez; yalnizca destekleyici kanit "
+            "Aşağıdaki sonuçlar operatörün işaretlediği tekerlek piksel noktalarından "
+            "hesaplanmış aks genişliğinin bilinen referans değeriyle karşılaştırılmasıdır. "
+            "Bu değer güven seviyesi hesabına dahil edilmez; yalnızca destekleyici kanıt "
             "olarak sunulur.",
             S["Normal"],
         ))
         story.append(Spacer(1, 0.2 * cm))
-        axle_header = ["Track ID", "Olculen (m)", "Bilinen (m)", "Fark (%)", "Hesaplama Tarihi"]
+        axle_header = ["Track ID", "Ölçülen (m)", "Bilinen (m)", "Fark (%)", "Hesaplama Tarihi"]
         axle_rows = [axle_header]
         for ac in axle_checks:
             axle_rows.append([
@@ -386,21 +592,21 @@ def _build_story(
         story.append(t_axle)
         story.append(Spacer(1, 0.5 * cm))
 
-    # 4c. Operatör-Tekerlek Hız Ölçümü (T16, isteğe bağlı — rapor regenerate edilince eklenir)
+    # ── 4c. Operatör-Tekerlek Hız Ölçümü ─────────────────────────────────────
     if wheel_speeds:
-        story.append(Paragraph("Operator-Tekerlek Hiz Olcumu (Birincil)", S["SectionTitle"]))
+        story.append(Paragraph("Operatör-Tekerlek Hız Ölçümü (Birincil)", S["SectionTitle"]))
         story.append(Paragraph(
-            "Asagidaki sonuclar operatorun isaretledigi tekerlek-zemin temas noktalarindan "
-            "hesaplanmistir. Her track icin operatör en az 2 farkli karede ayni tekerin "
-            "yere degdigi yeri isaretlemistir; bu pikseller H ile dunya koordinatina "
-            "cevrilerek dogrusal regresyon ile hiz elde edilmistir. "
-            "Bu yontem YOLO bbox parallax hatasindan bagimsizdir ve forensic birincil "
-            "hiz olarak kullanilmalidir (bkz. GPS dogrulama — bbox ~74, tekerlek ~80 km/h).",
+            "Aşağıdaki sonuçlar operatörün işaretlediği tekerlek-zemin temas noktalarından "
+            "hesaplanmıştır. Her track için operatör en az 2 farklı karede aynı tekerin "
+            "yere değdiği yeri işaretlemiştir; bu pikseller H ile dünya koordinatına "
+            "çevrilerek doğrusal regresyon ile hız elde edilmiştir. "
+            "Bu yöntem YOLO bbox paralaks hatasından bağımsızdır ve forensic birincil "
+            "hız olarak kullanılmalıdır.",
             S["Normal"],
         ))
         story.append(Spacer(1, 0.2 * cm))
         ws_header = [
-            "Track ID", "Hiz (km/h)", "CI (km/h)", "Guven", "Isaret Sayisi",
+            "Track ID", "Hız (km/h)", "CI ± (km/h)", "Güven", "İşaret Sayısı",
             "Residual (km/h)", "Hesaplama Tarihi",
         ]
         ws_rows = [ws_header]
@@ -408,7 +614,7 @@ def _build_story(
             ws_rows.append([
                 f"#{ws.get('track_id', '?')}",
                 f"{ws.get('value_kmh', 0):.1f}",
-                f"{ws.get('ci_kmh', 0):.1f}",
+                f"± {ws.get('ci_kmh', 0):.1f}",
                 _CONFIDENCE_TR.get(ws.get("confidence_level", ""), ws.get("confidence_level", "—")),
                 str(ws.get("mark_count", "?")),
                 f"{ws.get('residual_kmh', 0):.1f}",
@@ -425,20 +631,20 @@ def _build_story(
                 for w in ws.get("warnings", []):
                     story.append(Spacer(1, 0.1 * cm))
                     story.append(Paragraph(
-                        f"Track #{ws.get('track_id', '?')} uyari: {w}", S["Note"]
+                        f"Track #{ws.get('track_id', '?')} uyarı: {w}", S["Note"]
                     ))
         story.append(Spacer(1, 0.5 * cm))
 
-    # 4d. Tekerlek Hız Profili / Fren Analizi (T19, isteğe bağlı)
+    # ── 4d. Tekerlek Hız Profili / Fren Analizi ───────────────────────────────
     if wheel_speed_profiles:
-        story.append(Paragraph("Hiz Profili — Fren / Ivme Analizi", S["SectionTitle"]))
+        story.append(Paragraph("Hız Profili — Fren / İvme Analizi", S["SectionTitle"]))
         story.append(Paragraph(
-            "Asagidaki profil operatorun isaretledigi birden fazla tekerlek temas "
-            "noktasindan turetilmistir. Kayan pencere yumusatma ile her segment icin "
-            "hiz ve guven araligi hesaplanmis; merkezi sonlu fark ile ivme tahmini yapilmistir. "
-            "Ham ardisik cift hizlari audit icin korunmaktadir. "
-            "Ozet (birincil) hiz T16 tek-deger yontemiyle hesaplanir ve profil hizlarina "
-            "gore onceliklidir.",
+            "Aşağıdaki profil operatörün işaretlediği birden fazla tekerlek temas "
+            "noktasından türetilmiştir. Kayan pencere yumuşatma ile her segment için "
+            "hız ve güven aralığı hesaplanmış; merkezi sonlu fark ile ivme tahmini yapılmıştır. "
+            "Ham ardışık çift hızları audit için korunmaktadır. "
+            "Özet (birincil) hız T16 tek-değer yöntemiyle hesaplanır ve profil hızlarına "
+            "göre önceliklidir.",
             S["Normal"],
         ))
         story.append(Spacer(1, 0.2 * cm))
@@ -447,16 +653,15 @@ def _build_story(
             track_label = f"Track #{prof.get('track_id', '?')}"
             story.append(Paragraph(track_label, S["Heading3"] if "Heading3" in S else S["Normal"]))
 
-            # Özet tablo
             summary_rows = [
-                ["Ozet Hiz (km/h)", f"{prof.get('summary_value_kmh', 0):.1f}"],
-                ["Guven Araligi (km/h)", f"± {prof.get('summary_ci_kmh', 0):.1f}"],
-                ["Guven Seviyesi", _CONFIDENCE_TR.get(
+                ["Özet Hız (km/h)", f"{prof.get('summary_value_kmh', 0):.1f}"],
+                ["Güven Aralığı (km/h)", f"± {prof.get('summary_ci_kmh', 0):.1f}"],
+                ["Güven Seviyesi", _CONFIDENCE_TR.get(
                     prof.get("summary_confidence_level", ""),
                     prof.get("summary_confidence_level", "—"),
                 )],
-                ["Isaret Sayisi", str(prof.get("summary_mark_count", "?"))],
-                ["Yumusatma Penceresi", str(prof.get("smoothing_window", "?"))],
+                ["İşaret Sayısı", str(prof.get("summary_mark_count", "?"))],
+                ["Yumuşatma Penceresi", str(prof.get("smoothing_window", "?"))],
                 ["Hesaplama Tarihi", prof.get("computed_at", "")[:19].replace("T", " ")],
             ]
             t_sum = Table(summary_rows, colWidths=[5 * cm, 11 * cm])
@@ -464,7 +669,6 @@ def _build_story(
             story.append(t_sum)
             story.append(Spacer(1, 0.2 * cm))
 
-            # Profil grafiği (PNG)
             pts = prof.get("points", [])
             if pts:
                 try:
@@ -498,9 +702,8 @@ def _build_story(
                 except Exception:
                     pass
 
-            # Profil noktaları tablosu
             if pts:
-                pt_header = ["t (s)", "Hiz (km/h)", "CI (km/h)", "Ivme (m/s²)"]
+                pt_header = ["t (s)", "Hız (km/h)", "CI ± (km/h)", "İvme (m/s²)"]
                 pt_rows = [pt_header]
                 for p in pts:
                     accel_str = f"{p['accel_ms2']:.2f}" if p.get("accel_ms2") is not None else "—"
@@ -515,44 +718,43 @@ def _build_story(
                 story.append(t_pts)
                 story.append(Spacer(1, 0.2 * cm))
 
-            # Uyarılar
             for w in prof.get("warnings", []):
-                story.append(Paragraph(f"Uyari: {w}", S["Note"]))
+                story.append(Paragraph(f"Uyarı: {w}", S["Note"]))
 
             story.append(Spacer(1, 0.4 * cm))
 
-    # 5. Varsayımlar
-    story.append(Paragraph("Varsayimlar ve Sinirlamalar", S["SectionTitle"]))
+    # ── 5. Varsayımlar ve Sınırlamalar ────────────────────────────────────────
+    story.append(Paragraph("Varsayımlar ve Sınırlamalar", S["SectionTitle"]))
 
     assumptions = [
-        "Yol yuzeyi duzlem kabul edilmistir (homografi ile perspektif donusumu uygulanmistir).",
-        "Kamera kaydi suresince sabit kalmistir; titreme veya yeniden konumlandirma olmamistir.",
-        "Arac hizi, bounding box alt-orta pikselinden (tekerlek-zemin temasi) hesaplanmistir. "
-        "Bbox merkezi kullanilamaz (paralaks hatasi).",
-        f"FPS degeri video konteyner meta verisinden okunmustur ({meta.fps_source}). "
-        "Gercek kayit hiziyla uyumsuzluk olursa hiz hesabi etkilenir.",
+        "Yol yüzeyi düzlem kabul edilmiştir (homografi ile perspektif dönüşümü uygulanmıştır).",
+        "Kamera kayıt süresince sabit kalmıştır; titreme veya yeniden konumlandırma olmamıştır.",
+        "Araç hızı, tekerlek-zemin temas noktası pikselinden hesaplanmıştır. "
+        "Kütlemerkezi kullanılamaz (paralaks hatası).",
+        f"FPS değeri video konteyner meta verisinden okunmuştur ({meta.fps_source}). "
+        "Gerçek kayıt hızıyla uyumsuzluk olursa hız hesabı etkilenir.",
     ]
 
     if cal.confidence_layer in ("standard_assumption", "operator"):
         assumptions.append(
-            "Kalibrasyon referans mesafeleri standart boyutlara dayalidir "
-            "(serit genisligi ~3.5 m veya arac plakasi 520x110 mm). "
-            "Saha olcumu yapilmamistir; gercek boyutlardan sapmalar hatay1 artirabilir."
+            "Kalibrasyon referans mesafeleri standart boyutlara dayalıdır "
+            "(şerit genişliği ~3,5 m veya araç plakası 520 × 110 mm). "
+            "Saha ölçümü yapılmamıştır; gerçek boyutlardan sapmalar hatayı artırabilir."
         )
 
     if cal.planarity_warning:
         assumptions.append(
-            "UYARI - Duzlemsellik: Kalibrasyon artiklari ile derinlik arasinda "
-            "sistematik korelasyon saptanmistir. Yol egimli/kabartili olabilir."
+            "UYARI — Düzlemsellik: Kalibrasyon artıkları ile derinlik arasında "
+            "sistematik korelasyon saptanmıştır. Yol eğimli veya kabartılı olabilir."
         )
 
     assumptions += [
-        "Arac tespiti ve takibi YOLO + ByteTrack algoritmasi ile gerceklestirilmistir. "
-        "Kacirilan veya yanlis eslesen tespitler sonuclari etkileyebilir.",
-        "Raporlanan guven araliklari (CI) yalnizca hiz serisinin istatistiksel "
-        "yayilimini yansitir; kalibrasyon belirsizligini kapsamamaktadir.",
-        "Bu rapor adli (forensic) kullanima destek amaclIdir. Sonuclarin bagimsiz "
-        "uzman incelemesinden gecIrilmesi onerilir.",
+        "Araç tespiti ve takibi YOLO + ByteTrack algoritması ile gerçekleştirilmiştir. "
+        "Kaçırılan veya yanlış eşlenen tespitler sonuçları etkileyebilir.",
+        "Raporlanan güven aralıkları (CI) yalnızca hız serisinin istatistiksel "
+        "yayılımını yansıtır; kalibrasyon belirsizliğini kapsamamaktadır.",
+        "Bu rapor adli (forensic) kullanıma destek amaçlıdır. Sonuçların bağımsız "
+        "uzman incelemesinden geçirilmesi önerilir.",
     ]
 
     for i, text in enumerate(assumptions, 1):
@@ -568,13 +770,14 @@ def generate_report(
     axle_checks: list[dict] | None = None,
     wheel_speeds: list[dict] | None = None,
     wheel_speed_profiles: list[dict] | None = None,
+    speed_limit_kmh: float | None = None,
 ) -> None:
     """Adli raporu PDF olarak yaz (ReportLab).
 
     axle_checks: aks genişliği doğrulama sonuçları listesi.
     wheel_speeds: T16 operatör-tekerlek hız ölçümü sonuçları listesi (birincil).
     wheel_speed_profiles: T19 hız profili (fren/ivme) sonuçları listesi.
-    Verilirse rapora ilgili bölümler olarak eklenir.
+    speed_limit_kmh: Mahallin hız limiti (km/h). Verilirse aşım + durma mesafesi karşılaştırması eklenir.
     """
     out_path = Path(out_path)
     doc = SimpleDocTemplate(
@@ -582,11 +785,12 @@ def generate_report(
         pagesize=A4,
         leftMargin=_MARGIN, rightMargin=_MARGIN,
         topMargin=_MARGIN, bottomMargin=_MARGIN,
-        title="Arac Hiz Tespit Raporu",
+        title="Araç Hız Tespit Raporu",
     )
     doc.build(_build_story(
         result,
         axle_checks=axle_checks,
         wheel_speeds=wheel_speeds,
         wheel_speed_profiles=wheel_speed_profiles,
+        speed_limit_kmh=speed_limit_kmh,
     ))

@@ -169,9 +169,13 @@ export const api = {
   },
 
   /** Aks doğrulaması dahil güncellenmiş PDF raporu üretir. */
-  async regenerateReport(jobId: string): Promise<{ status: string; axle_check_count: number }> {
+  async regenerateReport(
+    jobId: string,
+    speedLimitKmh?: number,
+  ): Promise<{ status: string; axle_check_count: number }> {
+    const params = speedLimitKmh != null ? `?speed_limit_kmh=${speedLimitKmh}` : ''
     return unwrap(
-      await fetch(`/api/job/${jobId}/report/regenerate`, { method: 'POST' }),
+      await fetch(`/api/job/${jobId}/report/regenerate${params}`, { method: 'POST' }),
     )
   },
 

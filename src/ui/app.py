@@ -754,11 +754,16 @@ async def download_report(job_id: str) -> FileResponse:
 
 
 @app.post("/api/job/{job_id}/report/regenerate", status_code=200)
-async def regenerate_report(job_id: str) -> dict:
+async def regenerate_report(
+    job_id: str,
+    speed_limit_kmh: float | None = None,
+) -> dict:
     """result_data.json + axle_check_*.json ile raporu yeniden üretir.
 
     Orijinal report.pdf korunur — yeni rapor report_v2.pdf olarak yazılır.
     Forensic kural: eski rapor değişmez; aks doğrulaması yeni versiyona eklenir.
+    speed_limit_kmh: Mahallin hız limiti (query param). Verilirse raporda
+    hız limiti karşılaştırması ve durma mesafesi bölümü eklenir.
     """
     job = _get_done_job(job_id)
     out_dir = _job_out_dir(job_id)
@@ -812,6 +817,7 @@ async def regenerate_report(job_id: str) -> dict:
             axle_checks=axle_checks or None,
             wheel_speeds=wheel_speeds or None,
             wheel_speed_profiles=wheel_speed_profiles or None,
+            speed_limit_kmh=speed_limit_kmh,
         )
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Rapor üretilemedi: {exc}")

@@ -56,7 +56,7 @@ export function AxleCheckPanel({ jobId, videoId, trackId, controlPoints, onClose
   })
 
   const regenerateMutation = useMutation({
-    mutationFn: () => api.regenerateReport(jobId),
+    mutationFn: (speedLimitKmh?: number) => api.regenerateReport(jobId, speedLimitKmh),
     onSuccess: () => onReportRegenerated?.(),
   })
 
@@ -257,7 +257,7 @@ export function AxleCheckPanel({ jobId, videoId, trackId, controlPoints, onClose
               variant="outline"
               size="sm"
               disabled={regenerateMutation.isPending || regenerateMutation.isSuccess}
-              onClick={() => regenerateMutation.mutate()}
+              onClick={() => regenerateMutation.mutate(undefined)}
             >
               {regenerateMutation.isPending ? (
                 <Loader2 className="animate-spin" />
