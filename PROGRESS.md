@@ -5,7 +5,7 @@
 > geçmişine bakılır; bu dosya yalnızca **anlık durumun özetini** tutar (şişirmeyin).
 
 **Son güncelleme:** 2026-09-17
-**Aktif görev:** _(T24+T25 tamamlandı, T26 analiz belgesi hazır — sıradaki: T26 UI/UX implementasyonu)_
+**Aktif görev:** T26 — Kapsamlı UI/UX yeniden tasarımı (Aşama 1 tamamlandı, Aşama 2 bekliyor)
 
 **En son (önemli, forensic-etkili bir düzeltme):** Kullanıcı gerçek video analizinde şunu fark
 etti: araç kareye girdiği an overlay videoda ~25 km/h, birkaç kare sonra "aniden" ~65 km/h
@@ -99,7 +99,7 @@ Durum işaretleri: ⬜ Başlanmadı · 🟡 Devam ediyor · ✅ Bitti · ⛔ Eng
 
 - **T25 tamamlandı:** Tekerlek hızı overlay + video toggle. `overlay.py::write_overlay_video` + `draw_frame`'e `speed_overrides: dict[int, float]` parametresi. `POST /api/job/{id}/track/{id}/wheel-overlay` endpoint (overlay üretir, track'e özel hız etiketi). `GET` endpoint ile inline oynatma. Frontend: `ResultsStep.tsx`'te `wheelOverlayTracks` set + `activeOverlay` state; bbox / tekerlek sekme toggle. `WheelSpeedPanel`'de "Bu Hızla Overlay Oluştur" butonu.
 
-- **T26 başladı:** Kapsamlı UI/UX analiz belgesi `docs/uiux-analiz.md` oluşturuldu. 11 bölüm, tüm adımlar, tema, tipografi, öncelik sırası (kritik → yüksek → orta → düşük). Görev kartı `tasks/T26.md`. Kodlama analiz belgesi okunduktan sonra başlar.
+- **T26 Aşama 1 tamamlandı:** Kapsamlı UI/UX yeniden tasarımı. `ResultsStep.tsx`: 8 sütunlu tablo → 2-sütun layout (araç kart listesi + video/panel), araç kartı ön tahmin vs birincil hız kutuları, overlay sekme toggle emerald→success token, AlertTriangle rapor modalı. `CalibrationStep.tsx`: mod göstergesi şeridi (canvas üstü, bracket faz dot indikatörü), kalibrasyon durum kutusu renk-kodlu bg + "✓ hazır" mesajı. `PipelineStep.tsx`: "Gelişmiş Ayarlar" accordion, default model=medium. `UploadStep.tsx`: HistoryPanel → "Yeni / Geçmiş" sekme. Token temizliği: emerald→success (Stepper, StatusBanner, Badge). npm build: 1840 modül temiz. Commit: `9b959b4`.
 
 ## Son Oturum (2026-09-17) — T22 + VP düzeltmesi
 
