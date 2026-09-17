@@ -5,14 +5,61 @@ import { Header } from './Header'
 import { Footer } from './Footer'
 import { Stepper } from './Stepper'
 
+function AnalysisStatusBar() {
+  const videoMeta = useWizard((s) => s.videoMeta)
+  const cal = useWizard((s) => s.calibration)
+  const jobId = useWizard((s) => s.jobId)
+
+  if (!videoMeta) return null
+
+  const items: { label: string; value: string; ok: boolean }[] = []
+
+  if (videoMeta) {
+    const name = videoMeta.sha256
+      ? videoMeta.sha256.slice(0, 6) + '…'
+      : '—'
+    items.push({ label: 'Video', value: name, ok: true })
+  }
+
+  if (cal) {
+    const rmsOk = cal.rms_m * 100 < 5
+    items.push({
+      label: 'Kalibrasyon',
+      value: `RMS ${(cal.rms_m * 100).toFixed(1)} cm`,
+      ok: rmsOk,
+    })
+  }
+
+  if (jobId) {
+    items.push({ label: 'Analiz', value: 'tamamlandı', ok: true })
+  }
+
+  return (
+    <div className="flex h-8 shrink-0 items-center gap-0 border-b bg-muted/30 px-5 text-[11px]">
+      {items.map((item, i) => (
+        <span key={item.label} className="flex items-center gap-1.5">
+          {i > 0 && <span className="mx-3 text-border">·</span>}
+          <span className="text-muted-foreground">{item.label}:</span>
+          <span className={cn('font-medium tabular-nums', item.ok ? 'text-foreground' : 'text-warning')}>
+            {item.value}
+          </span>
+          <span className={item.ok ? 'text-success' : 'text-warning'}>
+            {item.ok ? '✓' : '⚠'}
+          </span>
+        </span>
+      ))}
+    </div>
+  )
+}
+
 export function AppShell({ children }: { children: ReactNode }) {
   const step = useWizard((s) => s.step)
-  // Kalibrasyon (3) tuval için en geniş alanı ister; diğer adımlar okunaklı dar kolon.
   const wide = step === 3 || step === 6
 
   return (
     <div className="flex h-screen flex-col text-foreground">
       <Header />
+      <AnalysisStatusBar />
       <div className="flex flex-1 overflow-hidden">
         <aside className="hidden w-60 shrink-0 border-r bg-card/60 backdrop-blur-sm md:block">
           <Stepper />

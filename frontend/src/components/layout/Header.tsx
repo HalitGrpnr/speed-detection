@@ -15,8 +15,8 @@ export function Header() {
         <span className="font-semibold tracking-tight">Araç Hız Tespit Sistemi</span>
       </div>
 
-      <span className="ml-2 hidden shrink-0 items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-medium text-emerald-700 sm:inline-flex">
-        <span className="size-1.5 animate-pulse rounded-full bg-emerald-500" />
+      <span className="ml-2 hidden shrink-0 items-center gap-1.5 rounded-full border border-success/30 bg-success/10 px-2.5 py-1 text-[11px] font-medium text-success sm:inline-flex">
+        <span className="size-1.5 animate-pulse rounded-full bg-success" />
         Tamamen Yerel
       </span>
 
@@ -34,7 +34,7 @@ export function Header() {
 
       {videoMeta && (
         <span
-          className="flex shrink-0 items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700"
+          className="flex shrink-0 items-center gap-1.5 rounded-lg border border-success/30 bg-success/10 px-2.5 py-1 text-xs font-medium text-success"
           title={`Dosya bütünlüğü doğrulandı\n${videoMeta.width}×${videoMeta.height} · ${videoMeta.fps.toFixed(2)} fps\nSHA-256: ${videoMeta.sha256}`}
         >
           <ShieldCheck className="size-4" />

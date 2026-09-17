@@ -1,4 +1,4 @@
-import { Check, Lock } from 'lucide-react'
+import { AlertCircle, Check, Lock } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { STEPS, useWizard, type StepId } from '@/store/wizard'
 
@@ -6,6 +6,15 @@ export function Stepper() {
   const step = useWizard((s) => s.step)
   const goTo = useWizard((s) => s.goTo)
   const canEnter = useWizard((s) => s.canEnter)
+  const calibration = useWizard((s) => s.calibration)
+
+  const stepWarnings: Partial<Record<StepId, boolean>> = {
+    4: calibration != null && (
+      calibration.rms_m * 100 > 5 ||
+      !!calibration.planarity_warning ||
+      calibration.point_count < 6
+    ),
+  }
 
   return (
     <nav className="flex flex-col gap-1 p-3">
@@ -17,6 +26,7 @@ export function Stepper() {
         const active = id === step
         const done = id < step
         const enabled = canEnter(id)
+        const hasWarning = done && !!stepWarnings[id]
 
         return (
           <button
@@ -35,11 +45,18 @@ export function Stepper() {
               className={cn(
                 'flex size-6 shrink-0 items-center justify-center rounded-full border text-xs font-semibold',
                 active && 'border-primary bg-primary text-primary-foreground',
-                done && 'border-success bg-success text-success-foreground',
+                done && !hasWarning && 'border-success bg-success text-success-foreground',
+                done && hasWarning && 'border-warning bg-warning text-warning-foreground',
                 !active && !done && 'border-muted-foreground/30',
               )}
             >
-              {done ? <Check className="size-3.5" /> : !enabled ? <Lock className="size-3" /> : id}
+              {done
+                ? hasWarning
+                  ? <AlertCircle className="size-3.5" />
+                  : <Check className="size-3.5" />
+                : !enabled
+                  ? <Lock className="size-3" />
+                  : id}
             </span>
             {s.label}
           </button>

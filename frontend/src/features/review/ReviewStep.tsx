@@ -54,21 +54,23 @@ export function ReviewStep() {
       </CardHeader>
 
       <CardContent className="space-y-4">
+        {/* Birincil metrik — tam genişlik, öne çıkan kart */}
+        <div className={`rounded-lg border p-4 ${rmsOk ? 'border-success/40 bg-success/5' : 'border-warning/40 bg-warning/5'}`}>
+          <p className="mb-2 text-xs text-muted-foreground flex items-center gap-1.5">
+            Kalibrasyon hata payı
+            <InfoHint text="Tıkladığınız noktaların girdiğiniz ölçümlerle ne kadar uyuştuğu. Küçük olması iyidir. (Teknik: re-projeksiyon RMS)" />
+          </p>
+          <RmsBadge rmsM={cal.rms_m} />
+          <p className="text-xs text-muted-foreground mt-1.5">
+            {cal.inlier_count}/{cal.point_count} nokta kullanıldı
+            {cal.rejected_points.length > 0 && (
+              <span className="text-orange-500 ml-1">· {cal.rejected_points.length} reddedildi</span>
+            )}
+          </p>
+        </div>
+
+        {/* Diğer metrikler — 2-3 sütun grid */}
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-          <Stat
-            label="Kalibrasyon hata payı"
-            hint="Tıkladığınız noktaların girdiğiniz ölçümlerle ne kadar uyuştuğu. Küçük olması iyidir. (Teknik: re-projeksiyon RMS)"
-          >
-            <RmsBadge rmsM={cal.rms_m} />
-          </Stat>
-          <Stat
-            label="Kullanılan / toplam nokta"
-            hint="Hesaba katılan sağlıklı nokta sayısı. Çok sapan noktalar otomatik elenebilir."
-          >
-            <span className="font-semibold tabular-nums">
-              {cal.inlier_count} / {cal.point_count}
-            </span>
-          </Stat>
           <Stat
             label="Güven kaynağı"
             hint="Kalibrasyonun hangi referansa dayandığı (operatör onayı, saha ölçümü veya standart varsayım)."
@@ -77,7 +79,7 @@ export function ReviewStep() {
           </Stat>
           <Stat
             label="Zemin düzlemi"
-            hint="Tüm noktalar tek bir düz zeminde mi? Değilse (kaldırım, eğim) sonuç bozulabilir. (Teknik: düzlemsellik)"
+            hint="Tüm noktalar tek bir düz zeminde mi? Değilse (kaldırım, eğim) sonuç bozulabilir."
           >
             {cal.planarity_warning ? (
               <Badge variant="warning">Aynı düzlemde değil</Badge>
@@ -87,17 +89,17 @@ export function ReviewStep() {
           </Stat>
           <Stat
             label="Bağımsız doğrulama"
-            hint="Bir noktayı dışarıda bırakıp geri kalanla tahmin ederek doğruluğu sınar. Küçük hata = güvenilir. (Teknik: leave-one-out RMS)"
+            hint="Bir noktayı dışarıda bırakıp geri kalanla tahmin ederek doğruluğu sınar. (Teknik: leave-one-out RMS)"
           >
             {cal.loo_rms_m != null ? (
               <RmsBadge rmsM={cal.loo_rms_m} />
             ) : (
-              <span className="text-xs text-muted-foreground">Yetersiz nokta (≥5 gerekli)</span>
+              <span className="text-xs text-muted-foreground">≥5 nokta gerekli</span>
             )}
           </Stat>
           <Stat
             label="Nokta yeterliliği"
-            hint="Güvenilir kontrol için fazladan nokta var mı? 6 ve üzeri önerilir. (Teknik: yedeklilik/redundancy)"
+            hint="Güvenilir kontrol için fazladan nokta var mı? 6 ve üzeri önerilir."
           >
             {redundant ? (
               <Badge variant="success">Yeterli (≥6)</Badge>
@@ -107,18 +109,22 @@ export function ReviewStep() {
           </Stat>
         </div>
 
-        {!rmsOk && (
-          <StatusBanner tone="warning">
-            Hata payı 5 cm'in üzerinde. Daha güvenilir sonuç için Adım 3'e dönüp nokta
-            koordinatlarını gözden geçirin veya saha ölçümü ekleyin.
-          </StatusBanner>
-        )}
-        {!redundant && (
-          <StatusBanner tone="info">
-            6'dan az kontrol noktası var. Daha fazla nokta, bağımsız doğrulama ve daha yüksek
-            güven sağlar.
-          </StatusBanner>
-        )}
+        {/* Karar özeti */}
+        <div className={`rounded-lg border p-4 ${rmsOk && redundant ? 'border-success/40 bg-success/5' : rmsOk ? 'border-primary/30 bg-primary/5' : 'border-warning/40 bg-warning/5'}`}>
+          <p className={`text-sm font-medium ${rmsOk && redundant ? 'text-success' : rmsOk ? 'text-primary' : 'text-warning'}`}>
+            {rmsOk && redundant
+              ? '✓ Kalibrasyon analize hazır'
+              : rmsOk
+                ? '✓ Kalibrasyon yeterli — Daha fazla nokta güveni artırır'
+                : '⚠ Analiz başlamadan önce kontrol edin'}
+          </p>
+          <p className="text-xs text-muted-foreground mt-1 tabular-nums">
+            RMS: {(cal.rms_m * 100).toFixed(1)} cm
+            {' · '}{cal.inlier_count}/{cal.point_count} nokta
+            {' · '}Yedeklilik: {redundant ? 'Yeterli' : 'Düşük'}
+            {cal.planarity_warning ? ' · ⚠ Düzlemsellik sorunu' : ''}
+          </p>
+        </div>
 
         {cal.holdout_rows.length > 0 && <HoldoutTable rows={cal.holdout_rows} />}
 
