@@ -4,6 +4,7 @@ import { Activity, Bot, CheckCheck, FileText, Loader2, Target, Trash2, Video } f
 import { api } from '@/lib/api'
 import type { ControlPoint, ProfilePoint, WheelMarkSource, WheelSpeedProfileResponse, WheelSpeedResponse } from '@/lib/models'
 import type { WheelOverlayRequest } from '@/lib/models'
+import { useWizard } from '@/store/wizard'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { StatusBanner } from '@/components/common/StatusBanner'
@@ -148,6 +149,8 @@ interface MarkEntry {
 export function WheelSpeedPanel({
   jobId, videoId, trackId, frameCount, onClose, onReportRegenerated, onWheelSpeedResult, onWheelOverlayReady,
 }: Props) {
+  const fps = useWizard((s) => s.videoMeta?.fps ?? 25)
+
   const [mode, setMode] = useState<Mode>('speed')
   const [marks, setMarks] = useState<Record<number, { pixel: [number, number]; source: WheelMarkSource }>>({})
   const [currentFrame, setCurrentFrame] = useState(0)
@@ -554,6 +557,8 @@ export function WheelSpeedPanel({
           result={profileResult}
           jobId={jobId}
           trackId={trackId}
+          fps={fps}
+          onGoToFrame={goToFrame}
           overLayMutation={overLayMutation}
           regenerateMutation={regenerateMutation}
         />
@@ -652,12 +657,16 @@ function ProfileResult({
   result,
   jobId,
   trackId,
+  fps,
+  onGoToFrame,
   overLayMutation,
   regenerateMutation,
 }: {
   result: WheelSpeedProfileResponse
   jobId: string
   trackId: number
+  fps: number
+  onGoToFrame: (frame: number) => void
   overLayMutation: UseMutationResult<{ overlay_path: string; download_url: string }, Error, void>
   regenerateMutation: UseMutationResult<unknown, Error, void>
 }) {
@@ -742,17 +751,25 @@ function ProfileResult({
                 </tr>
               </thead>
               <tbody>
-                {result.points.map((p, i) => (
-                  <tr key={i} className={i % 2 === 0 ? '' : 'bg-muted/20'}>
-                    <td className="border border-border px-2 py-0.5 tabular-nums">{p.t_s.toFixed(2)}</td>
-                    <td className="border border-border px-2 py-0.5 tabular-nums text-right">{p.speed_kmh.toFixed(1)}</td>
-                    <td className="border border-border px-2 py-0.5 tabular-nums text-right">± {p.ci_kmh.toFixed(1)}</td>
-                    <td className={`border border-border px-2 py-0.5 tabular-nums text-right
-                      ${p.accel_ms2 !== null && p.accel_ms2 < -2 ? 'text-orange-600 font-medium' : ''}`}>
-                      {p.accel_ms2 !== null ? p.accel_ms2.toFixed(2) : '—'}
-                    </td>
-                  </tr>
-                ))}
+                {result.points.map((p, i) => {
+                  const targetFrame = Math.round(p.t_s * fps)
+                  return (
+                    <tr
+                      key={i}
+                      className={`cursor-pointer hover:bg-primary/10 transition-colors ${i % 2 === 0 ? '' : 'bg-muted/20'}`}
+                      title={`Kare ${targetFrame}'e git`}
+                      onClick={() => onGoToFrame(targetFrame)}
+                    >
+                      <td className="border border-border px-2 py-0.5 tabular-nums text-primary underline-offset-2 hover:underline">{p.t_s.toFixed(2)}</td>
+                      <td className="border border-border px-2 py-0.5 tabular-nums text-right">{p.speed_kmh.toFixed(1)}</td>
+                      <td className="border border-border px-2 py-0.5 tabular-nums text-right">± {p.ci_kmh.toFixed(1)}</td>
+                      <td className={`border border-border px-2 py-0.5 tabular-nums text-right
+                        ${p.accel_ms2 !== null && p.accel_ms2 < -2 ? 'text-orange-600 font-medium' : ''}`}>
+                        {p.accel_ms2 !== null ? p.accel_ms2.toFixed(2) : '—'}
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>
@@ -768,29 +785,18 @@ function ProfileResult({
       )}
 
       {/* Overlay ve rapor butonları */}
-      <div className="border-t pt-3 space-y-2">
-        <div className="flex flex-wrap gap-2">
+      <div className="border-t pt-3 space-y-3">
+        {!overLayMutation.isSuccess && (
           <Button
             variant="outline"
             size="sm"
-            disabled={overLayMutation.isPending || overLayMutation.isSuccess}
+            disabled={overLayMutation.isPending}
             onClick={() => overLayMutation.mutate()}
           >
             {overLayMutation.isPending ? <Loader2 className="animate-spin" /> : <Video />}
-            {overLayMutation.isSuccess ? 'Overlay hazır ✓' : 'Fren Overlay Oluştur'}
+            {overLayMutation.isPending ? 'Oluşturuluyor…' : 'Fren Overlay Oluştur'}
           </Button>
-
-          {overLayMutation.isSuccess && (
-            <a
-              href={api.profileOverlayUrl(jobId, trackId)}
-              download={`fren_analizi_track${trackId}.mp4`}
-            >
-              <Button variant="secondary" size="sm">
-                <Video /> İndir
-              </Button>
-            </a>
-          )}
-        </div>
+        )}
 
         {overLayMutation.isError && (
           <StatusBanner tone="error">
@@ -799,9 +805,24 @@ function ProfileResult({
         )}
 
         {overLayMutation.isSuccess && (
-          <p className="text-[0.7rem] text-muted-foreground">
-            Overlay videoda işaretli karelerde yeşil dolu etiket, ara karelerde sarı kenarlı etiket gösterilir.
-          </p>
+          <div className="space-y-2">
+            <video
+              key={`profile-overlay-${jobId}-${trackId}`}
+              controls
+              src={api.profileOverlayUrl(jobId, trackId)}
+              className="w-full rounded-lg border bg-canvas"
+            >
+              Tarayıcınız video oynatmayı desteklemiyor.
+            </video>
+            <div className="flex items-center gap-2">
+              <p className="flex-1 text-[0.7rem] text-muted-foreground">
+                İşaretli karelerde yeşil dolu etiket, ara karelerde sarı kenarlı etiket.
+              </p>
+              <a href={api.profileOverlayUrl(jobId, trackId)} download={`fren_analizi_track${trackId}.mp4`}>
+                <Button variant="outline" size="sm"><Video /> İndir</Button>
+              </a>
+            </div>
+          </div>
         )}
 
         <ReportButton regenerateMutation={regenerateMutation} />
