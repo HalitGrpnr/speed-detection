@@ -5,7 +5,7 @@
 > geçmişine bakılır; bu dosya yalnızca **anlık durumun özetini** tutar (şişirmeyin).
 
 **Son güncelleme:** 2026-09-17
-**Aktif görev:** T26 — Kapsamlı UI/UX yeniden tasarımı (Aşama 1 tamamlandı, Aşama 2 bekliyor)
+**Aktif görev:** — (T26 tamamlandı; sıradaki: T3/T4 tarayıcı testleri veya T9 paketleme)
 
 **En son (önemli, forensic-etkili bir düzeltme):** Kullanıcı gerçek video analizinde şunu fark
 etti: araç kareye girdiği an overlay videoda ~25 km/h, birkaç kare sonra "aniden" ~65 km/h
@@ -73,6 +73,14 @@ H ile kaba dünya konumuna oturtup bilinen genişliğe göre düzeltiyor. Yeni e
 | T7 | Aks doğrulama sonucunu PDF'e ekle | ✅ Bitti | /report/regenerate + report_v2.pdf + frontend v2 indirme |
 | — | DTP karşılaştırması — kuş bakışı (plan-view) görünüm | ✅ Bitti | Adım 4 önizleme + PDF'te ilk görsel; görev dosyasız (küçük ek) |
 | — | Aks doğrulama — kare seçimi düzeltmesi + "kalibrasyona ekle ve yeniden analiz et" | ✅ Bitti | tracks.json yeniden kullanılır, detection tekrarlanmaz; görev dosyasız |
+| T19 | Çok-işaretli tekerlek hız profili + fren/ivme analizi | ✅ Bitti | wheel_contact_profile + overlay + SVG grafik + rapor; `tasks/T19.md` |
+| T20 | Otomatik tekerlek temas noktası tespiti | ✅ Bitti | wheel_auto.py (Canny CV + bbox yedek) + 18 test + auto UI; `tasks/T20.md` |
+| T21 | Tekerlek hızı birincil akış UI yeniden düzenlemesi | ✅ Bitti | auto-load, wheelSpeedResults state, uyarı modal; `tasks/T21.md` |
+| T22 | Otomatik kalibrasyon önerisi (vanishing-point) | ✅ Bitti | vanishing.py RANSAC VP + 13 test + endpoint + CalibrationStep paneli; `tasks/T22.md` |
+| T23 | ML pose modeli temas noktası POC | ✅ Bitti | YOLO-seg −8.7 km/h GPS farkı → KALMA kararı; `tasks/T23.md` |
+| T24 | Kalıcı analiz geçmişi | ✅ Bitti | ~/.speed_detection/jobs/ + HistoryPanel + loadHistoricalJob(); `tasks/T24.md` |
+| T25 | Tekerlek hızı overlay + bbox/tekerlek video toggle | ✅ Bitti | wheel-overlay endpoint + ResultsStep toggle; `tasks/T25.md` |
+| T26 | Kapsamlı UI/UX yeniden tasarımı | ✅ Bitti | 2-sütun layout, durum çubuğu, stepper uyarı, token temizliği; `tasks/T26.md` |
 
 Durum işaretleri: ⬜ Başlanmadı · 🟡 Devam ediyor · ✅ Bitti · ⛔ Engellendi
 
@@ -93,13 +101,15 @@ Durum işaretleri: ⬜ Başlanmadı · 🟡 Devam ediyor · ✅ Bitti · ⛔ Eng
   yeniden hesaplanır; her hız CI + güven seviyesi taşır (çıplak sayı yok); harici ağ çağrısı yok
   (fontlar self-host).
 
-## Son Oturum (2026-09-17) — T24 + T25 + T26 analiz
+## Son Oturum (2026-09-17) — T24 + T25 + T26
 
 - **T24 tamamlandı:** Kalıcı analiz geçmişi. `~/.speed_detection/jobs/` dizinine job_meta.json yazılıyor. Uygulama başlangıcında tüm eski job'lar restore ediliyor. `GET /api/jobs` endpoint (en yeniden eskiye sıralı). `GET /api/job/{id}/calibration` endpoint. Frontend: UploadStep'te `HistoryPanel` — collapsible, lazy-fetch, "Yükle" butonu ile kalibrasyon noktaları + wizard adım 6'ya atlar. `loadHistoricalJob()` Zustand action'ı.
 
 - **T25 tamamlandı:** Tekerlek hızı overlay + video toggle. `overlay.py::write_overlay_video` + `draw_frame`'e `speed_overrides: dict[int, float]` parametresi. `POST /api/job/{id}/track/{id}/wheel-overlay` endpoint (overlay üretir, track'e özel hız etiketi). `GET` endpoint ile inline oynatma. Frontend: `ResultsStep.tsx`'te `wheelOverlayTracks` set + `activeOverlay` state; bbox / tekerlek sekme toggle. `WheelSpeedPanel`'de "Bu Hızla Overlay Oluştur" butonu.
 
-- **T26 Aşama 1 tamamlandı:** Kapsamlı UI/UX yeniden tasarımı. `ResultsStep.tsx`: 8 sütunlu tablo → 2-sütun layout (araç kart listesi + video/panel), araç kartı ön tahmin vs birincil hız kutuları, overlay sekme toggle emerald→success token, AlertTriangle rapor modalı. `CalibrationStep.tsx`: mod göstergesi şeridi (canvas üstü, bracket faz dot indikatörü), kalibrasyon durum kutusu renk-kodlu bg + "✓ hazır" mesajı. `PipelineStep.tsx`: "Gelişmiş Ayarlar" accordion, default model=medium. `UploadStep.tsx`: HistoryPanel → "Yeni / Geçmiş" sekme. Token temizliği: emerald→success (Stepper, StatusBanner, Badge). npm build: 1840 modül temiz. Commit: `9b959b4`.
+- **T26 tamamlandı (✅):** Kapsamlı UI/UX yeniden tasarımı — 2 aşama.
+  - **Aşama 1 (`9b959b4`):** `ResultsStep.tsx`: 8 sütunlu tablo → 2-sütun layout (araç kart listesi + video/panel), araç kartı ön tahmin vs birincil hız kutuları, overlay sekme toggle emerald→success token, AlertTriangle rapor modalı. `CalibrationStep.tsx`: mod göstergesi şeridi (canvas üstü, bracket faz dot indikatörü), kalibrasyon durum kutusu renk-kodlu bg + "✓ hazır" mesajı. `PipelineStep.tsx`: "Gelişmiş Ayarlar" accordion, default model=medium. `UploadStep.tsx`: HistoryPanel → "Yeni / Geçmiş" sekme. Token temizliği: emerald→success (Stepper, StatusBanner, Badge). npm build: 1840 modül temiz.
+  - **Aşama 2 (`0d932ab`):** `AppShell.tsx`: `AnalysisStatusBar` (SHA/RMS/analiz şeridi). `Stepper.tsx`: Adım 4 amber AlertCircle (RMS>5cm / planarity / nokta<6). `ReviewStep.tsx`: tam genişlik RMS kartı + karar özeti banner. `FrameStep.tsx`: kılavuz ipuçları grid + custom slider + toplam süre. `Header.tsx`: emerald→success token temizliği. `index.css`: gradient opaklık azaltma (0.55→0.25, 0.45→0.20).
 
 ## Son Oturum (2026-09-17) — T22 + VP düzeltmesi
 
