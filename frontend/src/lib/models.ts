@@ -102,6 +102,22 @@ export interface WheelSpeedProfileResponse {
   warnings: string[]
 }
 
+// T24 — Geçmiş analiz özeti
+export interface JobSummary {
+  job_id: string
+  video_filename: string | null
+  created_at: string
+  completed_at: string | null
+  vehicle_count: number
+  frame_step: number | null
+  model_name: string | null
+  fps: number | null
+  width: number | null
+  height: number | null
+  frame_count: number | null
+  video_id: string | null
+}
+
 // T22 — Otomatik kalibrasyon önerisi (vanishing-point)
 export interface AutoCalibrateRequest {
   frame_n: number

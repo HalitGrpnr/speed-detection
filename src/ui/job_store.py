@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import datetime
 import threading
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -20,6 +21,10 @@ class JobState:
     video_path: str | None = None
     result_data_path: Path | None = None
     report_v2_path: Path | None = None
+    video_id: str | None = None
+    video_filename: str | None = None
+    created_at: str = field(default_factory=lambda: datetime.datetime.now().isoformat(timespec="seconds"))
+    completed_at: str | None = None
 
 
 class JobStore:

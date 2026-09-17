@@ -11,10 +11,12 @@ import type {
   AxleSuggestFrameResponse,
   CalibrateRequest,
   CalibrateResponse,
+  ControlPoint,
   InterpolatePointRequest,
   InterpolatePointResponse,
   JobResult,
   JobStatus,
+  JobSummary,
   PipelineRequest,
   PlanViewRequest,
   RecalibrateRequest,
@@ -254,5 +256,15 @@ export const api = {
         `/api/job/${jobId}/track/${trackId}/auto-contact-points?max_marks=${maxMarks}`,
       ),
     )
+  },
+
+  /** T24 — Geçmiş analizlerin listesi (en yeniden en eskiye). */
+  async listJobs(): Promise<JobSummary[]> {
+    return unwrap(await fetch('/api/jobs'))
+  },
+
+  /** T24 — Geçmiş analiz için kalibrasyon kontrol noktaları. */
+  async jobCalibration(jobId: string): Promise<{ control_points: ControlPoint[] }> {
+    return unwrap(await fetch(`/api/job/${jobId}/calibration`))
   },
 }

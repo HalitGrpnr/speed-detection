@@ -4,7 +4,6 @@ import datetime
 import hashlib
 import json
 import shutil
-import tempfile
 import threading
 import uuid
 from contextlib import asynccontextmanager
@@ -43,6 +42,7 @@ from .schemas import (
     InterpolatePointResponse,
     JobResultOut,
     JobStatusOut,
+    JobSummaryOut,
     PipelineRequest,
     PlanViewRequest,
     RecalibrateRequest,
@@ -74,17 +74,70 @@ _WEB_DIR = _UI_DIR / "web"
 _MODEL_MAP = {"nano": "yolo11n.pt", "small": "yolo11s.pt", "medium": "yolo11m.pt"}
 _MAX_UPLOAD_BYTES = 10 * 1024 * 1024 * 1024  # 10 GB
 
+_WORK_DIR = Path.home() / ".speed_detection"
 _tmp_dir: Path | None = None
 _video_store: dict[str, Path] = {}
+_video_filenames: dict[str, str] = {}   # video_id → original filename
 _job_store = JobStore()
+
+
+def _restore_jobs_from_disk() -> None:
+    """Sunucu yeniden başlatıldığında tamamlanan işleri diskten geri yükle."""
+    jobs_dir = _WORK_DIR / "jobs"
+    if not jobs_dir.exists():
+        return
+    for meta_path in sorted(jobs_dir.glob("*/job_meta.json")):
+        try:
+            meta = json.loads(meta_path.read_text(encoding="utf-8"))
+            job_id = meta["job_id"]
+            if _job_store.get(job_id) is not None:
+                continue
+
+            out_dir = meta_path.parent
+            job = _job_store.create(job_id)
+            job.state = "done"
+            job.progress_pct = 100.0
+            job.video_id = meta.get("video_id")
+            job.video_filename = meta.get("video_filename")
+            job.video_path = meta.get("video_path")
+            job.frame_step = meta.get("frame_step")
+            job.model_name_used = meta.get("model_name")
+            job.created_at = meta.get("created_at", "")
+            job.completed_at = meta.get("completed_at")
+            job.result_json = meta.get("result_json") or {"vehicle_count": meta.get("vehicle_count", 0), "estimates": []}
+
+            for fname, attr in [
+                ("overlay.mp4", "overlay_path"),
+                ("report.pdf", "report_path"),
+                ("report_v2.pdf", "report_v2_path"),
+                ("result_data.json", "result_data_path"),
+            ]:
+                p = out_dir / fname
+                if p.exists():
+                    setattr(job, attr, p)
+
+            video_id = meta.get("video_id")
+            video_path_str = meta.get("video_path")
+            if video_id and video_path_str:
+                vpath = Path(video_path_str)
+                if vpath.exists():
+                    _video_store[video_id] = vpath
+                    if meta.get("video_filename"):
+                        _video_filenames[video_id] = meta["video_filename"]
+        except Exception as exc:
+            print(f"[RESTORE UYARI] {meta_path}: {exc}", flush=True)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global _tmp_dir
-    _tmp_dir = Path(tempfile.mkdtemp(prefix="speed_det_"))
+    _WORK_DIR.mkdir(parents=True, exist_ok=True)
+    (_WORK_DIR / "videos").mkdir(exist_ok=True)
+    (_WORK_DIR / "jobs").mkdir(exist_ok=True)
+    _tmp_dir = _WORK_DIR / "jobs"
+    _restore_jobs_from_disk()
     yield
-    shutil.rmtree(_tmp_dir, ignore_errors=True)
+    # Kalıcı depolama — temizleme yapılmaz
 
 
 app = FastAPI(title="Araç Hız Tespit Sistemi", lifespan=lifespan)
@@ -144,8 +197,9 @@ async def upload_video(file: UploadFile = File(...)) -> VideoMetaOut:
         raise HTTPException(status_code=413, detail="Dosya boyutu 10 GB limitini aşıyor.")
 
     video_id = str(uuid.uuid4())
-    suffix = Path(file.filename or "video.mp4").suffix or ".mp4"
-    dest = _tmp_dir / f"{video_id}{suffix}"
+    original_filename = file.filename or "video.mp4"
+    suffix = Path(original_filename).suffix or ".mp4"
+    dest = _WORK_DIR / "videos" / f"{video_id}{suffix}"
     dest.write_bytes(data)
 
     try:
@@ -156,6 +210,7 @@ async def upload_video(file: UploadFile = File(...)) -> VideoMetaOut:
 
     sha = _sha256(dest)
     _video_store[video_id] = dest
+    _video_filenames[video_id] = original_filename
 
     return VideoMetaOut(
         video_id=video_id,
@@ -418,7 +473,32 @@ def _finalize_job(job: JobState, result, out_video: Path, out_report: Path, out_
     job.model_name_used = result.model_name
     job.video_path = result.video_path
     job.progress_pct = 100.0
+    job.completed_at = datetime.datetime.now().isoformat(timespec="seconds")
     job.state = "done"
+
+    # Kalıcı metadata index — restart sonrası geri yükleme için
+    try:
+        job_meta = {
+            "job_id": job.job_id,
+            "video_id": job.video_id,
+            "video_path": result.video_path,
+            "video_filename": job.video_filename,
+            "fps": round(result.video_meta.fps, 4),
+            "width": result.video_meta.width,
+            "height": result.video_meta.height,
+            "frame_count": result.video_meta.frame_count,
+            "created_at": job.created_at,
+            "completed_at": job.completed_at,
+            "vehicle_count": len(estimates),
+            "frame_step": result.frame_step,
+            "model_name": result.model_name,
+            "result_json": job.result_json,
+        }
+        (out_dir / "job_meta.json").write_text(
+            json.dumps(job_meta, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+    except Exception as exc:
+        print(f"[UYARI] job_meta.json yazılamadı ({job.job_id}): {exc}", flush=True)
 
     # Ham hız serisi — GPS doğrulaması ve hata analizi için
     _est_by_id = {est.track_id: est for est in result.speed_estimates}
@@ -551,6 +631,8 @@ async def start_pipeline(req: PipelineRequest) -> dict:
 
     job_id = str(uuid.uuid4())
     job = _job_store.create(job_id)
+    job.video_id = req.video_id
+    job.video_filename = _video_filenames.get(req.video_id)
 
     out_dir = _tmp_dir / job_id
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -823,6 +905,58 @@ async def job_plan_view(job_id: str) -> Response:
 # Not: Yalnızca destekleyici kanıt üretir — bkz. tasks/M9.md, DECISIONS.md.
 # confidence_level hesabına dahil edilmez; PDF raporu değiştirmez (bkz. bilinen sınırlama).
 
+@app.get("/api/jobs", response_model=list[JobSummaryOut])
+async def list_jobs() -> list[JobSummaryOut]:
+    """Tüm tamamlanan analizleri, en yeniden en eskiye listeler."""
+    summaries: list[JobSummaryOut] = []
+    jobs_dir = _WORK_DIR / "jobs"
+    if not jobs_dir.exists():
+        return []
+    for meta_path in jobs_dir.glob("*/job_meta.json"):
+        try:
+            meta = json.loads(meta_path.read_text(encoding="utf-8"))
+            summaries.append(JobSummaryOut(
+                job_id=meta["job_id"],
+                video_filename=meta.get("video_filename"),
+                created_at=meta.get("created_at", ""),
+                completed_at=meta.get("completed_at"),
+                vehicle_count=meta.get("vehicle_count", 0),
+                frame_step=meta.get("frame_step"),
+                model_name=meta.get("model_name"),
+                fps=meta.get("fps"),
+                width=meta.get("width"),
+                height=meta.get("height"),
+                frame_count=meta.get("frame_count"),
+                video_id=meta.get("video_id"),
+            ))
+        except Exception:
+            pass
+    summaries.sort(key=lambda s: s.created_at, reverse=True)
+    return summaries
+
+
+@app.get("/api/job/{job_id}/calibration")
+async def job_calibration(job_id: str) -> dict:
+    """Geçmiş analiz için kalibrasyon kontrol noktalarını döner."""
+    _get_done_job(job_id)
+    cal_json_path = _job_out_dir(job_id) / "calibration.json"
+    if not cal_json_path.exists():
+        raise HTTPException(status_code=404, detail="Kalibrasyon verisi bulunamadı.")
+    _, points, _ = load_calibration(cal_json_path)
+    return {
+        "control_points": [
+            {
+                "id": p.id,
+                "pixel": list(p.pixel),
+                "world_m": list(p.world_m),
+                "source": p.source,
+                "held_out": p.held_out,
+            }
+            for p in points
+        ]
+    }
+
+
 def _job_out_dir(job_id: str) -> Path:
     if _tmp_dir is None:
         raise HTTPException(status_code=503, detail="Sunucu hazır değil.")
@@ -960,6 +1094,8 @@ async def recalibrate(job_id: str, req: RecalibrateRequest) -> dict:
 
     new_job_id = str(uuid.uuid4())
     new_job = _job_store.create(new_job_id)
+    new_job.video_id = req.video_id
+    new_job.video_filename = _video_filenames.get(req.video_id)
     new_out_dir = _tmp_dir / new_job_id
     new_out_dir.mkdir(parents=True, exist_ok=True)
     new_cal_path = new_out_dir / "calibration.json"

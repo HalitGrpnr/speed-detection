@@ -1,9 +1,9 @@
 import { useRef, useState } from 'react'
-import { useMutation } from '@tanstack/react-query'
-import { Check, Copy, FileVideo, Loader2, UploadCloud } from 'lucide-react'
+import { useMutation, useQuery } from '@tanstack/react-query'
+import { Check, ChevronDown, ChevronRight, Clock, Copy, FileVideo, Loader2, UploadCloud } from 'lucide-react'
 import { api } from '@/lib/api'
 import { cn } from '@/lib/utils'
-import type { VideoMeta } from '@/lib/models'
+import type { JobSummary, VideoMeta } from '@/lib/models'
 import { useWizard } from '@/store/wizard'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -30,6 +30,7 @@ export function UploadStep() {
   const setControlPoints = useWizard((s) => s.setControlPoints)
   const setCalibration = useWizard((s) => s.setCalibration)
   const setJobId = useWizard((s) => s.setJobId)
+  const loadHistoricalJob = useWizard((s) => s.loadHistoricalJob)
 
   const inputRef = useRef<HTMLInputElement>(null)
   const [dragOver, setDragOver] = useState(false)
@@ -148,6 +149,8 @@ export function UploadStep() {
         )}
 
         <StepFooter />
+
+        <HistoryPanel onLoad={loadHistoricalJob} />
       </CardContent>
     </Card>
   )
@@ -187,5 +190,130 @@ function ShaChip({ sha }: { sha: string }) {
         <Copy className="ml-auto size-4 shrink-0" />
       )}
     </button>
+  )
+}
+
+// ── T24 Geçmiş Analizler Paneli ───────────────────────────────────────────────
+
+function formatDate(iso: string): string {
+  try {
+    return new Date(iso).toLocaleString('tr-TR', {
+      day: '2-digit', month: '2-digit', year: 'numeric',
+      hour: '2-digit', minute: '2-digit',
+    })
+  } catch {
+    return iso
+  }
+}
+
+function HistoryPanel({ onLoad }: { onLoad: (summary: JobSummary, controlPoints: import('@/lib/models').ControlPoint[]) => void }) {
+  const [open, setOpen] = useState(false)
+  const [loadingId, setLoadingId] = useState<string | null>(null)
+  const [loadError, setLoadError] = useState<string | null>(null)
+
+  const historyQuery = useQuery({
+    queryKey: ['jobHistory'],
+    queryFn: () => api.listJobs(),
+    staleTime: 30_000,
+    enabled: open,
+  })
+
+  const jobs = historyQuery.data ?? []
+
+  async function handleLoad(summary: JobSummary) {
+    setLoadingId(summary.job_id)
+    setLoadError(null)
+    try {
+      const cal = await api.jobCalibration(summary.job_id)
+      onLoad(summary, cal.control_points)
+    } catch (err) {
+      setLoadError((err as Error).message)
+    } finally {
+      setLoadingId(null)
+    }
+  }
+
+  return (
+    <div className="rounded-lg border border-dashed">
+      <button
+        type="button"
+        className="flex w-full items-center gap-2 px-4 py-3 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+        onClick={() => setOpen((v) => !v)}
+      >
+        {open ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
+        <Clock className="size-4" />
+        Geçmiş Analizler
+        {jobs.length > 0 && (
+          <span className="ml-auto text-xs bg-muted rounded px-1.5 py-0.5">{jobs.length}</span>
+        )}
+      </button>
+
+      {open && (
+        <div className="border-t px-4 pb-4 pt-3 space-y-3">
+          {loadError && (
+            <StatusBanner tone="error">{loadError}</StatusBanner>
+          )}
+
+          {historyQuery.isLoading && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="size-3.5 animate-spin" /> Yükleniyor…
+            </div>
+          )}
+
+          {historyQuery.isError && (
+            <StatusBanner tone="error">
+              {(historyQuery.error as Error).message}
+            </StatusBanner>
+          )}
+
+          {historyQuery.isSuccess && jobs.length === 0 && (
+            <p className="text-xs text-muted-foreground">
+              Henüz tamamlanmış analiz yok. Yeni bir analiz yaptığınızda burada görünür.
+            </p>
+          )}
+
+          {jobs.length > 0 && (
+            <div className="space-y-1.5">
+              {jobs.map((job) => (
+                <div
+                  key={job.job_id}
+                  className="flex items-center gap-3 rounded-md border bg-card px-3 py-2"
+                >
+                  <FileVideo className="size-4 shrink-0 text-muted-foreground" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">
+                      {job.video_filename ?? 'Bilinmeyen video'}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {formatDate(job.created_at)}
+                      {' · '}
+                      {job.vehicle_count} araç
+                      {job.frame_count != null && job.fps != null && (
+                        <> · {Math.round(job.frame_count / job.fps)}s</>
+                      )}
+                      {job.model_name && (
+                        <> · {job.model_name}</>
+                      )}
+                    </p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="shrink-0 h-7 px-3 text-xs"
+                    disabled={loadingId === job.job_id}
+                    onClick={() => handleLoad(job)}
+                  >
+                    {loadingId === job.job_id ? (
+                      <Loader2 className="size-3 animate-spin" />
+                    ) : null}
+                    Yükle
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
   )
 }

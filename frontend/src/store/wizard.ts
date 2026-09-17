@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { CalibrateResponse, ControlPoint, VideoMeta } from '@/lib/models'
+import type { CalibrateResponse, ControlPoint, JobSummary, VideoMeta } from '@/lib/models'
 
 export const STEPS = [
   { id: 1, label: 'Video Yükle' },
@@ -33,6 +33,8 @@ interface WizardState {
   setCalibration: (c: CalibrateResponse | null) => void
   setJobId: (id: string | null) => void
   setSourceJobId: (id: string | null) => void
+  /** T24 — Geçmiş bir analizi yükleyip doğrudan Adım 6'ya geç. */
+  loadHistoricalJob: (summary: JobSummary, controlPoints: ControlPoint[]) => void
   reset: () => void
 }
 
@@ -83,5 +85,23 @@ export const useWizard = create<WizardState>((set, get) => ({
   setCalibration: (calibration) => set({ calibration }),
   setJobId: (jobId) => set({ jobId }),
   setSourceJobId: (sourceJobId) => set({ sourceJobId }),
+
+  loadHistoricalJob: (summary, controlPoints) => set({
+    ...INITIAL,
+    jobId: summary.job_id,
+    sourceJobId: null,
+    controlPoints,
+    videoMeta: summary.video_id ? {
+      video_id: summary.video_id,
+      fps: summary.fps ?? 25,
+      fps_source: 'container',
+      width: summary.width ?? 0,
+      height: summary.height ?? 0,
+      frame_count: summary.frame_count ?? 0,
+      sha256: '',
+    } : null,
+    step: 6,
+  }),
+
   reset: () => set({ ...INITIAL }),
 }))

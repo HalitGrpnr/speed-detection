@@ -88,6 +88,21 @@ class JobResultOut(BaseModel):
     estimates: list[SpeedEstimateOut]
 
 
+class JobSummaryOut(BaseModel):
+    job_id: str
+    video_filename: str | None = None
+    created_at: str
+    completed_at: str | None = None
+    vehicle_count: int
+    frame_step: int | None = None
+    model_name: str | None = None
+    fps: float | None = None
+    width: int | None = None
+    height: int | None = None
+    frame_count: int | None = None
+    video_id: str | None = None
+
+
 class AxleSuggestFrameResponse(BaseModel):
     frame_n: int | None = None
 
