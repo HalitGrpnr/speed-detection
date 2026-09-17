@@ -45,6 +45,7 @@
 | T24 | Kalıcı analiz geçmişi (disk-based job storage) | Backend + UI | Orta | — | ✅ |
 | T25 | Tekerlek hızı overlay + bbox/tekerlek video toggle | UI + Backend | Orta | T16 | ✅ |
 | T26 | Kapsamlı UI/UX yeniden tasarımı | UI | Büyük | T24, T25 | ✅ |
+| T27 | H-bağımsız dingil adımlama (axle timing) | Hız çekirdeği + UI | Orta | — | ✅ |
 
 Durum: ⬜ Başlanmadı · 🟡 Devam ediyor · ✅ Bitti · ⛔ Engellendi
 
@@ -416,3 +417,4 @@ yüklemek RCE riski taşıyor (bkz. `DECISIONS.md`).
 | 2026-09-17 | T26 | Görev kartı + kapsamlı UI/UX analiz belgesi (docs/uiux-analiz.md) oluşturuldu | — |
 | 2026-09-17 | T26 | Aşama 1: 2-sütun sonuç layoutu, araç kartları, mod şeridi, accordion, sekme, token temizliği | `9b959b4` |
 | 2026-09-17 | T26 | Aşama 2: durum çubuğu, stepper uyarı ikonu, slider, RMS tam-genişlik kart, gradient azaltma | `0d932ab` |
+| 2026-09-17 | T27 | axle_timing_speed() + 10 birim testi + /axle-timing endpoint + AxleTimingPanel (5-adım wizard) + ResultsStep entegrasyonu | `54c936e` |
