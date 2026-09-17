@@ -390,6 +390,35 @@ export function CalibrationStep() {
                 <ChevronRight className="size-4" />
               </button>
             </div>
+            {/* Aktif mod göstergesi */}
+            {(() => {
+              const modeMap: Record<string, { label: string; cls: string }> = {
+                'point':       { label: 'Nokta Ekleme',            cls: 'border-primary/40 bg-primary/5 text-primary' },
+                'bracket':     { label: 'Bracket Enterpolasyon',   cls: 'border-pink-500/40 bg-pink-500/5 text-pink-400' },
+                'quad':        { label: 'Dörtgen',                 cls: 'border-violet-500/40 bg-violet-500/5 text-violet-400' },
+                'road-anchor': { label: 'Yol Yönü Tanımla',       cls: 'border-sky-500/40 bg-sky-500/5 text-sky-400' },
+              }
+              const cfg = modeMap[canvasMode] ?? modeMap['point']
+              const bracketFazlar = ['rear_n', 'rear_n1', 'front_n', 'front_n1', 'result'] as const
+              const fazIdx = bracketFazlar.indexOf(bracketPhase as typeof bracketFazlar[number])
+              return (
+                <div className={`flex items-center gap-2 rounded-md border px-3 py-1.5 text-xs font-medium ${cfg.cls}`}>
+                  <span>Mod: {cfg.label}</span>
+                  {canvasMode === 'bracket' && bracketPhase !== 'result' && (
+                    <span className="ml-auto flex items-center gap-1">
+                      {bracketFazlar.slice(0, 4).map((_, i) => (
+                        <span
+                          key={i}
+                          className={`size-2 rounded-full ${i < fazIdx ? 'bg-current opacity-70' : i === fazIdx ? 'bg-current' : 'bg-current opacity-20'}`}
+                        />
+                      ))}
+                      <span className="ml-1 opacity-70">Faz {fazIdx + 1}/4</span>
+                    </span>
+                  )}
+                </div>
+              )
+            })()}
+
             {/* Bracket mode ek bilgi */}
             {canvasMode === 'bracket' && ghostPoint && (
               <div className="px-1 text-xs text-pink-400/80">
@@ -446,24 +475,38 @@ export function CalibrationStep() {
           </div>
 
           <div className="space-y-3">
-            {/* Canlı RMS */}
-            <div className="rounded-lg border p-3">
+            {/* Canlı kalibrasyon durumu */}
+            <div className={`rounded-lg border p-3 transition-colors ${
+              cal.status === 'ok'
+                ? 'border-success/50 bg-success/5'
+                : cal.status === 'error'
+                  ? 'border-danger/50 bg-danger/5'
+                  : cal.status === 'loading'
+                    ? 'border-primary/40 bg-primary/5'
+                    : 'border-border'
+            }`}>
               <div className="mb-1 flex items-center justify-between">
                 <span
                   className="text-sm font-medium"
                   title="Kalibrasyon hata payı: tıkladığınız noktaların girdiğiniz ölçümlerle ne kadar uyuştuğu."
                 >
-                  Kalibrasyon hata payı
+                  Kalibrasyon Durumu
                 </span>
-                {cal.status === 'loading' && <Loader2 className="size-4 animate-spin text-muted-foreground" />}
+                {cal.status === 'loading' && (
+                  <Loader2 className="size-4 animate-spin text-primary" />
+                )}
               </div>
               {cal.status === 'insufficient' && (
-                <p className="text-sm text-muted-foreground">En az 4 nokta gerekli ({points.length} var)</p>
+                <p className="text-sm text-muted-foreground">
+                  En az 4 nokta gerekli ({points.length} var)
+                </p>
               )}
               {cal.status === 'loading' && <RmsBadge rmsM={null} />}
-              {cal.status === 'error' && <StatusBanner tone="error">{cal.message}</StatusBanner>}
+              {cal.status === 'error' && (
+                <StatusBanner tone="error">{cal.message}</StatusBanner>
+              )}
               {cal.status === 'ok' && (
-                <div className="space-y-1">
+                <div className="space-y-1.5">
                   <RmsBadge rmsM={cal.data.rms_m} />
                   <p className="text-xs text-muted-foreground">
                     {cal.data.rejected_points.length > 0 ? (
@@ -474,8 +517,11 @@ export function CalibrationStep() {
                       <span>{cal.data.inlier_count}/{cal.data.point_count} nokta kullanıldı</span>
                     )}
                     {cal.data.planarity_warning && (
-                      <span> · ⚠ noktalar aynı düzlemde görünmüyor</span>
+                      <span> · ⚠ noktalar düzlemsel değil</span>
                     )}
+                  </p>
+                  <p className="text-xs font-medium text-success">
+                    ✓ Kalibrasyon hazır — Adım 4'te onaylayabilirsiniz
                   </p>
                 </div>
               )}

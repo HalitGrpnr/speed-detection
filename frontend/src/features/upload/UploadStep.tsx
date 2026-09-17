@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { Check, ChevronDown, ChevronRight, Clock, Copy, FileVideo, Loader2, UploadCloud } from 'lucide-react'
+import { Check, Clock, Copy, FileVideo, Loader2, UploadCloud } from 'lucide-react'
 import { api } from '@/lib/api'
 import { cn } from '@/lib/utils'
 import type { JobSummary, VideoMeta } from '@/lib/models'
@@ -36,6 +36,7 @@ export function UploadStep() {
   const [dragOver, setDragOver] = useState(false)
   const [progress, setProgress] = useState(0)
   const [fileName, setFileName] = useState<string | null>(null)
+  const [activeTab, setActiveTab] = useState<'new' | 'history'>('new')
 
   const mutation = useMutation({
     mutationFn: (file: File) => {
@@ -82,17 +83,8 @@ export function UploadStep() {
           <StatusBanner tone="error">{(mutation.error as Error).message}</StatusBanner>
         )}
 
-        {uploading ? (
-          <div className="space-y-3 rounded-xl border bg-muted/30 p-6">
-            <div className="flex items-center gap-2 text-sm">
-              <Loader2 className="size-4 animate-spin text-primary" />
-              <span className="font-medium">Yükleniyor…</span>
-              <span className="truncate text-muted-foreground">{fileName}</span>
-              <span className="ml-auto tabular-nums text-muted-foreground">{progress}%</span>
-            </div>
-            <Progress value={progress} />
-          </div>
-        ) : videoMeta ? (
+        {/* Video yüklenmişse sekme gösterme — direkt meta + StepFooter */}
+        {videoMeta ? (
           <div className="space-y-4">
             <StatusBanner tone="success">
               Video yüklendi ve doğrulandı. Aşağıdaki bilgileri kontrol edip devam edin.
@@ -111,7 +103,7 @@ export function UploadStep() {
 
             <div>
               <p className="mb-1 text-xs font-medium text-muted-foreground">
-                SHA-256 (orijinal dosya bütünlüğü — adli iz)
+                Dosya bütünlüğü doğrulandı · SHA-256
               </p>
               <ShaChip sha={videoMeta.sha256} />
             </div>
@@ -120,37 +112,81 @@ export function UploadStep() {
               <FileVideo /> Farklı video yükle
             </Button>
           </div>
-        ) : (
-          <div
-            onClick={() => inputRef.current?.click()}
-            onDragOver={(e) => {
-              e.preventDefault()
-              setDragOver(true)
-            }}
-            onDragLeave={() => setDragOver(false)}
-            onDrop={(e) => {
-              e.preventDefault()
-              setDragOver(false)
-              handleFile(e.dataTransfer.files?.[0])
-            }}
-            className={cn(
-              'flex cursor-pointer flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed p-12 text-center transition-colors',
-              dragOver
-                ? 'border-primary bg-primary/5'
-                : 'border-border hover:border-primary/50 hover:bg-accent/40',
-            )}
-          >
-            <UploadCloud className="size-10 text-muted-foreground" />
-            <div>
-              <p className="text-sm font-medium">Tıklayın veya videoyu sürükleyip bırakın</p>
-              <p className="mt-1 text-xs text-muted-foreground">MP4, AVI, MKV, MOV · maksimum 10 GB</p>
+        ) : uploading ? (
+          <div className="space-y-3 rounded-xl border bg-muted/30 p-6">
+            <div className="flex items-center gap-2 text-sm">
+              <Loader2 className="size-4 animate-spin text-primary" />
+              <span className="font-medium">Yükleniyor…</span>
+              <span className="truncate text-muted-foreground">{fileName}</span>
+              <span className="ml-auto tabular-nums text-muted-foreground">{progress}%</span>
             </div>
+            <Progress value={progress} />
           </div>
+        ) : (
+          <>
+            {/* Sekme seçici */}
+            <div className="flex overflow-hidden rounded-lg border text-sm font-medium">
+              <button
+                type="button"
+                className={cn(
+                  'flex-1 px-4 py-2.5 transition-colors',
+                  activeTab === 'new'
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-card text-muted-foreground hover:bg-muted',
+                )}
+                onClick={() => setActiveTab('new')}
+              >
+                Yeni Analiz
+              </button>
+              <button
+                type="button"
+                className={cn(
+                  'flex-1 border-l px-4 py-2.5 transition-colors flex items-center justify-center gap-2',
+                  activeTab === 'history'
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-card text-muted-foreground hover:bg-muted',
+                )}
+                onClick={() => setActiveTab('history')}
+              >
+                <Clock className="size-3.5" /> Geçmiş Analizler
+              </button>
+            </div>
+
+            {activeTab === 'new' && (
+              <div
+                onClick={() => inputRef.current?.click()}
+                onDragOver={(e) => {
+                  e.preventDefault()
+                  setDragOver(true)
+                }}
+                onDragLeave={() => setDragOver(false)}
+                onDrop={(e) => {
+                  e.preventDefault()
+                  setDragOver(false)
+                  handleFile(e.dataTransfer.files?.[0])
+                }}
+                className={cn(
+                  'flex cursor-pointer flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed p-12 text-center transition-colors',
+                  dragOver
+                    ? 'border-primary bg-primary/5'
+                    : 'border-border hover:border-primary/50 hover:bg-accent/40',
+                )}
+              >
+                <UploadCloud className="size-10 text-muted-foreground" />
+                <div>
+                  <p className="text-sm font-medium">Tıklayın veya videoyu sürükleyip bırakın</p>
+                  <p className="mt-1 text-xs text-muted-foreground">MP4, AVI, MKV, MOV · maksimum 10 GB</p>
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'history' && (
+              <HistoryPanelContent onLoad={loadHistoricalJob} />
+            )}
+          </>
         )}
 
         <StepFooter />
-
-        <HistoryPanel onLoad={loadHistoricalJob} />
       </CardContent>
     </Card>
   )
@@ -185,7 +221,7 @@ function ShaChip({ sha }: { sha: string }) {
     >
       <span className="break-all">{sha}</span>
       {copied ? (
-        <Check className="ml-auto size-4 shrink-0 text-emerald-600" />
+        <Check className="ml-auto size-4 shrink-0 text-success" />
       ) : (
         <Copy className="ml-auto size-4 shrink-0" />
       )}
@@ -193,7 +229,7 @@ function ShaChip({ sha }: { sha: string }) {
   )
 }
 
-// ── T24 Geçmiş Analizler Paneli ───────────────────────────────────────────────
+// ── T24 Geçmiş Analizler ─────────────────────────────────────────────────────
 
 function formatDate(iso: string): string {
   try {
@@ -206,8 +242,11 @@ function formatDate(iso: string): string {
   }
 }
 
-function HistoryPanel({ onLoad }: { onLoad: (summary: JobSummary, controlPoints: import('@/lib/models').ControlPoint[]) => void }) {
-  const [open, setOpen] = useState(false)
+function HistoryPanelContent({
+  onLoad,
+}: {
+  onLoad: (summary: JobSummary, controlPoints: import('@/lib/models').ControlPoint[]) => void
+}) {
   const [loadingId, setLoadingId] = useState<string | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
 
@@ -215,7 +254,6 @@ function HistoryPanel({ onLoad }: { onLoad: (summary: JobSummary, controlPoints:
     queryKey: ['jobHistory'],
     queryFn: () => api.listJobs(),
     staleTime: 30_000,
-    enabled: open,
   })
 
   const jobs = historyQuery.data ?? []
@@ -234,84 +272,61 @@ function HistoryPanel({ onLoad }: { onLoad: (summary: JobSummary, controlPoints:
   }
 
   return (
-    <div className="rounded-lg border border-dashed">
-      <button
-        type="button"
-        className="flex w-full items-center gap-2 px-4 py-3 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
-        onClick={() => setOpen((v) => !v)}
-      >
-        {open ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
-        <Clock className="size-4" />
-        Geçmiş Analizler
-        {jobs.length > 0 && (
-          <span className="ml-auto text-xs bg-muted rounded px-1.5 py-0.5">{jobs.length}</span>
-        )}
-      </button>
+    <div className="space-y-3">
+      {loadError && <StatusBanner tone="error">{loadError}</StatusBanner>}
 
-      {open && (
-        <div className="border-t px-4 pb-4 pt-3 space-y-3">
-          {loadError && (
-            <StatusBanner tone="error">{loadError}</StatusBanner>
-          )}
+      {historyQuery.isLoading && (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Loader2 className="size-3.5 animate-spin" /> Yükleniyor…
+        </div>
+      )}
 
-          {historyQuery.isLoading && (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Loader2 className="size-3.5 animate-spin" /> Yükleniyor…
+      {historyQuery.isError && (
+        <StatusBanner tone="error">{(historyQuery.error as Error).message}</StatusBanner>
+      )}
+
+      {historyQuery.isSuccess && jobs.length === 0 && (
+        <p className="rounded-lg border border-dashed px-4 py-6 text-center text-sm text-muted-foreground">
+          Henüz tamamlanmış analiz yok. Yeni bir analiz yaptığınızda burada görünür.
+        </p>
+      )}
+
+      {jobs.length > 0 && (
+        <div className="space-y-1.5">
+          {jobs.map((job) => (
+            <div
+              key={job.job_id}
+              className="flex items-center gap-3 rounded-md border bg-card px-3 py-2.5"
+            >
+              <FileVideo className="size-4 shrink-0 text-muted-foreground" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium truncate">
+                  {job.video_filename ?? 'Bilinmeyen video'}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {formatDate(job.created_at)}
+                  {' · '}
+                  {job.vehicle_count} araç
+                  {job.frame_count != null && job.fps != null && (
+                    <> · {Math.round(job.frame_count / job.fps)}s</>
+                  )}
+                  {job.model_name && <> · {job.model_name}</>}
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="shrink-0 h-7 px-3 text-xs"
+                disabled={loadingId === job.job_id}
+                onClick={() => handleLoad(job)}
+              >
+                {loadingId === job.job_id ? (
+                  <Loader2 className="size-3 animate-spin" />
+                ) : null}
+                Yükle
+              </Button>
             </div>
-          )}
-
-          {historyQuery.isError && (
-            <StatusBanner tone="error">
-              {(historyQuery.error as Error).message}
-            </StatusBanner>
-          )}
-
-          {historyQuery.isSuccess && jobs.length === 0 && (
-            <p className="text-xs text-muted-foreground">
-              Henüz tamamlanmış analiz yok. Yeni bir analiz yaptığınızda burada görünür.
-            </p>
-          )}
-
-          {jobs.length > 0 && (
-            <div className="space-y-1.5">
-              {jobs.map((job) => (
-                <div
-                  key={job.job_id}
-                  className="flex items-center gap-3 rounded-md border bg-card px-3 py-2"
-                >
-                  <FileVideo className="size-4 shrink-0 text-muted-foreground" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">
-                      {job.video_filename ?? 'Bilinmeyen video'}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {formatDate(job.created_at)}
-                      {' · '}
-                      {job.vehicle_count} araç
-                      {job.frame_count != null && job.fps != null && (
-                        <> · {Math.round(job.frame_count / job.fps)}s</>
-                      )}
-                      {job.model_name && (
-                        <> · {job.model_name}</>
-                      )}
-                    </p>
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="shrink-0 h-7 px-3 text-xs"
-                    disabled={loadingId === job.job_id}
-                    onClick={() => handleLoad(job)}
-                  >
-                    {loadingId === job.job_id ? (
-                      <Loader2 className="size-3 animate-spin" />
-                    ) : null}
-                    Yükle
-                  </Button>
-                </div>
-              ))}
-            </div>
-          )}
+          ))}
         </div>
       )}
     </div>

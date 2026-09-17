@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { Loader2, Play, RotateCcw } from 'lucide-react'
+import { ChevronDown, Loader2, Play, RotateCcw } from 'lucide-react'
 import { api } from '@/lib/api'
 import type { ModelSize } from '@/lib/models'
 import { useWizard } from '@/store/wizard'
@@ -27,7 +27,7 @@ export function PipelineStep() {
   const setJobId = useWizard((s) => s.setJobId)
   const goTo = useWizard((s) => s.goTo)
 
-  const [modelSize, setModelSize] = useState<ModelSize>('nano')
+  const [modelSize, setModelSize] = useState<ModelSize>('medium')
   const [frameStep, setFrameStep] = useState(1)
   const [fpsEnabled, setFpsEnabled] = useState(false)
   const [fpsValue, setFpsValue] = useState(25)
@@ -80,6 +80,7 @@ export function PipelineStep() {
     )
   }
 
+  const [advancedOpen, setAdvancedOpen] = useState(false)
   const locked = active || start.isPending
   const reset = () => {
     setJobId(null)
@@ -89,65 +90,97 @@ export function PipelineStep() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Adım 5 — Analiz Parametreleri ve Başlat</CardTitle>
+        <CardTitle>Adım 5 — Analizi Başlat</CardTitle>
         <CardDescription>
-          Tespit + takip + hız hesabı arka planda çalışır. Düşük donanımda kare adımını artırın.
+          Tespit + takip + hız hesabı arka planda çalışır. Varsayılan ayarlar adli doğruluk
+          önceliklidir.
         </CardDescription>
       </CardHeader>
 
       <CardContent className="space-y-5">
-        <div className="grid gap-4 sm:grid-cols-3">
-          <label className="space-y-1 text-sm">
-            <span className="font-medium">Model Boyutu</span>
-            <select
-              value={modelSize}
-              disabled={locked}
-              onChange={(e) => setModelSize(e.target.value as ModelSize)}
-              className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm disabled:opacity-50"
-            >
-              <option value="nano">Nano (CPU, hızlı)</option>
-              <option value="small">Small (daha iyi tespit)</option>
-              <option value="medium">Medium (en iyi, yavaş)</option>
-            </select>
-          </label>
-
-          <label className="space-y-1 text-sm">
-            <span className="font-medium">Kare Adımı</span>
-            <select
-              value={frameStep}
-              disabled={locked}
-              onChange={(e) => setFrameStep(Number(e.target.value))}
-              className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm disabled:opacity-50"
-            >
-              <option value={1}>1 (her kare)</option>
-              <option value={2}>2 (her 2. kare)</option>
-              <option value={3}>3 (her 3. kare)</option>
-              <option value={5}>5 (düşük RAM)</option>
-            </select>
-          </label>
-
-          <label className="space-y-1 text-sm">
-            <span className="font-medium">FPS Geçersiz Kıl</span>
-            <div className="flex h-9 items-center gap-2">
-              <input
-                type="checkbox"
-                checked={fpsEnabled}
-                disabled={locked}
-                onChange={(e) => setFpsEnabled(e.target.checked)}
-                className="size-4 accent-primary"
-              />
-              <Input
-                type="number"
-                step="0.01"
-                min="1"
-                value={fpsValue}
-                disabled={!fpsEnabled || locked}
-                onChange={(e) => setFpsValue(Number(e.target.value))}
-                className="h-9"
+        {/* Gelişmiş ayarlar accordion */}
+        <div className="rounded-lg border">
+          <button
+            type="button"
+            className="flex w-full items-center justify-between px-4 py-3 text-sm font-medium hover:bg-muted/30 transition-colors"
+            onClick={() => setAdvancedOpen((v) => !v)}
+            disabled={locked}
+          >
+            <span>Gelişmiş Ayarlar</span>
+            <div className="flex items-center gap-2">
+              {locked ? (
+                <span className="text-xs text-muted-foreground tabular-nums">
+                  {modelSize} · Kare adımı {frameStep}
+                  {fpsEnabled ? ` · FPS: ${fpsValue}` : ''}
+                </span>
+              ) : (
+                <span className="text-xs text-muted-foreground">
+                  Model: {modelSize}
+                </span>
+              )}
+              <ChevronDown
+                className={`size-4 text-muted-foreground transition-transform ${advancedOpen && !locked ? 'rotate-180' : ''}`}
               />
             </div>
-            <span className="text-xs text-muted-foreground">VFR video için manuel girin.</span>
-          </label>
+          </button>
+
+          {advancedOpen && !locked && (
+            <div className="border-t px-4 py-4">
+              <div className="grid gap-4 sm:grid-cols-3">
+                <label className="space-y-1 text-sm">
+                  <span className="font-medium">Model Boyutu</span>
+                  <select
+                    value={modelSize}
+                    onChange={(e) => setModelSize(e.target.value as ModelSize)}
+                    className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                  >
+                    <option value="nano">Nano (CPU, hızlı)</option>
+                    <option value="small">Small (daha iyi tespit)</option>
+                    <option value="medium">Medium (en iyi, yavaş)</option>
+                  </select>
+                  {modelSize !== 'medium' && (
+                    <span className="text-[10px] text-warning">Adli doğruluk için Medium önerilir</span>
+                  )}
+                </label>
+
+                <label className="space-y-1 text-sm">
+                  <span className="font-medium">Kare Adımı</span>
+                  <select
+                    value={frameStep}
+                    onChange={(e) => setFrameStep(Number(e.target.value))}
+                    className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                  >
+                    <option value={1}>1 (her kare)</option>
+                    <option value={2}>2 (her 2. kare)</option>
+                    <option value={3}>3 (her 3. kare)</option>
+                    <option value={5}>5 (düşük RAM)</option>
+                  </select>
+                </label>
+
+                <label className="space-y-1 text-sm">
+                  <span className="font-medium">FPS Geçersiz Kıl</span>
+                  <div className="flex h-9 items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={fpsEnabled}
+                      onChange={(e) => setFpsEnabled(e.target.checked)}
+                      className="size-4 accent-primary"
+                    />
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="1"
+                      value={fpsValue}
+                      disabled={!fpsEnabled}
+                      onChange={(e) => setFpsValue(Number(e.target.value))}
+                      className="h-9"
+                    />
+                  </div>
+                  <span className="text-xs text-muted-foreground">VFR video için manuel girin.</span>
+                </label>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Durum */}

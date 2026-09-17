@@ -35,7 +35,7 @@ export function Stepper() {
               className={cn(
                 'flex size-6 shrink-0 items-center justify-center rounded-full border text-xs font-semibold',
                 active && 'border-primary bg-primary text-primary-foreground',
-                done && 'border-emerald-500 bg-emerald-500 text-white',
+                done && 'border-success bg-success text-success-foreground',
                 !active && !done && 'border-muted-foreground/30',
               )}
             >
