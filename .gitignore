@@ -20,3 +20,10 @@ src/ui/web/
 
 # IDE (JetBrains)
 .idea/
+
+# Kalıcı oturum logları + araştırma çıktıları (audit izi yerelde kalır — CLAUDE.md Kural 1)
+data/
+# Test/olay videoları ve sahne görüntüleri repoya girmez (veri makineden çıkmaz)
+docs/*.mp4
+docs/*.jpg
+docs/*.png
