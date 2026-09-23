@@ -47,6 +47,10 @@
 | T26 | Kapsamlı UI/UX yeniden tasarımı | UI | Büyük | T24, T25 | ✅ |
 | T27 | H-bağımsız dingil adımlama (axle timing) | Hız çekirdeği + UI | Orta | — | ✅ |
 | T28 | Cross-ratio hız yöntemi: iskelet sağlık kontrolü + odaklı uygulama | Hız çekirdeği + UX | Büyük | — | 🟡 |
+| T29 | Kare kare hız profili: overlay video + grafik/tablo (ortalama değil) | Hız çekirdeği + Çıktı | Büyük | T28 | ⬜ |
+| T30 | Operatör akışını sadeleştirme (kılavuz çizgi yanlılığı, günlük dil, cetvel) | UX | Orta-Büyük | T28 | ⬜ |
+| T31 | Araç izi referansının güvenilirlik kontrolleri (yön, dağılım) | Hız çekirdeği | Orta | T28 | ⬜ |
+| T32 | Oturum ekran görüntüleri (test/inceleme için, log ile eşli) | UI + Adli iz | Orta | T28 | ⬜ |
 
 Durum: ⬜ Başlanmadı · 🟡 Devam ediyor · ✅ Bitti · ⛔ Engellendi
 
