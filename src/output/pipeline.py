@@ -13,7 +13,7 @@ from src.calibration.io import load_calibration
 from src.calibration.planview import compute_plan_view
 from src.detection.models import Track
 from src.detection.tracker import VehicleTracker
-from src.detection.video import iter_video_frames, read_video_meta
+from src.detection.video import VideoMeta, iter_video_frames, read_video_meta
 from src.reliability.hull import calibration_hull
 from src.speed.calculator import estimate_speed
 from .models import PipelineResult
@@ -176,6 +176,39 @@ def run_pipeline(
         print(f"Tamamlandı: {elapsed:.1f} sn", flush=True)
 
     return result
+
+
+def run_tracking(
+    video_path: str | Path,
+    frame_step: int = 1,
+    model_name: str = "yolo11n.pt",
+    fps: float | None = None,
+    fps_source: str | None = None,
+    progress: bool = True,
+    on_progress: Callable[[float], None] | None = None,
+) -> tuple[list[Track], VideoMeta]:
+    """T28 — Yalnızca tespit + takip. Homografi kalibrasyonu, overlay ve rapor yok.
+
+    Cross-ratio hız yöntemi H gerektirmez; iz (bbox) verisi araç seçimi, düz-gidiş penceresi ve
+    araç-izi kaçış noktası için yeterlidir. FPS: operatör → konteyner.
+    """
+    meta = read_video_meta(video_path)
+    if fps is not None:
+        meta.fps = fps
+        meta.fps_source = (fps_source or "operator_override")  # type: ignore[assignment]
+
+    tracker = VehicleTracker(model_name=model_name)
+
+    def _track_cb(done: int, total: int) -> None:
+        if on_progress is not None:
+            on_progress(5.0 + done / total * 90.0)
+
+    tracks, _ = tracker.process_video(
+        video_path, frame_step=frame_step, progress=progress, on_progress=_track_cb
+    )
+    if progress:
+        print(f"Takip: {len(tracks)} track", flush=True)
+    return tracks, meta
 
 
 if __name__ == "__main__":

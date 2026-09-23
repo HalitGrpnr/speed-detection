@@ -281,3 +281,121 @@ class AutoCalibrateResponse(BaseModel):
     quality_reason: str
     estimated_rms_m: float | None
     warning: str | None
+
+
+# ── T28 — Cross-ratio (H-bağımsız, tek doğru boyunca hız) ──────────────────────
+
+class TrackRequest(BaseModel):
+    """Yalnızca tespit + takip (homografi kalibrasyonu gerekmez)."""
+    video_id: str
+    fps_override: float | None = None
+    frame_step: int = 1
+    model_size: Literal["nano", "small", "medium"] = "nano"
+
+
+class TrackPointOut(BaseModel):
+    frame: int
+    bbox: tuple[float, float, float, float]
+
+
+class TrackSummaryOut(BaseModel):
+    track_id: int
+    vehicle_class: str
+    first_frame: int
+    last_frame: int
+    point_count: int
+    points: list[TrackPointOut]
+
+
+class CrossRatioVpRequest(BaseModel):
+    """Perspektif referansı (VP) kaynakları. İkisi de verilirse uyum kontrolü yapılır."""
+    lane_lines: list[list[tuple[float, float]]] = []   # her çizgi ≥ 2 nokta (operatör)
+    use_trajectory: bool = True                        # araç gövdesi izlerinden (KLT)
+    frame_start: int | None = None                     # düz-gidiş penceresi
+    frame_end: int | None = None
+
+
+class FittedLineOut(BaseModel):
+    start: tuple[float, float]
+    end: tuple[float, float]
+    rms_px: float
+
+
+class VanishingOut(BaseModel):
+    source: str
+    point: tuple[float, float] | None
+    direction: tuple[float, float] | None
+    sigma_major_px: float | None
+    sigma_minor_px: float | None
+    n_lines: int
+    n_inliers: int
+    residual_rms_sigma: float
+    lines: list[FittedLineOut]
+    warnings: list[str]
+
+
+class VanishingAgreementOut(BaseModel):
+    status: Literal["agree", "disagree", "indeterminate"]
+    angle_deg: float
+    relative_distance: float | None
+    mahalanobis2: float | None
+    message: str
+
+
+class CrossRatioVpResponse(BaseModel):
+    lane: VanishingOut | None
+    trajectory: VanishingOut | None
+    trajectory_error: str | None = None
+    agreement: VanishingAgreementOut | None
+
+
+class KnownLengthIn(BaseModel):
+    kind: Literal["wheelbase", "scene"]
+    length_m: float
+    point_a: tuple[float, float]
+    point_b: tuple[float, float]
+    sigma_m: float | None = None
+    frame: int | None = None
+
+
+class ContactMarkIn(BaseModel):
+    frame: float
+    pixel: tuple[float, float]
+    source: Literal["manual", "operator-confirmed", "auto"] = "manual"
+
+
+class CrossRatioSpeedRequest(CrossRatioVpRequest):
+    vp_primary: Literal["lane", "trajectory"] = "lane"
+    known_length: KnownLengthIn
+    marks: list[ContactMarkIn]
+    pixel_sigma: float = 1.0
+
+
+class QualityGateOut(BaseModel):
+    code: str
+    severity: Literal["info", "warn", "error"]
+    message: str
+    action: str
+
+
+class CrossRatioSpeedResponse(BaseModel):
+    speed_kmh: float
+    ci_kmh: float
+    confidence_level: Literal["high", "medium", "low"]
+    ci_components_kmh: dict[str, float]
+    direction: str
+    mark_count: int
+    positions_m: list[float]
+    times_s: list[float]
+    mark_sensitivity_m_per_px: list[float]
+    residual_rms_m: float
+    max_offset_px: float
+    vp_used: VanishingOut
+    vp_alternative: VanishingOut | None
+    agreement: VanishingAgreementOut | None
+    vp_mc_samples: int
+    vp_mc_invalid_fraction: float
+    length_sigma_m: float
+    fps: float
+    fps_source: str
+    gates: list[QualityGateOut]

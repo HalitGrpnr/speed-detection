@@ -5,8 +5,8 @@
 > geçmişine bakılır; bu dosya yalnızca **anlık durumun özetini** tutar (şişirmeyin).
 
 **Son güncelleme:** 2026-09-23
-**Aktif görev:** **T28 — Cross-ratio hız yöntemi** (`tasks/T28.md`). 🟡 Faz 0 ✓ (**Seçenek C onaylı**), **Faz 1 ✓** (`src/speed/cross_ratio.py`), **Faz 2 ✓** (`src/calibration/vp_sources.py` + `src/detection/feature_tracks.py`; araç izi VP'si = KLT rijit gövde noktaları). pytest 337/337. Sıradaki: **Faz 3** endpoint + şemalar + VP belirsizliğinin hıza yayılımı + kalite kapıları.
-**Bilinen:** pipeline şu an H'siz çalışmıyor (Faz 3/5'te çözülecek).
+**Aktif görev:** **T28 — Cross-ratio hız yöntemi** (`tasks/T28.md`). 🟡 Faz 0 ✓ (**Seçenek C onaylı**), **Faz 1 ✓** (`src/speed/cross_ratio.py`), **Faz 2 ✓** (`src/calibration/vp_sources.py` + `src/detection/feature_tracks.py`; araç izi VP'si = KLT rijit gövde noktaları). **Faz 3 ✓** (`src/speed/cross_ratio_service.py`; H'siz takip `POST /api/track`; `…/cross-ratio/vp` + `…/cross-ratio-speed`). pytest 359/359. Sıradaki: **Faz 4** `CrossRatioPanel` operatör sihirbazı.
+**Bilinen:** eski `/api/pipeline` hâlâ H zorunlu; yeni akış `/api/track` ile H'siz. Eskisinin sökülmesi Faz 5.
 
 **⚑ Yön değişikliği (2026-09-23):** Proje amacı tek hedefe indirgendi: *tek bir aracın, düz gittiği bir
 doğru boyunca hızı.* Bu amaç için en yalın yöntem **cross-ratio** (kaçış noktası + bilinen uzunlukla 1B

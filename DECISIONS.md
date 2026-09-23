@@ -491,3 +491,29 @@ Format:
 - **Alternatifler:** Tek izden sabit-hız varsayımıyla VP — frenleyen araçta döngüsel/yanlı, reddedildi.
   bbox köşe izleri — köşeler rijit gövde noktası değil (perspektifle kayar), reddedildi.
   Otomatik izler kara kutu değildir: izler ve VP UI'da operatöre gösterilecek (Faz 4).
+
+## [2026-09-23] T28 Faz 3 — H'siz takip işi, VP belirsizliği yayılımı, kalite kapıları
+- **Karar 1 (pipeline H bağımlılığı):** Eski `run_pipeline` bozulmadan yanına `run_tracking`
+  (yalnızca tespit + takip) ve `POST /api/track` eklendi. Kalibrasyon, overlay ve eski rapor yok;
+  `tracks.json` + `job_meta.json` (fps, fps_source, video_sha256, `mode: "tracking"`) + audit
+  (`tracking_started` — hash dahil, iş hata verse bile kalır; `tracking_run`). Eski akışın
+  sökülmesi Faz 5'te.
+- **Karar 2 (endpoint'ler):** `POST …/cross-ratio/vp` (önizleme: şerit ve/veya araç izi + uyum) ve
+  `POST …/cross-ratio-speed`. **VP sunucuda girdilerden yeniden hesaplanır; istemcinin VP'si kabul
+  edilmez** (mevcut "sunucu H" denetim kalıbıyla aynı). Sonuç `cross_ratio_{track}.json`'a (girdiler +
+  VP kovaryansı + sonuç) ve session log'a yazılır. FPS: kalibrasyonlu işlerde `calibration.json`,
+  takip işlerinde `job_meta.json`.
+- **Karar 3 (CI):** %95 CI = √(fit² + vp² + uzunluk²). VP bileşeni, VP kovaryansından **sabit tohumlu
+  (seed=0) 400 örnekli Monte Carlo** ile (aynı girdi → aynı sayı; adli tekrarlanabilirlik). Örneklerin
+  >%5'i geçersiz ölçüm üretirse `vp_unreliable` (error). Bilinen uzunluk σ verilmezse varsayılan
+  dingil ±5 cm, olay yeri ±2 cm (1σ) — `length_sigma_default` bilgisiyle raporlanır.
+- **Karar 4 (kalite kapıları):** Her kapı `code / severity / message (ne oldu, neden) / action (ne
+  yapmalı)`. Kodlar: too_few_marks, auto_marks_unconfirmed, not_straight (>4 px), far_marks
+  (1 px > 20 cm), ref_off_line, length_sigma_default, vp_note, vp_infinite, vp_unreliable,
+  vp_uncertain (σ/uzaklık > %25), vp_agree/vp_disagree/vp_indeterminate, fps_suspicious (standart
+  FPS'ten > %0,5), fps_override, trajectory_vp_failed. Güven seviyesi: göreli CI ≤%5 ve ≥4 işaret →
+  yüksek, ≤%15 → orta, aksi düşük; herhangi bir `warn` üst sınırı orta, `error` → düşük.
+  Eşikler T10 GPS doğrulamasına kadar geçicidir.
+- **Alternatifler:** VP yayılımı için analitik Jacobian — uzak VP'de doğrusal olmayanlık büyük,
+  reddedildi. `run_pipeline`'ı H-opsiyonel yapmak — overlay/rapor/hull zinciri H varsayıyor, Faz 5
+  temizliğinden önce riskli, reddedildi.

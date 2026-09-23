@@ -23,7 +23,7 @@ from src.calibration.planview import compute_plan_view
 from src.detection.models import load_tracks, save_tracks
 from src.detection.video import read_video_meta
 from src.output.overlay import write_overlay_video
-from src.output.pipeline import run_pipeline
+from src.output.pipeline import run_pipeline, run_tracking
 from src.output.serialization import write_result_data, read_result_data
 from src.reliability.axle_check import (
     axle_cross_check,
@@ -65,6 +65,12 @@ from .schemas import (
     AxleTimingRequest,
     AxleTimingResponse,
     WheelOverlayRequest,
+    CrossRatioSpeedRequest,
+    CrossRatioSpeedResponse,
+    CrossRatioVpRequest,
+    CrossRatioVpResponse,
+    TrackRequest,
+    TrackSummaryOut,
 )
 
 import sys as _sys
@@ -1651,6 +1657,391 @@ async def axle_timing(job_id: str, track_id: int, req: AxleTimingRequest) -> Axl
         delta_t_per_crossing_s=result.delta_t_per_crossing_s,
         warnings=result.warnings,
     )
+
+
+# ── T28 — Cross-ratio: H-bağımsız takip + tek doğru boyunca hız ──────────────
+
+def _track_summaries(tracks: list) -> list[dict]:
+    return [
+        {
+            "track_id": t.track_id,
+            "vehicle_class": t.vehicle_class,
+            "first_frame": t.points[0].frame if t.points else 0,
+            "last_frame": t.points[-1].frame if t.points else 0,
+            "point_count": len(t.points),
+        }
+        for t in tracks
+    ]
+
+
+def _run_tracking_thread(
+    job: JobState,
+    video_path: Path,
+    out_dir: Path,
+    frame_step: int,
+    model_name: str,
+    fps: float | None,
+    fps_source: str,
+    video_sha256: str,
+) -> None:
+    try:
+        job.state = "running"
+        job.progress_pct = 5.0
+
+        def _progress(pct: float) -> None:
+            job.progress_pct = pct
+
+        tracks, meta = run_tracking(
+            video_path, frame_step=frame_step, model_name=model_name,
+            fps=fps, fps_source=fps_source, progress=True, on_progress=_progress,
+        )
+        save_tracks(out_dir / "tracks.json", tracks)
+        summaries = _track_summaries(tracks)
+
+        job.result_json = {"vehicle_count": len(tracks), "estimates": [], "mode": "tracking"}
+        job.frame_step = frame_step
+        job.model_name_used = model_name
+        job.video_path = str(video_path)
+        job.progress_pct = 100.0
+        job.completed_at = datetime.datetime.now().isoformat(timespec="seconds")
+
+        job_meta = {
+            "job_id": job.job_id,
+            "mode": "tracking",
+            "video_id": job.video_id,
+            "video_path": str(video_path),
+            "video_filename": job.video_filename,
+            "video_sha256": video_sha256,
+            "fps": round(meta.fps, 4),
+            "fps_source": meta.fps_source,
+            "width": meta.width,
+            "height": meta.height,
+            "frame_count": meta.frame_count,
+            "created_at": job.created_at,
+            "completed_at": job.completed_at,
+            "vehicle_count": len(tracks),
+            "frame_step": frame_step,
+            "model_name": model_name,
+            "result_json": job.result_json,
+        }
+        (out_dir / "job_meta.json").write_text(
+            json.dumps(job_meta, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+        slog.append(
+            out_dir, "tracking_run", _job_id=job.job_id,
+            fps=round(meta.fps, 4), fps_source=meta.fps_source, model=model_name,
+            frame_step=frame_step, video_sha256=video_sha256,
+            track_count=len(tracks), tracks=summaries,
+        )
+        job.state = "done"
+    except Exception as exc:
+        import traceback as _tb
+        print(f"\n[TAKIP HATA] job={job.job_id}\n{_tb.format_exc()}", flush=True)
+        job.state = "error"
+        job.error = f"{type(exc).__name__}: {exc}"
+
+
+@app.post("/api/track", status_code=202)
+async def start_tracking(req: TrackRequest) -> dict:
+    """Yalnızca tespit + takip işi başlat (kalibrasyon gerekmez) — cross-ratio akışının girişi."""
+    if _tmp_dir is None:
+        raise HTTPException(status_code=503, detail="Sunucu hazır değil.")
+    video_path = _get_video_path(req.video_id)
+    if req.frame_step < 1:
+        raise HTTPException(status_code=422, detail="Kare adımı en az 1 olmalıdır.")
+    if req.fps_override is not None and req.fps_override <= 0:
+        raise HTTPException(status_code=422, detail="FPS pozitif olmalıdır.")
+
+    job_id = str(uuid.uuid4())
+    job = _job_store.create(job_id)
+    job.video_id = req.video_id
+    job.video_filename = _video_filenames.get(req.video_id)
+    out_dir = _tmp_dir / job_id
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    video_sha256 = _sha256(video_path)
+    model_name = _MODEL_MAP.get(req.model_size, "yolo11n.pt")
+    fps_source = "operator_override" if req.fps_override is not None else "container"
+    slog.append(
+        out_dir, "tracking_started", _job_id=job_id,
+        video_filename=job.video_filename, video_sha256=video_sha256,
+        frame_step=req.frame_step, model=model_name,
+        fps_override=req.fps_override, fps_source=fps_source,
+    )
+    threading.Thread(
+        target=_run_tracking_thread,
+        args=(job, video_path, out_dir, req.frame_step, model_name,
+              req.fps_override, fps_source, video_sha256),
+        daemon=True,
+    ).start()
+    return {"job_id": job_id}
+
+
+@app.get("/api/job/{job_id}/tracks", response_model=list[TrackSummaryOut])
+async def job_tracks(job_id: str) -> list[TrackSummaryOut]:
+    """Araç izleri (her karede bbox) — araç ve düz-gidiş penceresi seçimi için."""
+    _get_done_job(job_id)
+    tracks = _load_all_tracks_or_404(job_id)
+    out = []
+    for t, summ in zip(tracks, _track_summaries(tracks)):
+        out.append(TrackSummaryOut(
+            **summ,
+            points=[{"frame": p.frame, "bbox": tuple(round(v, 1) for v in p.bbox)} for p in t.points],
+        ))
+    return out
+
+
+def _job_fps(job_id: str) -> tuple[float, str]:
+    """FPS: kalibrasyonlu işlerde calibration.json, takip işlerinde job_meta.json."""
+    out_dir = _job_out_dir(job_id)
+    cal_json_path = out_dir / "calibration.json"
+    if cal_json_path.exists():
+        _, _, (fps, fps_source) = load_calibration(cal_json_path)
+        if fps:
+            return float(fps), fps_source or "container"
+    meta_path = out_dir / "job_meta.json"
+    if meta_path.exists():
+        meta = json.loads(meta_path.read_text(encoding="utf-8"))
+        if meta.get("fps"):
+            return float(meta["fps"]), meta.get("fps_source") or "container"
+    raise HTTPException(status_code=404, detail="İşin FPS bilgisi bulunamadı.")
+
+
+_MAX_TRAJECTORY_FRAMES = 40
+
+
+def _read_frames(video_path: Path, frame_numbers: list[int]) -> list[np.ndarray]:
+    cap = cv2.VideoCapture(str(video_path))
+    if not cap.isOpened():
+        raise HTTPException(status_code=500, detail="Video açılamadı.")
+    frames = []
+    try:
+        pos = -1
+        for n in frame_numbers:
+            if n != pos + 1:
+                cap.set(cv2.CAP_PROP_POS_FRAMES, n)
+            ok, frame = cap.read()
+            if not ok:
+                raise HTTPException(status_code=500, detail=f"Kare {n} okunamadı.")
+            frames.append(frame)
+            pos = n
+    finally:
+        cap.release()
+    return frames
+
+
+def _window_points(track, frame_start: int | None, frame_end: int | None) -> list:
+    return [
+        p for p in track.points
+        if (frame_start is None or p.frame >= frame_start)
+        and (frame_end is None or p.frame <= frame_end)
+    ]
+
+
+def _trajectory_vp(job: JobState, track, frame_start: int | None, frame_end: int | None):
+    from src.calibration.vp_sources import vanishing_from_trajectories
+    from src.detection.feature_tracks import track_features_in_box
+
+    pts = _window_points(track, frame_start, frame_end)
+    if len(pts) < 3:
+        raise ValueError("Seçilen aralıkta aracın en az 3 karesi olmalı — pencereyi genişletin.")
+    if len(pts) > _MAX_TRAJECTORY_FRAMES:
+        idx = np.unique(np.linspace(0, len(pts) - 1, _MAX_TRAJECTORY_FRAMES).round().astype(int))
+        pts = [pts[i] for i in idx]
+    if not job.video_path or not Path(job.video_path).exists():
+        raise HTTPException(status_code=404, detail="İşin video dosyası bulunamadı.")
+    frames = _read_frames(Path(job.video_path), [p.frame for p in pts])
+    feats = track_features_in_box(frames, [p.bbox for p in pts], frame_indices=[p.frame for p in pts])
+    return vanishing_from_trajectories([f.points for f in feats])
+
+
+def _vp_out(e) -> dict | None:
+    if e is None:
+        return None
+    sig = e.sigma_px
+    return {
+        "source": e.source,
+        "point": e.point,
+        "direction": e.direction,
+        "sigma_major_px": None if sig is None else round(sig[0], 2),
+        "sigma_minor_px": None if sig is None else round(sig[1], 2),
+        "n_lines": e.n_lines,
+        "n_inliers": e.n_inliers,
+        "residual_rms_sigma": e.residual_rms_sigma,
+        "lines": [
+            {"start": l.extent[0], "end": l.extent[1], "rms_px": round(l.rms_px, 3)}
+            for l in e.lines
+        ],
+        "warnings": list(e.warnings),
+    }
+
+
+def _agreement_out(a) -> dict | None:
+    if a is None:
+        return None
+    return {
+        "status": a.status,
+        "angle_deg": a.angle_deg,
+        "relative_distance": a.relative_distance,
+        "mahalanobis2": a.mahalanobis2,
+        "message": a.message,
+    }
+
+
+def _build_vps(job_id: str, track_id: int, req: CrossRatioVpRequest):
+    """(şerit VP | None, araç-izi VP | None, araç-izi hatası | None, pencere noktaları)."""
+    from src.calibration.vp_sources import vanishing_from_lines
+
+    job = _get_done_job(job_id)
+    track = _get_track_or_404(job_id, track_id)
+    if len(req.lane_lines) == 1:
+        raise HTTPException(status_code=422, detail="Perspektif referansı için en az 2 şerit çizgisi gerekir.")
+    lane = None
+    if req.lane_lines:
+        try:
+            lane = vanishing_from_lines(req.lane_lines, source="lane_manual")
+        except ValueError as e:
+            raise HTTPException(status_code=422, detail=f"Şerit çizgileri: {e}")
+    traj, traj_err = None, None
+    if req.use_trajectory:
+        try:
+            traj = _trajectory_vp(job, track, req.frame_start, req.frame_end)
+        except ValueError as e:
+            traj_err = str(e)
+    return lane, traj, traj_err, _window_points(track, req.frame_start, req.frame_end)
+
+
+@app.post(
+    "/api/job/{job_id}/track/{track_id}/cross-ratio/vp",
+    response_model=CrossRatioVpResponse,
+)
+async def cross_ratio_vp(job_id: str, track_id: int, req: CrossRatioVpRequest) -> CrossRatioVpResponse:
+    """Perspektif referansı önizlemesi (sihirbaz adım 2): şerit ve/veya araç izi + uyum."""
+    from src.calibration.vp_sources import compare_vanishing
+
+    lane, traj, traj_err, window = _build_vps(job_id, track_id, req)
+    agreement = None
+    if lane is not None and traj is not None and window:
+        at = np.mean([((p.bbox[0] + p.bbox[2]) / 2, p.bbox[3]) for p in window], axis=0)
+        agreement = compare_vanishing(lane, traj, at=at)
+    return CrossRatioVpResponse(
+        lane=_vp_out(lane),
+        trajectory=_vp_out(traj),
+        trajectory_error=traj_err,
+        agreement=_agreement_out(agreement),
+    )
+
+
+@app.post(
+    "/api/job/{job_id}/track/{track_id}/cross-ratio-speed",
+    response_model=CrossRatioSpeedResponse,
+)
+async def cross_ratio_speed_endpoint(
+    job_id: str, track_id: int, req: CrossRatioSpeedRequest,
+) -> CrossRatioSpeedResponse:
+    """Cross-ratio hız (H-bağımsız). VP sunucuda girdilerden yeniden hesaplanır; istemci VP'si
+    kabul edilmez. Sonuç diske yazılır ve audit-log'a kaydedilir."""
+    from src.speed.cross_ratio_service import (
+        ContactMark,
+        KnownLength,
+        QualityGate,
+        measure_cross_ratio,
+        select_vp,
+    )
+
+    lane, traj, traj_err, _ = _build_vps(job_id, track_id, req)
+    try:
+        used, alt = select_vp(lane, traj, prefer=req.vp_primary)
+    except ValueError as e:
+        detail = str(e) + (f" (Araç izi: {traj_err})" if traj_err else "")
+        raise HTTPException(status_code=422, detail=detail)
+    if req.pixel_sigma <= 0:
+        raise HTTPException(status_code=422, detail="pixel_sigma pozitif olmalıdır.")
+
+    fps, fps_source = _job_fps(job_id)
+    kl_in = req.known_length
+    kl = KnownLength(
+        kind=kl_in.kind, length_m=kl_in.length_m,
+        point_a=tuple(kl_in.point_a), point_b=tuple(kl_in.point_b),
+        sigma_m=kl_in.sigma_m, frame=kl_in.frame,
+    )
+    marks = [ContactMark(frame=m.frame, pixel=tuple(m.pixel), source=m.source) for m in req.marks]
+    try:
+        m = measure_cross_ratio(
+            used, kl, marks, fps, fps_source=fps_source,
+            vp_alternative=alt, pixel_sigma=req.pixel_sigma,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+
+    gates = list(m.gates)
+    if traj_err:
+        gates.append(QualityGate(
+            "trajectory_vp_failed", "info",
+            f"Araç izinden perspektif referansı çıkarılamadı: {traj_err}",
+            "Şerit çizgileriyle devam edilebilir; çapraz kontrol için daha uzun bir düz aralık seçin.",
+        ))
+
+    result = {
+        "speed_kmh": m.speed_kmh,
+        "ci_kmh": m.ci_kmh,
+        "confidence_level": m.confidence_level,
+        "ci_components_kmh": m.ci_components_kmh,
+        "direction": m.core.direction,
+        "mark_count": m.core.n_points,
+        "positions_m": m.core.positions_m,
+        "times_s": m.core.times_s,
+        "mark_sensitivity_m_per_px": m.mark_sensitivity_m_per_px,
+        "residual_rms_m": m.core.residual_rms_m,
+        "max_offset_px": m.core.max_offset_px,
+        "vp_used": _vp_out(m.vp_used),
+        "vp_alternative": _vp_out(m.vp_alternative),
+        "agreement": _agreement_out(m.agreement),
+        "vp_mc_samples": m.vp_mc_samples,
+        "vp_mc_invalid_fraction": m.vp_mc_invalid_fraction,
+        "length_sigma_m": m.length_sigma_m,
+        "fps": m.fps,
+        "fps_source": m.fps_source,
+        "gates": [
+            {"code": g.code, "severity": g.severity, "message": g.message, "action": g.action}
+            for g in gates
+        ],
+    }
+
+    out_dir = _job_out_dir(job_id)
+    inputs = {
+        "lane_lines": [[list(p) for p in line] for line in req.lane_lines],
+        "use_trajectory": req.use_trajectory,
+        "frame_start": req.frame_start,
+        "frame_end": req.frame_end,
+        "vp_primary": req.vp_primary,
+        "known_length": kl_in.model_dump(),
+        "marks": [mk.model_dump() for mk in req.marks],
+        "pixel_sigma": req.pixel_sigma,
+    }
+    record = {
+        "track_id": track_id,
+        "method": "cross_ratio",
+        "inputs": inputs,
+        "vp_used_covariance": m.vp_used.covariance,
+        "result": result,
+        "computed_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+    }
+    (out_dir / f"cross_ratio_{track_id}.json").write_text(
+        json.dumps(record, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+    slog.append(
+        out_dir, "cross_ratio_speed", _job_id=job_id, track_id=track_id,
+        inputs=inputs,
+        vp_source=m.vp_used.source, vp_point=m.vp_used.point,
+        vp_covariance=m.vp_used.covariance,
+        agreement=result["agreement"],
+        speed_kmh=m.speed_kmh, ci_kmh=m.ci_kmh, confidence_level=m.confidence_level,
+        ci_components_kmh=m.ci_components_kmh,
+        fps=m.fps, fps_source=m.fps_source,
+        gates=[g["code"] for g in result["gates"]],
+    )
+    return CrossRatioSpeedResponse(**result)
 
 
 @app.get("/api/job/{job_id}/session-log")
