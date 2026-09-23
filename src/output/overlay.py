@@ -218,9 +218,11 @@ def _draw_profile_label(
                     font, scale, (0, 0, 0), thick, cv2.LINE_AA)
         cv2.circle(img, (x, y), 5, color, -1)
     else:
+        # Koyu dolgu + renkli kenarlık + beyaz yazı → interpolasyon kareleri okunabilir
+        cv2.rectangle(img, (x1, y1), (x2, y2), (25, 25, 25), -1)
         cv2.rectangle(img, (x1, y1), (x2, y2), color, 1)
         cv2.putText(img, label, (x1 + pad, y2 - bl - pad),
-                    font, scale, color, thick, cv2.LINE_AA)
+                    font, scale, (255, 255, 255), thick, cv2.LINE_AA)
         cv2.circle(img, (x, y), 3, color, 1)
 
 

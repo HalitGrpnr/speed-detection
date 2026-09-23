@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { type ReactNode, useState } from 'react'
 import { cn } from '@/lib/utils'
 import { useWizard } from '@/store/wizard'
 import { Header } from './Header'
@@ -52,19 +52,25 @@ function AnalysisStatusBar() {
 export function AppShell({ children }: { children: ReactNode }) {
   const step = useWizard((s) => s.step)
   const wide = step === 3 || step === 6
+  const [sidebarOpen, setSidebarOpen] = useState(true)
 
   return (
     <div className="flex h-screen flex-col text-foreground">
-      <Header />
+      <Header onToggleSidebar={() => setSidebarOpen((v) => !v)} />
       <AnalysisStatusBar />
       <div className="flex flex-1 overflow-hidden">
-        <aside className="hidden w-60 shrink-0 border-r bg-card/60 backdrop-blur-sm md:block">
+        <aside
+          className={cn(
+            'hidden shrink-0 border-r bg-card/60 backdrop-blur-sm md:block overflow-hidden transition-all duration-200',
+            sidebarOpen ? 'w-52' : 'w-0 border-r-0',
+          )}
+        >
           <Stepper />
         </aside>
         <main className="flex-1 overflow-auto">
           <div
             className={cn(
-              'mx-auto w-full px-6 py-7',
+              'mx-auto w-full px-6 py-6',
               wide ? 'max-w-7xl' : 'max-w-4xl',
             )}
           >

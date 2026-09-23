@@ -1,18 +1,28 @@
-import { Gauge, ShieldCheck } from 'lucide-react'
+import { Gauge, Menu, ShieldCheck } from 'lucide-react'
 import { STEPS, useWizard } from '@/store/wizard'
 
-export function Header() {
+export function Header({ onToggleSidebar }: { onToggleSidebar?: () => void }) {
   const videoMeta = useWizard((s) => s.videoMeta)
   const step = useWizard((s) => s.step)
   const stepLabel = STEPS.find((s) => s.id === step)?.label
 
   return (
-    <header className="flex h-16 shrink-0 items-center gap-3 border-b bg-card/80 px-5 backdrop-blur-md">
-      <div className="flex shrink-0 items-center gap-3">
+    <header className="flex h-14 shrink-0 items-center gap-3 border-b bg-card/80 px-4 backdrop-blur-md">
+      {onToggleSidebar && (
+        <button
+          type="button"
+          onClick={onToggleSidebar}
+          className="flex size-8 items-center justify-center rounded-md hover:bg-accent transition-colors shrink-0"
+          title="Menüyü aç/kapat"
+        >
+          <Menu className="size-4" />
+        </button>
+      )}
+      <div className="flex shrink-0 items-center gap-2.5">
         <div className="flex size-9 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-blue-700 text-primary-foreground shadow-pop">
           <Gauge className="size-5" />
         </div>
-        <span className="font-semibold tracking-tight">Araç Hız Tespit Sistemi</span>
+        <span className="font-semibold tracking-tight text-sm">Araç Hız Tespit Sistemi</span>
       </div>
 
       <span className="ml-2 hidden shrink-0 items-center gap-1.5 rounded-full border border-success/30 bg-success/10 px-2.5 py-1 text-[11px] font-medium text-success sm:inline-flex">
