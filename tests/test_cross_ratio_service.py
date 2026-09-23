@@ -154,3 +154,28 @@ def test_select_vp():
     assert select_vp(lane, traj, prefer="trajectory") == (traj, lane)
     with pytest.raises(ValueError):
         select_vp(None, None)
+
+
+def test_disagreement_is_added_to_ci_and_reported():
+    project, lane, marks, kl = _setup(lane_noise=0.2)
+    wrong = vanishing_from_lines([l + [60.0, 0.0] * np.linspace(0, 1, len(l))[:, None]
+                                  for l in _lane_lines(project)])
+    m = measure_cross_ratio(wrong, kl, marks, FPS, vp_alternative=lane)
+    assert m.speed_alternative_kmh == pytest.approx(80.0, rel=0.01)
+    d = m.ci_components_kmh["vp_disagreement"]
+    assert d == pytest.approx(abs(m.speed_kmh - m.speed_alternative_kmh), abs=0.1)
+    # Yanlış referansla bile gerçek değer genişletilmiş CI içinde kalır
+    assert abs(m.speed_kmh - 80.0) <= m.ci_kmh
+    g = next(g for g in m.gates if g.code == "vp_disagreement_in_ci")
+    rel = d / m.speed_kmh
+    assert g.severity == ("error" if rel > 0.10 else "warn")
+    if rel > 0.10:
+        assert m.confidence_level == "low"
+
+
+def test_agreeing_sources_add_no_systematic_term():
+    project, lane, marks, kl = _setup()
+    traj = vanishing_from_trajectories(_body_trajectories(project))
+    m = measure_cross_ratio(lane, kl, marks, FPS, vp_alternative=traj)
+    assert "vp_disagreement" not in m.ci_components_kmh
+    assert m.speed_alternative_kmh == pytest.approx(m.speed_kmh, rel=0.01)

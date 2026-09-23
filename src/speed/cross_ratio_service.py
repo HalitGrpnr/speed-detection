@@ -4,10 +4,13 @@
 tek bir adli ölçüme bağlar ve operatöre "ne oldu, neden, ne yapmalı" diyen kapılar üretir.
 FastAPI'ye bağımlı değildir (endpoint ince bir sarmalayıcıdır) → doğrudan test edilir.
 
-Güven aralığı (~%95) üç bileşenin karesel toplamıdır:
+Güven aralığı (~%95) bileşenlerin karesel toplamıdır:
   - fit     : konum–zaman doğrusunun eğim belirsizliği (işaretleme gürültüsü + düzlük)
   - vp      : VP kovaryansından sabit tohumlu Monte Carlo (tekrarlanabilir) → hız dağılımı
   - length  : bilinen uzunluğun belirsizliği (oransal)
+  - vp_disagreement : iki bağımsız VP kaynağı istatistiksel olarak ayrışırsa, alternatif VP ile
+              hesaplanan hızla fark (sistematik; model varsayımı — ör. lens bükülmesi, şeridin
+              araç yoluna paralel olmaması — ihlal edildiğinde CI'nin gerçeği kaçırmaması için)
 """
 from __future__ import annotations
 
@@ -26,6 +29,7 @@ FAR_SENSITIVITY_M_PER_PX = 0.20   # 1 px işaret hatası > 20 cm → kare "uzak"
 OFFSET_WARN_PX = 4.0              # ölçüm doğrusundan dik sapma
 VP_MC_INVALID_WARN = 0.05         # VP örneklerinin > %5'i geçersiz → VP güvenilmez
 VP_REL_SIGMA_WARN = 0.25          # VP 1σ belirsizliği / VP–iz uzaklığı
+VP_DISAGREE_LOW = 0.10            # ayrışan iki VP'nin hızları > %10 farklı → düşük güven
 HIGH_REL_CI = 0.05
 MEDIUM_REL_CI = 0.15
 STANDARD_FPS = (23.976, 24.0, 25.0, 29.97, 30.0, 48.0, 50.0, 59.94, 60.0, 120.0)
@@ -71,6 +75,7 @@ class CrossRatioMeasurement:
     vp_used: VanishingEstimate
     vp_alternative: VanishingEstimate | None
     agreement: VanishingAgreement | None
+    speed_alternative_kmh: float | None  # alternatif VP ile hız (şeffaflık / çapraz kontrol)
     vp_mc_samples: int
     vp_mc_invalid_fraction: float
     known_length: KnownLength
@@ -171,7 +176,22 @@ def measure_cross_ratio(
         ci_vp = 0.0
     ci_len = 1.96 * length_sigma / kl.length_m * speed
     ci_fit = core.ci_kmh
-    ci_total = float(np.sqrt(ci_fit**2 + ci_vp**2 + ci_len**2))
+
+    # Alternatif VP ile hız: her zaman raporlanır; ayrışma varsa fark CI'ye sistematik bileşen olur
+    agreement = None
+    speed_alt = None
+    ci_disagree = 0.0
+    if vp_alternative is not None:
+        agreement = compare_vanishing(vp_used, vp_alternative, at=pts.mean(axis=0))
+        try:
+            sc_alt = line_scale_from_vp(vp_alternative.point, kl.point_a, kl.point_b, kl.length_m, line_points=pts)
+            speed_alt = cross_ratio_speed(sc_alt, frames, pts, fps, pixel_sigma=pixel_sigma).speed_kmh
+        except ValueError:
+            speed_alt = None
+        if agreement.status == "disagree" and speed_alt is not None:
+            ci_disagree = abs(speed - speed_alt)
+
+    ci_total = float(np.sqrt(ci_fit**2 + ci_vp**2 + ci_len**2 + ci_disagree**2))
     mc_total = mc_samples if vp_used.point is not None and vp_used.covariance is not None else 0
     invalid_frac = mc_invalid / mc_total if mc_total else 0.0
 
@@ -260,15 +280,22 @@ def measure_cross_ratio(
                     "Ek şerit çizgisi işaretleyin veya araç izi ile birlikte kullanın.",
                 ))
 
-    agreement = None
-    if vp_alternative is not None:
-        agreement = compare_vanishing(vp_used, vp_alternative, at=pts.mean(axis=0))
+    if agreement is not None:
         sev: Severity = {"agree": "info", "disagree": "warn", "indeterminate": "info"}[agreement.status]
         gates.append(QualityGate(
             f"vp_{agreement.status}", sev, agreement.message,
             "" if agreement.status != "disagree" else
             "Şerit çizgilerinin aracın gittiği yönle paralel olduğunu ve aracın düz gittiğini kontrol edin.",
         ))
+        if agreement.status == "disagree" and speed_alt is not None:
+            rel_d = abs(speed - speed_alt) / speed if speed > 0 else np.inf
+            gates.append(QualityGate(
+                "vp_disagreement_in_ci", "error" if rel_d > VP_DISAGREE_LOW else "warn",
+                f"Diğer perspektif referansıyla hız {speed_alt:.1f} km/h (fark %{rel_d * 100:.0f}). Bu fark güven "
+                "aralığına sistematik belirsizlik olarak eklendi.",
+                "Farkın kaynağını giderin: şerit çizgilerini aracın yakınında ve uzun işaretleyin; görüntü kenarındaki "
+                "(lens bükülmesi olabilecek) çizgilerden kaçının; daha düz bir aralık seçin.",
+            ))
 
     fg = _fps_gate(fps, fps_source)
     if fg:
@@ -292,11 +319,15 @@ def measure_cross_ratio(
         speed_kmh=round(speed, 1),
         ci_kmh=round(ci_total, 1),
         confidence_level=level,
-        ci_components_kmh={"fit": round(ci_fit, 2), "vp": round(ci_vp, 2), "length": round(ci_len, 2)},
+        ci_components_kmh={
+            "fit": round(ci_fit, 2), "vp": round(ci_vp, 2), "length": round(ci_len, 2),
+            **({"vp_disagreement": round(ci_disagree, 2)} if ci_disagree > 0 else {}),
+        },
         core=core,
         vp_used=vp_used,
         vp_alternative=vp_alternative,
         agreement=agreement,
+        speed_alternative_kmh=None if speed_alt is None else round(speed_alt, 1),
         vp_mc_samples=mc_total,
         vp_mc_invalid_fraction=round(invalid_frac, 4),
         known_length=kl,

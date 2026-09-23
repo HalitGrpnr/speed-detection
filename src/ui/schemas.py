@@ -393,6 +393,7 @@ class CrossRatioSpeedResponse(BaseModel):
     vp_used: VanishingOut
     vp_alternative: VanishingOut | None
     agreement: VanishingAgreementOut | None
+    speed_alternative_kmh: float | None = None
     vp_mc_samples: int
     vp_mc_invalid_fraction: float
     length_sigma_m: float

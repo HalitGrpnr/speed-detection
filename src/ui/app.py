@@ -1997,6 +1997,7 @@ async def cross_ratio_speed_endpoint(
         "vp_used": _vp_out(m.vp_used),
         "vp_alternative": _vp_out(m.vp_alternative),
         "agreement": _agreement_out(m.agreement),
+        "speed_alternative_kmh": m.speed_alternative_kmh,
         "vp_mc_samples": m.vp_mc_samples,
         "vp_mc_invalid_fraction": m.vp_mc_invalid_fraction,
         "length_sigma_m": m.length_sigma_m,
