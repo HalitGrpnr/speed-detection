@@ -12,8 +12,12 @@ export const STEPS = [
 
 export type StepId = 1 | 2 | 3 | 4 | 5 | 6
 
+/** T28: 'crossratio' = kalibrasyonsuz tek-doğru ölçüm sihirbazı; 'legacy' = homografi akışı. */
+export type Flow = 'crossratio' | 'legacy'
+
 interface WizardState {
   step: StepId
+  flow: Flow
   videoMeta: VideoMeta | null
   selectedFrame: number
   controlPoints: ControlPoint[]
@@ -27,6 +31,7 @@ interface WizardState {
   next: () => void
   back: () => void
 
+  setFlow: (f: Flow) => void
   setVideoMeta: (m: VideoMeta) => void
   setSelectedFrame: (n: number) => void
   setControlPoints: (p: ControlPoint[]) => void
@@ -40,6 +45,7 @@ interface WizardState {
 
 const INITIAL = {
   step: 1 as StepId,
+  flow: 'legacy' as Flow,
   videoMeta: null,
   selectedFrame: 0,
   controlPoints: [] as ControlPoint[],
@@ -79,6 +85,7 @@ export const useWizard = create<WizardState>((set, get) => ({
   },
   back: () => set({ step: Math.max(1, get().step - 1) as StepId }),
 
+  setFlow: (flow) => set({ flow }),
   setVideoMeta: (videoMeta) => set({ videoMeta }),
   setSelectedFrame: (selectedFrame) => set({ selectedFrame }),
   setControlPoints: (controlPoints) => set({ controlPoints }),

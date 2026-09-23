@@ -1,10 +1,15 @@
 import { Gauge, Menu, ShieldCheck } from 'lucide-react'
 import { STEPS, useWizard } from '@/store/wizard'
+import { useCrossRatio, XR_STEPS } from '@/features/crossratio/store'
 
 export function Header({ onToggleSidebar }: { onToggleSidebar?: () => void }) {
   const videoMeta = useWizard((s) => s.videoMeta)
-  const step = useWizard((s) => s.step)
-  const stepLabel = STEPS.find((s) => s.id === step)?.label
+  const flow = useWizard((s) => s.flow)
+  const legacyStep = useWizard((s) => s.step)
+  const xrStep = useCrossRatio((s) => s.step)
+  const steps = flow === 'crossratio' ? XR_STEPS : STEPS
+  const step = flow === 'crossratio' ? xrStep : legacyStep
+  const stepLabel = steps.find((s) => s.id === step)?.label
 
   return (
     <header className="flex h-14 shrink-0 items-center gap-3 border-b bg-card/80 px-4 backdrop-blur-md">
@@ -35,7 +40,7 @@ export function Header({ onToggleSidebar }: { onToggleSidebar?: () => void }) {
           <span className="hidden text-sm text-muted-foreground md:inline-flex">
             <span className="font-medium text-foreground">Adım {step}</span>
             <span className="mx-1.5">/</span>
-            {STEPS.length}
+            {steps.length}
             <span className="mx-2 text-border">·</span>
             <span className="text-foreground">{stepLabel}</span>
           </span>

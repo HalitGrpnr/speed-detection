@@ -176,3 +176,16 @@ export interface AutoCalibrateResponse {
   estimated_rms_m: number | null
   warning: string | null
 }
+
+// T28 — Cross-ratio (H-bağımsız, tek doğru boyunca hız)
+export type TrackRequest = Schemas['TrackRequest']
+export type TrackSummary = Schemas['TrackSummaryOut']
+export type CrossRatioVpRequest = Schemas['CrossRatioVpRequest']
+export type CrossRatioVpResponse = Schemas['CrossRatioVpResponse']
+export type VanishingOut = Schemas['VanishingOut']
+export type VanishingAgreement = Schemas['VanishingAgreementOut']
+export type CrossRatioSpeedRequest = Schemas['CrossRatioSpeedRequest']
+export type CrossRatioSpeedResponse = Schemas['CrossRatioSpeedResponse']
+export type KnownLengthIn = Schemas['KnownLengthIn']
+export type ContactMarkIn = Schemas['ContactMarkIn']
+export type QualityGate = Schemas['QualityGateOut']

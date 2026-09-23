@@ -112,7 +112,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/video/{video_id}/autoref": {
+    "/api/video/{video_id}/interpolate-point": {
         parameters: {
             query?: never;
             header?: never;
@@ -121,8 +121,60 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Autoref */
-        post: operations["autoref_api_video__video_id__autoref_post"];
+        /**
+         * Interpolate Point
+         * @description Sub-frame calibration point interpolation (T14).
+         *
+         *     Given two consecutive frames bracketing the target longitudinal position,
+         *     returns the interpolated pixel where the wheel aligns exactly with the target.
+         */
+        post: operations["interpolate_point_api_video__video_id__interpolate_point_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/video/{video_id}/transverse-guide": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Transverse Guide
+         * @description Compute transverse (cross-road) guide direction for calibration (T15).
+         *
+         *     Given two road-direction anchor pixels, returns the perpendicular (transverse)
+         *     direction. If wheel_px is provided, also returns the guide line endpoints clipped
+         *     to the canvas.
+         */
+        post: operations["transverse_guide_api_video__video_id__transverse_guide_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/video/{video_id}/auto-calibrate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Auto Calibrate
+         * @description T22 — Yol şerit çizgilerinden VP tabanlı otomatik kalibrasyon noktası önerisi.
+         *
+         *     Operatör onayına sunulur; asla doğrudan pipeline'a girmez (kara kutu değil).
+         */
+        post: operations["auto_calibrate_api_video__video_id__auto_calibrate_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -172,6 +224,51 @@ export interface paths {
         };
         /** Download Report */
         get: operations["download_report_api_job__job_id__report_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/job/{job_id}/report/regenerate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Regenerate Report
+         * @description result_data.json + axle_check_*.json ile raporu yeniden üretir.
+         *
+         *     Orijinal report.pdf korunur — yeni rapor report_v2.pdf olarak yazılır.
+         *     Forensic kural: eski rapor değişmez; aks doğrulaması yeni versiyona eklenir.
+         *     speed_limit_kmh: Mahallin hız limiti (query param). Verilirse raporda
+         *     hız limiti karşılaştırması ve durma mesafesi bölümü eklenir.
+         */
+        post: operations["regenerate_report_api_job__job_id__report_regenerate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/job/{job_id}/report/v2": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Download Report V2
+         * @description Aks doğrulaması eklenmiş güncellenmiş raporu indir.
+         */
+        get: operations["download_report_v2_api_job__job_id__report_v2_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -237,6 +334,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/job/{job_id}/plan-view": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Job Plan View
+         * @description Tamamlanmış analiz için kuş bakışı — homografi doğrulama amaçlı.
+         */
+        get: operations["job_plan_view_api_job__job_id__plan_view_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Jobs
+         * @description Tüm tamamlanan analizleri, en yeniden en eskiye listeler.
+         */
+        get: operations["list_jobs_api_jobs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/job/{job_id}/calibration": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Job Calibration
+         * @description Geçmiş analiz için kalibrasyon kontrol noktalarını döner.
+         */
+        get: operations["job_calibration_api_job__job_id__calibration_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/job/{job_id}/track/{track_id}/axle-suggest-frame": {
         parameters: {
             query?: never;
@@ -293,12 +450,318 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/job/{job_id}/track/{track_id}/wheel-speed": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Wheel Speed
+         * @description Operatör-işaretli tekerlek temas noktalarından birincil hız hesapla (T16).
+         *
+         *     Operatör sonuç ekranında 2-5 farklı karede aynı tekerin yere değdiği noktayı
+         *     işaretler; bu endpoint H + fps ile hızı hesaplar, sonucu diske yazar ve
+         *     audit-log'a kaydeder. Detection tekrar çalışmaz.
+         */
+        post: operations["wheel_speed_api_job__job_id__track__track_id__wheel_speed_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/job/{job_id}/track/{track_id}/wheel-speed-profile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Wheel Speed Profile
+         * @description T19 — Çok-işaretli tekerlek temas noktalarından kayan pencere hız profili.
+         *
+         *     En az 3, tercihen 5+ işaret ile fren/ivme profili hesaplanır.
+         *     Sonuç diske yazılır ve audit-log'a kaydedilir.
+         *     T16 tek-değer özet (birincil hız) korunur.
+         */
+        post: operations["wheel_speed_profile_api_job__job_id__track__track_id__wheel_speed_profile_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/job/{job_id}/track/{track_id}/wheel-speed-profile-overlay": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Wheel Speed Profile Overlay
+         * @description T19 — Tekerlek hız profili overlay videosu oluştur.
+         *
+         *     İşaretlenen kare aralığında kare-kare interpolasyon hız etiketleri ekler.
+         *     Sonuç `wheel_profile_overlay_{track_id}.mp4` olarak kaydedilir.
+         */
+        post: operations["wheel_speed_profile_overlay_api_job__job_id__track__track_id__wheel_speed_profile_overlay_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/job/{job_id}/track/{track_id}/wheel-profile-overlay": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Download Wheel Profile Overlay
+         * @description T19 — Oluşturulan profil overlay videosunu indir.
+         */
+        get: operations["download_wheel_profile_overlay_api_job__job_id__track__track_id__wheel_profile_overlay_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/job/{job_id}/track/{track_id}/wheel-overlay": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Stream Wheel Overlay
+         * @description T25 — Tekerlek hızı overlay videosunu oynat.
+         */
+        get: operations["stream_wheel_overlay_api_job__job_id__track__track_id__wheel_overlay_get"];
+        put?: never;
+        /**
+         * Generate Wheel Overlay
+         * @description T25 — Tekerlek hızı ile overlay video üret.
+         *
+         *     Seçilen track'in hızı sabit tekerlek değeriyle (value_kmh*) override edilir;
+         *     diğer track'ler bbox hızıyla gösterilir. Bbox overlay değişmez (forensic bütünlük).
+         */
+        post: operations["generate_wheel_overlay_api_job__job_id__track__track_id__wheel_overlay_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/job/{job_id}/track/{track_id}/wheel-profile-chart": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Wheel Profile Chart
+         * @description T19 — Profil hız-zaman grafiğini PNG olarak döndür.
+         */
+        get: operations["wheel_profile_chart_api_job__job_id__track__track_id__wheel_profile_chart_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/job/{job_id}/track/{track_id}/auto-contact-points": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Auto Contact Points
+         * @description T20 — Track'in bbox'larından otomatik tekerlek temas noktası tahminleri.
+         *
+         *     Klasik CV (Canny kenar tespiti) ile her seçili karede temas noktası tahmini yapar.
+         *     Tespit başarısız olursa bbox alt-orta yedek olarak kullanılır.
+         *     Tüm noktalarda source='auto' — operatör onayı zorunlu (CLAUDE.md Kural 5).
+         */
+        get: operations["auto_contact_points_api_job__job_id__track__track_id__auto_contact_points_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/job/{job_id}/track/{track_id}/axle-timing": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Axle Timing
+         * @description T27 — H-bağımsız dingil adımlama ile hız hesapla.
+         *
+         *     Mesafe bilinen dingil uzunluğundan gelir (H'ye bağımlı değil).
+         *     Her geçiş olayı ön + arka tekerlek bracket kareleri ve yol referans noktası içerir.
+         */
+        post: operations["axle_timing_api_job__job_id__track__track_id__axle_timing_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/track": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start Tracking
+         * @description Yalnızca tespit + takip işi başlat (kalibrasyon gerekmez) — cross-ratio akışının girişi.
+         */
+        post: operations["start_tracking_api_track_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/job/{job_id}/tracks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Job Tracks
+         * @description Araç izleri (her karede bbox) — araç ve düz-gidiş penceresi seçimi için.
+         */
+        get: operations["job_tracks_api_job__job_id__tracks_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/job/{job_id}/track/{track_id}/cross-ratio/vp": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cross Ratio Vp
+         * @description Perspektif referansı önizlemesi (sihirbaz adım 2): şerit ve/veya araç izi + uyum.
+         */
+        post: operations["cross_ratio_vp_api_job__job_id__track__track_id__cross_ratio_vp_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/job/{job_id}/track/{track_id}/cross-ratio-speed": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cross Ratio Speed Endpoint
+         * @description Cross-ratio hız (H-bağımsız). VP sunucuda girdilerden yeniden hesaplanır; istemci VP'si
+         *     kabul edilmez. Sonuç diske yazılır ve audit-log'a kaydedilir.
+         */
+        post: operations["cross_ratio_speed_endpoint_api_job__job_id__track__track_id__cross_ratio_speed_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/job/{job_id}/session-log": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Session Log
+         * @description Job oturum logu — her adım, parametre ve sonuç (session_log.jsonl).
+         */
+        get: operations["get_session_log_api_job__job_id__session_log_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
-        /** AutoRefRequest */
-        AutoRefRequest: {
+        /** AutoCalibratePointOut */
+        AutoCalibratePointOut: {
+            /** Id */
+            id: string;
+            /** Pixel */
+            pixel: [
+                number,
+                number
+            ];
+            /** World M */
+            world_m: [
+                number,
+                number
+            ];
+            /**
+             * Source
+             * @default auto-vanishing
+             */
+            source: string;
+        };
+        /** AutoCalibrateRequest */
+        AutoCalibrateRequest: {
             /** Frame N */
             frame_n: number;
             /**
@@ -306,16 +769,64 @@ export interface components {
              * @default 3.5
              */
             lane_width_m: number;
+        };
+        /** AutoCalibrateResponse */
+        AutoCalibrateResponse: {
+            /** Vanishing Point */
+            vanishing_point: [
+                number,
+                number
+            ] | null;
+            /** Left Line Pts */
+            left_line_pts: [
+                number,
+                number
+            ][] | null;
+            /** Right Line Pts */
+            right_line_pts: [
+                number,
+                number
+            ][] | null;
+            /** Proposed Points */
+            proposed_points: components["schemas"]["AutoCalibratePointOut"][];
+            /** Quality Gate Passed */
+            quality_gate_passed: boolean;
+            /** Quality Reason */
+            quality_reason: string;
+            /** Estimated Rms M */
+            estimated_rms_m: number | null;
+            /** Warning */
+            warning: string | null;
+        };
+        /** AutoContactPointsResponse */
+        AutoContactPointsResponse: {
+            /** Marks */
+            marks: components["schemas"]["AutoMarkOut"][];
+            /** Track Id */
+            track_id: number;
+            /** Method Summary */
+            method_summary: string;
+        };
+        /** AutoMarkOut */
+        AutoMarkOut: {
+            /** Frame */
+            frame: number;
+            /** Pixel */
+            pixel: [
+                number,
+                number
+            ];
+            /** Source */
+            source: string;
+            /** Confidence */
+            confidence: number;
+            /** Detection Method */
+            detection_method: string;
             /**
-             * Dash Length M
-             * @default 3
+             * Note
+             * @default
              */
-            dash_length_m: number;
-            /**
-             * D Near M
-             * @default 5
-             */
-            d_near_m: number;
+            note: string;
         };
         /** AxleCheckRequest */
         AxleCheckRequest: {
@@ -345,6 +856,75 @@ export interface components {
         AxleSuggestFrameResponse: {
             /** Frame N */
             frame_n?: number | null;
+        };
+        /**
+         * AxleTimingCrossing
+         * @description Tek bir geçiş olayı — ön + arka tekerlek bracket kareleri ve referans noktası.
+         */
+        AxleTimingCrossing: {
+            /** Front Frame N */
+            front_frame_n: number;
+            /** Front Pixel N */
+            front_pixel_n: [
+                number,
+                number
+            ];
+            /** Front Frame N1 */
+            front_frame_n1: number;
+            /** Front Pixel N1 */
+            front_pixel_n1: [
+                number,
+                number
+            ];
+            /** Rear Frame N */
+            rear_frame_n: number;
+            /** Rear Pixel N */
+            rear_pixel_n: [
+                number,
+                number
+            ];
+            /** Rear Frame N1 */
+            rear_frame_n1: number;
+            /** Rear Pixel N1 */
+            rear_pixel_n1: [
+                number,
+                number
+            ];
+            /** Target Px */
+            target_px: [
+                number,
+                number
+            ];
+        };
+        /** AxleTimingRequest */
+        AxleTimingRequest: {
+            /** Crossings */
+            crossings: components["schemas"]["AxleTimingCrossing"][];
+            /**
+             * Wheelbase M
+             * @default 2.65
+             */
+            wheelbase_m: number;
+        };
+        /** AxleTimingResponse */
+        AxleTimingResponse: {
+            /** Speed Kmh */
+            speed_kmh: number;
+            /** Ci Kmh */
+            ci_kmh: number;
+            /** Confidence Level */
+            confidence_level: string;
+            /** Crossing Count */
+            crossing_count: number;
+            /** Crossing Speeds Kmh */
+            crossing_speeds_kmh: number[];
+            /** Delta T Per Crossing S */
+            delta_t_per_crossing_s: number[];
+            /**
+             * Warnings
+             * @default []
+             */
+            warnings: string[];
         };
         /** Body_upload_video_api_video_upload_post */
         Body_upload_video_api_video_upload_post: {
@@ -393,11 +973,23 @@ export interface components {
              * Rejected Points
              * @default []
              */
-            rejected_points: {
-                id: string;
-                error_cm: number;
-                threshold_cm: number;
-            }[];
+            rejected_points: components["schemas"]["RejectedPointOut"][];
+        };
+        /** ContactMarkIn */
+        ContactMarkIn: {
+            /** Frame */
+            frame: number;
+            /** Pixel */
+            pixel: [
+                number,
+                number
+            ];
+            /**
+             * Source
+             * @default manual
+             * @enum {string}
+             */
+            source: "manual" | "operator-confirmed" | "auto";
         };
         /** ControlPointIn */
         ControlPointIn: {
@@ -424,13 +1016,185 @@ export interface components {
              * @default false
              */
             held_out: boolean;
-            /** Interpolation Meta — T14 audit trail for sub-frame interpolated points */
-            interpolation_meta?: Record<string, unknown> | null;
+            /** Interpolation Meta */
+            interpolation_meta?: {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** CrossRatioSpeedRequest */
+        CrossRatioSpeedRequest: {
+            /**
+             * Lane Lines
+             * @default []
+             */
+            lane_lines: [
+                number,
+                number
+            ][][];
+            /**
+             * Use Trajectory
+             * @default true
+             */
+            use_trajectory: boolean;
+            /** Frame Start */
+            frame_start?: number | null;
+            /** Frame End */
+            frame_end?: number | null;
+            /**
+             * Vp Primary
+             * @default lane
+             * @enum {string}
+             */
+            vp_primary: "lane" | "trajectory";
+            known_length: components["schemas"]["KnownLengthIn"];
+            /** Marks */
+            marks: components["schemas"]["ContactMarkIn"][];
+            /**
+             * Pixel Sigma
+             * @default 1
+             */
+            pixel_sigma: number;
+        };
+        /** CrossRatioSpeedResponse */
+        CrossRatioSpeedResponse: {
+            /** Speed Kmh */
+            speed_kmh: number;
+            /** Ci Kmh */
+            ci_kmh: number;
+            /**
+             * Confidence Level
+             * @enum {string}
+             */
+            confidence_level: "high" | "medium" | "low";
+            /** Ci Components Kmh */
+            ci_components_kmh: {
+                [key: string]: number;
+            };
+            /** Direction */
+            direction: string;
+            /** Mark Count */
+            mark_count: number;
+            /** Positions M */
+            positions_m: number[];
+            /** Times S */
+            times_s: number[];
+            /** Mark Sensitivity M Per Px */
+            mark_sensitivity_m_per_px: number[];
+            /** Residual Rms M */
+            residual_rms_m: number;
+            /** Max Offset Px */
+            max_offset_px: number;
+            vp_used: components["schemas"]["VanishingOut"];
+            vp_alternative: components["schemas"]["VanishingOut"] | null;
+            agreement: components["schemas"]["VanishingAgreementOut"] | null;
+            /** Speed Alternative Kmh */
+            speed_alternative_kmh?: number | null;
+            /** Vp Mc Samples */
+            vp_mc_samples: number;
+            /** Vp Mc Invalid Fraction */
+            vp_mc_invalid_fraction: number;
+            /** Length Sigma M */
+            length_sigma_m: number;
+            /** Fps */
+            fps: number;
+            /** Fps Source */
+            fps_source: string;
+            /** Gates */
+            gates: components["schemas"]["QualityGateOut"][];
+        };
+        /**
+         * CrossRatioVpRequest
+         * @description Perspektif referansı (VP) kaynakları. İkisi de verilirse uyum kontrolü yapılır.
+         */
+        CrossRatioVpRequest: {
+            /**
+             * Lane Lines
+             * @default []
+             */
+            lane_lines: [
+                number,
+                number
+            ][][];
+            /**
+             * Use Trajectory
+             * @default true
+             */
+            use_trajectory: boolean;
+            /** Frame Start */
+            frame_start?: number | null;
+            /** Frame End */
+            frame_end?: number | null;
+        };
+        /** CrossRatioVpResponse */
+        CrossRatioVpResponse: {
+            lane: components["schemas"]["VanishingOut"] | null;
+            trajectory: components["schemas"]["VanishingOut"] | null;
+            /** Trajectory Error */
+            trajectory_error?: string | null;
+            agreement: components["schemas"]["VanishingAgreementOut"] | null;
+        };
+        /** FittedLineOut */
+        FittedLineOut: {
+            /** Start */
+            start: [
+                number,
+                number
+            ];
+            /** End */
+            end: [
+                number,
+                number
+            ];
+            /** Rms Px */
+            rms_px: number;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /** InterpolatePointRequest */
+        InterpolatePointRequest: {
+            /** Frame N Px */
+            frame_n_px: [
+                number,
+                number
+            ];
+            /** Frame N1 Px */
+            frame_n1_px: [
+                number,
+                number
+            ];
+            /** Target Px */
+            target_px: [
+                number,
+                number
+            ];
+            /** Second N Px */
+            second_n_px?: [
+                number,
+                number
+            ] | null;
+            /** Second N1 Px */
+            second_n1_px?: [
+                number,
+                number
+            ] | null;
+        };
+        /** InterpolatePointResponse */
+        InterpolatePointResponse: {
+            /** Interpolated Px */
+            interpolated_px: [
+                number,
+                number
+            ];
+            /** T */
+            t: number;
+            /** Second Interpolated Px */
+            second_interpolated_px?: [
+                number,
+                number
+            ] | null;
         };
         /** JobResultOut */
         JobResultOut: {
@@ -456,6 +1220,57 @@ export interface components {
             eta_s?: number | null;
             /** Error */
             error?: string | null;
+        };
+        /** JobSummaryOut */
+        JobSummaryOut: {
+            /** Job Id */
+            job_id: string;
+            /** Video Filename */
+            video_filename?: string | null;
+            /** Created At */
+            created_at: string;
+            /** Completed At */
+            completed_at?: string | null;
+            /** Vehicle Count */
+            vehicle_count: number;
+            /** Frame Step */
+            frame_step?: number | null;
+            /** Model Name */
+            model_name?: string | null;
+            /** Fps */
+            fps?: number | null;
+            /** Width */
+            width?: number | null;
+            /** Height */
+            height?: number | null;
+            /** Frame Count */
+            frame_count?: number | null;
+            /** Video Id */
+            video_id?: string | null;
+        };
+        /** KnownLengthIn */
+        KnownLengthIn: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "wheelbase" | "scene";
+            /** Length M */
+            length_m: number;
+            /** Point A */
+            point_a: [
+                number,
+                number
+            ];
+            /** Point B */
+            point_b: [
+                number,
+                number
+            ];
+            /** Sigma M */
+            sigma_m?: number | null;
+            /** Frame */
+            frame?: number | null;
         };
         /** PipelineRequest */
         PipelineRequest: {
@@ -487,22 +1302,30 @@ export interface components {
             /** Control Points */
             control_points: components["schemas"]["ControlPointIn"][];
         };
-        /** ProposedPointOut */
-        ProposedPointOut: {
-            /** Pixel */
-            pixel: [
-                number,
-                number
-            ];
-            /** World M */
-            world_m: [
-                number,
-                number
-            ];
-            /** Detection Confidence */
-            detection_confidence: number;
-            /** Description */
-            description: string;
+        /** ProfilePointOut */
+        ProfilePointOut: {
+            /** T S */
+            t_s: number;
+            /** Speed Kmh */
+            speed_kmh: number;
+            /** Ci Kmh */
+            ci_kmh: number;
+            /** Accel Ms2 */
+            accel_ms2?: number | null;
+        };
+        /** QualityGateOut */
+        QualityGateOut: {
+            /** Code */
+            code: string;
+            /**
+             * Severity
+             * @enum {string}
+             */
+            severity: "info" | "warn" | "error";
+            /** Message */
+            message: string;
+            /** Action */
+            action: string;
         };
         /** RecalibrateRequest */
         RecalibrateRequest: {
@@ -525,6 +1348,15 @@ export interface components {
             /** Known Width M */
             known_width_m: number;
         };
+        /** RejectedPointOut */
+        RejectedPointOut: {
+            /** Id */
+            id: string;
+            /** Error Cm */
+            error_cm: number;
+            /** Threshold Cm */
+            threshold_cm: number;
+        };
         /** SpeedEstimateOut */
         SpeedEstimateOut: {
             /** Track Id */
@@ -539,10 +1371,104 @@ export interface components {
             confidence_level: string;
             /** Frame Count */
             frame_count: number;
-            /** Hull Inside Fraction */
-            hull_inside_fraction?: number;
-            /** Out Of Calibration Zone */
-            out_of_calibration_zone?: boolean;
+            /**
+             * Hull Inside Fraction
+             * @default 1
+             */
+            hull_inside_fraction: number;
+            /**
+             * Out Of Calibration Zone
+             * @default false
+             */
+            out_of_calibration_zone: boolean;
+        };
+        /** TrackPointOut */
+        TrackPointOut: {
+            /** Frame */
+            frame: number;
+            /** Bbox */
+            bbox: [
+                number,
+                number,
+                number,
+                number
+            ];
+        };
+        /**
+         * TrackRequest
+         * @description Yalnızca tespit + takip (homografi kalibrasyonu gerekmez).
+         */
+        TrackRequest: {
+            /** Video Id */
+            video_id: string;
+            /** Fps Override */
+            fps_override?: number | null;
+            /**
+             * Frame Step
+             * @default 1
+             */
+            frame_step: number;
+            /**
+             * Model Size
+             * @default nano
+             * @enum {string}
+             */
+            model_size: "nano" | "small" | "medium";
+        };
+        /** TrackSummaryOut */
+        TrackSummaryOut: {
+            /** Track Id */
+            track_id: number;
+            /** Vehicle Class */
+            vehicle_class: string;
+            /** First Frame */
+            first_frame: number;
+            /** Last Frame */
+            last_frame: number;
+            /** Point Count */
+            point_count: number;
+            /** Points */
+            points: components["schemas"]["TrackPointOut"][];
+        };
+        /** TransverseGuideRequest */
+        TransverseGuideRequest: {
+            /** Road P1 */
+            road_p1: [
+                number,
+                number
+            ];
+            /** Road P2 */
+            road_p2: [
+                number,
+                number
+            ];
+            /** Canvas W */
+            canvas_w: number;
+            /** Canvas H */
+            canvas_h: number;
+            /** Wheel Px */
+            wheel_px?: [
+                number,
+                number
+            ] | null;
+        };
+        /** TransverseGuideResponse */
+        TransverseGuideResponse: {
+            /** Transverse Dir */
+            transverse_dir: [
+                number,
+                number
+            ];
+            /** Guide P1 */
+            guide_p1?: [
+                number,
+                number
+            ] | null;
+            /** Guide P2 */
+            guide_p2?: [
+                number,
+                number
+            ] | null;
         };
         /** ValidationError */
         ValidationError: {
@@ -552,6 +1478,51 @@ export interface components {
             msg: string;
             /** Error Type */
             type: string;
+        };
+        /** VanishingAgreementOut */
+        VanishingAgreementOut: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "agree" | "disagree" | "indeterminate";
+            /** Angle Deg */
+            angle_deg: number;
+            /** Relative Distance */
+            relative_distance: number | null;
+            /** Mahalanobis2 */
+            mahalanobis2: number | null;
+            /** Message */
+            message: string;
+        };
+        /** VanishingOut */
+        VanishingOut: {
+            /** Source */
+            source: string;
+            /** Point */
+            point: [
+                number,
+                number
+            ] | null;
+            /** Direction */
+            direction: [
+                number,
+                number
+            ] | null;
+            /** Sigma Major Px */
+            sigma_major_px: number | null;
+            /** Sigma Minor Px */
+            sigma_minor_px: number | null;
+            /** N Lines */
+            n_lines: number;
+            /** N Inliers */
+            n_inliers: number;
+            /** Residual Rms Sigma */
+            residual_rms_sigma: number;
+            /** Lines */
+            lines: components["schemas"]["FittedLineOut"][];
+            /** Warnings */
+            warnings: string[];
         };
         /** VideoMetaOut */
         VideoMetaOut: {
@@ -569,6 +1540,87 @@ export interface components {
             frame_count: number;
             /** Sha256 */
             sha256: string;
+        };
+        /** WheelMarkIn */
+        WheelMarkIn: {
+            /** Frame */
+            frame: number;
+            /** Pixel */
+            pixel: [
+                number,
+                number
+            ];
+            /**
+             * Source
+             * @default manual
+             */
+            source: string;
+        };
+        /** WheelOverlayRequest */
+        WheelOverlayRequest: {
+            /** Value Kmh */
+            value_kmh: number;
+            /** Ci Kmh */
+            ci_kmh: number;
+            /** Confidence Level */
+            confidence_level: string;
+        };
+        /** WheelSpeedProfileRequest */
+        WheelSpeedProfileRequest: {
+            /** Marks */
+            marks: components["schemas"]["WheelMarkIn"][];
+            /**
+             * Smoothing Window
+             * @default 3
+             */
+            smoothing_window: number;
+        };
+        /** WheelSpeedProfileResponse */
+        WheelSpeedProfileResponse: {
+            /** Summary Value Kmh */
+            summary_value_kmh: number;
+            /** Summary Ci Kmh */
+            summary_ci_kmh: number;
+            /** Summary Confidence Level */
+            summary_confidence_level: string;
+            /** Summary Mark Count */
+            summary_mark_count: number;
+            /** Summary Residual Kmh */
+            summary_residual_kmh: number;
+            /** Points */
+            points: components["schemas"]["ProfilePointOut"][];
+            /** Raw Pairwise Kmh */
+            raw_pairwise_kmh: number[];
+            /** Smoothing Window */
+            smoothing_window: number;
+            /**
+             * Warnings
+             * @default []
+             */
+            warnings: string[];
+        };
+        /** WheelSpeedRequest */
+        WheelSpeedRequest: {
+            /** Marks */
+            marks: components["schemas"]["WheelMarkIn"][];
+        };
+        /** WheelSpeedResponse */
+        WheelSpeedResponse: {
+            /** Value Kmh */
+            value_kmh: number;
+            /** Ci Kmh */
+            ci_kmh: number;
+            /** Confidence Level */
+            confidence_level: string;
+            /** Mark Count */
+            mark_count: number;
+            /** Residual Kmh */
+            residual_kmh: number;
+            /**
+             * Warnings
+             * @default []
+             */
+            warnings: string[];
         };
     };
     responses: never;
@@ -774,7 +1826,7 @@ export interface operations {
             };
         };
     };
-    autoref_api_video__video_id__autoref_post: {
+    interpolate_point_api_video__video_id__interpolate_point_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -785,7 +1837,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["AutoRefRequest"];
+                "application/json": components["schemas"]["InterpolatePointRequest"];
             };
         };
         responses: {
@@ -795,7 +1847,77 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ProposedPointOut"][];
+                    "application/json": components["schemas"]["InterpolatePointResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    transverse_guide_api_video__video_id__transverse_guide_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                video_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TransverseGuideRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TransverseGuideResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    auto_calibrate_api_video__video_id__auto_calibrate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                video_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AutoCalibrateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutoCalibrateResponse"];
                 };
             };
             /** @description Validation Error */
@@ -876,6 +1998,72 @@ export interface operations {
         };
     };
     download_report_api_job__job_id__report_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    regenerate_report_api_job__job_id__report_regenerate_post: {
+        parameters: {
+            query?: {
+                speed_limit_kmh?: number | null;
+            };
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    download_report_v2_api_job__job_id__report_v2_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -999,6 +2187,90 @@ export interface operations {
             };
         };
     };
+    job_plan_view_api_job__job_id__plan_view_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_jobs_api_jobs_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobSummaryOut"][];
+                };
+            };
+        };
+    };
+    job_calibration_api_job__job_id__calibration_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     axle_suggest_frame_api_job__job_id__track__track_id__axle_suggest_frame_get: {
         parameters: {
             query?: never;
@@ -1091,6 +2363,491 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    wheel_speed_api_job__job_id__track__track_id__wheel_speed_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+                track_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WheelSpeedRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WheelSpeedResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    wheel_speed_profile_api_job__job_id__track__track_id__wheel_speed_profile_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+                track_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WheelSpeedProfileRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WheelSpeedProfileResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    wheel_speed_profile_overlay_api_job__job_id__track__track_id__wheel_speed_profile_overlay_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+                track_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WheelSpeedProfileRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    download_wheel_profile_overlay_api_job__job_id__track__track_id__wheel_profile_overlay_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+                track_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    stream_wheel_overlay_api_job__job_id__track__track_id__wheel_overlay_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+                track_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    generate_wheel_overlay_api_job__job_id__track__track_id__wheel_overlay_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+                track_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WheelOverlayRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    wheel_profile_chart_api_job__job_id__track__track_id__wheel_profile_chart_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+                track_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    auto_contact_points_api_job__job_id__track__track_id__auto_contact_points_get: {
+        parameters: {
+            query?: {
+                max_marks?: number;
+            };
+            header?: never;
+            path: {
+                job_id: string;
+                track_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutoContactPointsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    axle_timing_api_job__job_id__track__track_id__axle_timing_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+                track_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AxleTimingRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AxleTimingResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    start_tracking_api_track_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TrackRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    job_tracks_api_job__job_id__tracks_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TrackSummaryOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cross_ratio_vp_api_job__job_id__track__track_id__cross_ratio_vp_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+                track_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CrossRatioVpRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CrossRatioVpResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cross_ratio_speed_endpoint_api_job__job_id__track__track_id__cross_ratio_speed_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+                track_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CrossRatioSpeedRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CrossRatioSpeedResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_session_log_api_job__job_id__session_log_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    }[];
                 };
             };
             /** @description Validation Error */

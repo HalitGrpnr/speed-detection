@@ -5,8 +5,8 @@
 > geçmişine bakılır; bu dosya yalnızca **anlık durumun özetini** tutar (şişirmeyin).
 
 **Son güncelleme:** 2026-09-23
-**Aktif görev:** **T28 — Cross-ratio hız yöntemi** (`tasks/T28.md`). 🟡 Faz 0 ✓ (**Seçenek C onaylı**), **Faz 1 ✓** (`src/speed/cross_ratio.py`), **Faz 2 ✓** (`src/calibration/vp_sources.py` + `src/detection/feature_tracks.py`; araç izi VP'si = KLT rijit gövde noktaları). **Faz 3 ✓** (`src/speed/cross_ratio_service.py`; H'siz takip `POST /api/track`; `…/cross-ratio/vp` + `…/cross-ratio-speed`). pytest 359/359. Sıradaki: **Faz 4** `CrossRatioPanel` operatör sihirbazı.
-**Bilinen:** eski `/api/pipeline` hâlâ H zorunlu; yeni akış `/api/track` ile H'siz. Eskisinin sökülmesi Faz 5.
+**Aktif görev:** **T28 — Cross-ratio hız yöntemi** (`tasks/T28.md`). 🟡 Faz 0 ✓ (**Seçenek C onaylı**), **Faz 1 ✓** (`src/speed/cross_ratio.py`), **Faz 2 ✓** (`src/calibration/vp_sources.py` + `src/detection/feature_tracks.py`; araç izi VP'si = KLT rijit gövde noktaları). **Faz 3 ✓** (`src/speed/cross_ratio_service.py`; H'siz takip `POST /api/track`; `…/cross-ratio/vp` + `…/cross-ratio-speed`). **Faz 4 ✓** (`frontend/src/features/crossratio/` — yükleme sonrası "Tek araç, düz doğru boyunca hız" seçeneği). GPS videosunda uçtan uca test edildi (bkz. DECISIONS: VP ayrışması CI'ye eklendi). pytest 361/361. Sıradaki: **Faz 5** rakip yöntemleri gizle/sök → tek hikâye.
+**Bilinen:** bu videoda şerit VP'si araç izinden ~%12 ayrışıyor (lens/kıvrım şüphesi); ESLint config bozuk (önceden). Eski `/api/pipeline` hâlâ H zorunlu; yeni akış `/api/track` ile H'siz. Eskisinin sökülmesi Faz 5.
 **Not:** Atılan eski UI denemeleri (WelcomePage/"VeloProof" adı, CalibrationStep bracket otomasyonu) `git stash@{0}`'da saklı; gerekirse `git stash show -p stash@{0}`.
 
 **⚑ Yön değişikliği (2026-09-23):** Proje amacı tek hedefe indirgendi: *tek bir aracın, düz gittiği bir

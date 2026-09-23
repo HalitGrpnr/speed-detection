@@ -7,6 +7,7 @@ import { CalibrationStep } from '@/features/calibration/CalibrationStep'
 import { ReviewStep } from '@/features/review/ReviewStep'
 import { PipelineStep } from '@/features/pipeline/PipelineStep'
 import { ResultsStep } from '@/features/results/ResultsStep'
+import { CrossRatioWizard } from '@/features/crossratio/CrossRatioWizard'
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false } },
@@ -14,6 +15,8 @@ const queryClient = new QueryClient({
 
 function CurrentStep() {
   const step = useWizard((s) => s.step)
+  const flow = useWizard((s) => s.flow)
+  if (flow === 'crossratio') return <CrossRatioWizard />
   switch (step) {
     case 1:
       return <UploadStep />

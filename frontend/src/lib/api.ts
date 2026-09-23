@@ -14,6 +14,10 @@ import type {
   CalibrateRequest,
   CalibrateResponse,
   ControlPoint,
+  CrossRatioSpeedRequest,
+  CrossRatioSpeedResponse,
+  CrossRatioVpRequest,
+  CrossRatioVpResponse,
   InterpolatePointRequest,
   InterpolatePointResponse,
   JobResult,
@@ -22,6 +26,8 @@ import type {
   PipelineRequest,
   PlanViewRequest,
   RecalibrateRequest,
+  TrackRequest,
+  TrackSummary,
   VideoMeta,
   WheelOverlayRequest,
   WheelSpeedRequest,
@@ -299,5 +305,28 @@ export const api = {
   /** T24 — Geçmiş analiz için kalibrasyon kontrol noktaları. */
   async jobCalibration(jobId: string): Promise<{ control_points: ControlPoint[] }> {
     return unwrap(await fetch(`/api/job/${jobId}/calibration`))
+  },
+
+  // ── T28 — Cross-ratio ─────────────────────────────────────────────────────
+  /** Yalnızca tespit + takip (kalibrasyon gerekmez). */
+  async startTracking(req: TrackRequest): Promise<{ job_id: string }> {
+    return unwrap(await fetch('/api/track', { method: 'POST', headers: jsonHeaders, body: JSON.stringify(req) }))
+  },
+
+  async jobTracks(jobId: string): Promise<TrackSummary[]> {
+    return unwrap(await fetch(`/api/job/${jobId}/tracks`))
+  },
+
+  /** Perspektif referansı önizlemesi (şerit ve/veya araç izi + uyum). */
+  async crossRatioVp(jobId: string, trackId: number, req: CrossRatioVpRequest): Promise<CrossRatioVpResponse> {
+    return unwrap(await fetch(`/api/job/${jobId}/track/${trackId}/cross-ratio/vp`, {
+      method: 'POST', headers: jsonHeaders, body: JSON.stringify(req),
+    }))
+  },
+
+  async crossRatioSpeed(jobId: string, trackId: number, req: CrossRatioSpeedRequest): Promise<CrossRatioSpeedResponse> {
+    return unwrap(await fetch(`/api/job/${jobId}/track/${trackId}/cross-ratio-speed`, {
+      method: 'POST', headers: jsonHeaders, body: JSON.stringify(req),
+    }))
   },
 }

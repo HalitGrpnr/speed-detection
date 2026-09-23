@@ -51,7 +51,8 @@ function AnalysisStatusBar() {
 
 export function AppShell({ children }: { children: ReactNode }) {
   const step = useWizard((s) => s.step)
-  const wide = step === 3 || step === 6
+  const flow = useWizard((s) => s.flow)
+  const wide = flow === 'crossratio' || step === 3 || step === 6
   const [sidebarOpen, setSidebarOpen] = useState(true)
 
   return (

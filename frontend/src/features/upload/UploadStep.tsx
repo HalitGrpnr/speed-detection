@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { Check, Clock, Copy, FileVideo, Loader2, UploadCloud } from 'lucide-react'
+import { ArrowRight, Check, Clock, Copy, FileVideo, Loader2, Ruler, UploadCloud } from 'lucide-react'
 import { api } from '@/lib/api'
 import { cn } from '@/lib/utils'
 import type { JobSummary, VideoMeta } from '@/lib/models'
@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Progress } from '@/components/ui/progress'
 import { StatusBanner } from '@/components/common/StatusBanner'
 import { StepFooter } from '@/components/common/StepFooter'
+import { useCrossRatio } from '@/features/crossratio/store'
 
 const FPS_SOURCE_TR: Record<string, string> = {
   container: 'konteynerden',
@@ -31,6 +32,8 @@ export function UploadStep() {
   const setCalibration = useWizard((s) => s.setCalibration)
   const setJobId = useWizard((s) => s.setJobId)
   const loadHistoricalJob = useWizard((s) => s.loadHistoricalJob)
+  const setFlow = useWizard((s) => s.setFlow)
+  const resetCrossRatio = useCrossRatio((s) => s.reset)
 
   const inputRef = useRef<HTMLInputElement>(null)
   const [dragOver, setDragOver] = useState(false)
@@ -48,6 +51,7 @@ export function UploadStep() {
       setControlPoints([])
       setCalibration(null)
       setJobId(null)
+      resetCrossRatio()
       setVideoMeta(meta)
     },
   })
@@ -111,6 +115,28 @@ export function UploadStep() {
             <Button variant="outline" size="sm" onClick={() => inputRef.current?.click()}>
               <FileVideo /> Farklı video yükle
             </Button>
+
+            <div className="space-y-2 border-t pt-4">
+              <p className="text-sm font-medium">Ölçüm yöntemi</p>
+              <button type="button" onClick={() => setFlow('crossratio')}
+                className="group flex w-full items-start gap-3 rounded-xl border-2 border-primary/60 bg-primary/5 p-4 text-left transition-colors hover:bg-primary/10">
+                <Ruler className="mt-0.5 size-5 shrink-0 text-primary" />
+                <span className="flex-1">
+                  <span className="flex items-center gap-2 font-semibold">
+                    Tek araç, düz doğru boyunca hız
+                    <span className="rounded-full bg-primary px-2 py-0.5 text-[10px] font-semibold text-primary-foreground">önerilen</span>
+                  </span>
+                  <span className="mt-0.5 block text-xs leading-relaxed text-muted-foreground">
+                    Kalibrasyon noktası gerekmez. Yoldaki şerit çizgileri (veya aracın kendi hareketi) ile bilinen bir uzunluk
+                    (dingil mesafesi) kullanılır; sihirbaz her adımda ne yapacağınızı gösterir.
+                  </span>
+                </span>
+                <ArrowRight className="mt-1 size-4 text-primary transition-transform group-hover:translate-x-0.5" />
+              </button>
+              <p className="text-xs text-muted-foreground">
+                Alternatif: sahnede ölçülü kontrol noktalarıyla homografi kalibrasyonu — aşağıdaki “Devam” ile.
+              </p>
+            </div>
           </div>
         ) : uploading ? (
           <div className="space-y-3 rounded-xl border bg-muted/30 p-6">

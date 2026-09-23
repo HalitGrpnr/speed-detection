@@ -517,3 +517,39 @@ Format:
 - **Alternatifler:** VP yayılımı için analitik Jacobian — uzak VP'de doğrusal olmayanlık büyük,
   reddedildi. `run_pipeline`'ı H-opsiyonel yapmak — overlay/rapor/hull zinciri H varsayıyor, Faz 5
   temizliğinden önce riskli, reddedildi.
+
+## [2026-09-23] T28 — Gerçek-video (GPS 82 km/h) doğrulaması: VP ayrışması CI'ye sistematik bileşen olarak eklendi
+- **Bulgu:** `docs/82_kmh.mp4`, Track 8 (VW Jetta, dingil 2,651 m), aralık 52–72, ön teker teması 6 karede
+  elle işaretlendi. Şerit VP'siyle **93,6 ± 9,4 km/h** — GPS (82) **CI dışında**; araç izi VP'siyle
+  83,7 ± 5,0 (içinde). Kapılar `not_straight`, `ref_off_line`, `vp_disagree` (χ²=53) doğru uyarı verdi, ama
+  CI iki referans arasındaki farkı içermediği için "orta güven" etiketli bir sonuç gerçeği kaçırdı.
+  Olası kök neden: görüntü kenarındaki şerit çizgilerinde lens bükülmesi ve/veya sol-üstteki yol kıvrımı
+  (şerit çizgileri araç yoluna yerel olarak paralel değil). Bağımsız sağlama: 57. kare ön teker ≈ 60. kare
+  arka teker → 1 dingil / 3 kare ≈ 79,5 km/h.
+- **Karar:** İki VP kaynağı χ² testinde ayrışırsa, alternatif VP ile hesaplanan hız her zaman raporlanır
+  (`speed_alternative_kmh`) ve |fark| CI'ye `vp_disagreement` bileşeni olarak karesel eklenir. Fark >%10 ise
+  kapı `vp_disagreement_in_ci` **error** → güven "düşük". Sonuç: şerit 93,6 ± 13,7 [79,9–107,3], araç izi
+  83,7 ± 11,1 [72,6–94,8] — ikisinde de GPS içeride, güven dürüstçe "düşük".
+- **Gerekçe:** Adli çıktıda model varsayımı (paralellik, lens) ihlal edildiğinde CI dar kalıp gerçeği
+  dışarıda bırakmamalı; iki bağımsız referansın farkı bu ihlalin doğrudan ölçüsüdür.
+- **Alternatifler:** Yalnızca uyarı vermek (mevcut hâl) — sayı yine "orta güven" ile gerçeği kaçırıyordu,
+  reddedildi. Varsayılan birincil kaynağı araç izi yapmak — tek videoya dayalı karar olur; T10 GPS setiyle
+  değerlendirilecek. Lens distorsiyon düzeltmesi — kapsam dışı (ayrı görev önerisi).
+
+## [2026-09-23] T28 Faz 4 — Operatör sihirbazı: ayrı akış, istemci-tarafı canlı doğrulama
+- **Karar:** Sihirbaz `ResultsStep` içine panel olarak değil, video yüklendikten sonra seçilen **ayrı bir
+  akış** olarak kuruldu (`frontend/src/features/crossratio/`, `useWizard.flow = 'crossratio'`); kenar çubuğu
+  ve başlık akışa göre adımları gösterir. Eski homografi akışı Faz 5'e kadar "Devam" ile erişilebilir.
+  Kartta öngörülen `features/results/CrossRatioPanel.tsx` yerine bu yapı seçildi çünkü akış artık
+  kalibrasyonlu bir sonuç ekranına bağlı değil (H'siz takip işi ile başlıyor).
+- **Canlı doğrulama:** Her tıklamada "ölçüm çizgisinden sapma (px)" ve "1 px ≈ kaç cm" istemcide çekirdekle
+  aynı formülle hesaplanır (`geometry.ts`); **nihai sayı her zaman sunucudan** gelir ve sunucu VP'yi
+  girdilerden yeniden hesaplar.
+- **Yeni canvas:** `MeasureCanvas` (bildirimsel şekiller, ekran dışı VP oku, sürüklenebilir işaretler,
+  CalibrationCanvas ile aynı zoom/pan). Tarayıcı testinde bulunan ve düzeltilen hatalar: kare değişince
+  canvas'ın **eski kareyi göstermesi** (görüntü state'e alındı — adli açıdan kritik), `canEnter` fonksiyon
+  referansına abone olunduğu için adım butonlarının güncellenmemesi, `type=number` alanlarının "2,651"
+  girişini bozması (virgül/nokta kabul eden `DecimalField`), retina bulanıklığı (dpr'li çizim), sekme arka
+  plandayken takip sorgusunun durması (`refetchIntervalInBackground`).
+- **Bilinen:** `frontend/eslint.config.js:15` bu görevden önce de bozuk (`… 'recommended'` undefined) — lint
+  çalışmıyor; ayrı küçük görev önerisi.
