@@ -467,3 +467,27 @@ Format:
   izi üzerinde işaretleyin" yönlendirmesi yapılacak.
 - **Alternatifler:** Nokta çiftlerine formülü tek tek uygulayıp medyan almak — eşdeğer ama daha
   gürültülü, reddedildi. Homografiden 1B dilim almak — H bağımlılığını geri getirir, reddedildi.
+
+## [2026-09-23] T28 Faz 2 — Kaçış noktası kaynakları: "araç izi" = rijit gövde noktaları (KLT)
+- **Karar:** Görev kartındaki "tekerlek izinden VP (ek tık gerekmez)" ifadesi düzeltildi: **tek bir iz
+  görüntüde yalnızca bir doğru verir, VP'nin yerini belirlemez.** Düz giden araç saf öteleme yaptığı
+  için gövdedeki **her rijit noktanın** izi aynı VP'de buluşur. Bu yüzden "trajectory" kaynağı, araç
+  kutusu içinde Shi-Tomasi köşe + Lucas-Kanade (ileri-geri kontrollü) ile otomatik izlenen noktaların
+  izlerini RANSAC'lı ağırlıklı en küçük karelerle kesiştirir (`src/detection/feature_tracks.py`,
+  `src/calibration/vp_sources.py::vanishing_from_trajectories`). Model yok, yalnızca OpenCV.
+  Tek tekerlek izi ölçüm doğrusu olarak ve uyum kontrolünde kullanılmaya devam eder.
+- **Ortak arayüz:** `VanishingEstimate` (nokta veya sonsuz yön + 2×2 kovaryans + kaynak + uyarılar +
+  kullanılan doğrular). Kaynaklar: `lane_manual` (operatör çizgileri), `lane_auto` (mevcut
+  `detect_vanishing_point` sarmalı — öneri, onay uyarısıyla), `trajectory`.
+- **Belirsizlik:** Her doğru toplam-EKK ile uydurulur; VP konumundaki dik belirsizliği
+  `σ_ofset² + (uzaklık·σ_açı)²`. Kesişim bu ağırlıklarla yeniden ağırlıklandırılır; kovaryans
+  `(NᵀWN)⁻¹·max(χ²_red, 1)`. Monte Carlo (400 deneme) %95 kapsama = %96,5 → iyi kalibre, hafif temkinli.
+- **Uyum kontrolü:** `compare_vanishing` — iki kovaryans varsa χ²(2) %95 testi; yoksa açı ≤1° ve
+  uzaklık farkı ≤%10. Biri sonsuz diğeri sonluysa "belirlenemedi". Faz 3'te farkın hıza etkisi
+  (km/h) de raporlanabilir.
+- **Dosya yeri:** Kartta `vanishing.py`'ye ekleme öngörülmüştü; o modül homografi önerisine
+  (`propose_calibration`) bağlı ve Faz 5'te sökülebilir. Yeni kaynaklar bu yüzden ayrı
+  `vp_sources.py`'de; yalnızca `detect_vanishing_point` oradan kullanılıyor.
+- **Alternatifler:** Tek izden sabit-hız varsayımıyla VP — frenleyen araçta döngüsel/yanlı, reddedildi.
+  bbox köşe izleri — köşeler rijit gövde noktası değil (perspektifle kayar), reddedildi.
+  Otomatik izler kara kutu değildir: izler ve VP UI'da operatöre gösterilecek (Faz 4).
