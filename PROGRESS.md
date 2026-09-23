@@ -5,8 +5,8 @@
 > geçmişine bakılır; bu dosya yalnızca **anlık durumun özetini** tutar (şişirmeyin).
 
 **Son güncelleme:** 2026-09-23
-**Aktif görev:** **T28 — Cross-ratio hız yöntemi** (`tasks/T28.md`). 🟡 **Faz 0 bitti** → öneri **Seçenek C (yeniden odakla)**, kullanıcı onayı bekleniyor (`DECISIONS.md` 2026-09-23). Sıradaki: onay → Faz 1 `src/speed/cross_ratio.py` + testler.
-**Bilinen:** testleri `pytest tests/` ile koşun (kökteki `test_browser.py` çıplak toplamayı kırıyor); pipeline şu an H'siz çalışmıyor (Faz 3/5'te çözülecek).
+**Aktif görev:** **T28 — Cross-ratio hız yöntemi** (`tasks/T28.md`). 🟡 Faz 0 ✓ (**Seçenek C onaylı**), **Faz 1 ✓** — `src/speed/cross_ratio.py` çekirdeği + 18 test (318/318). Sıradaki: **Faz 2** `vanishing_from_trajectory` + şerit/tekerlek-izi VP sağlayıcılarının ortak arayüzü.
+**Bilinen:** pipeline şu an H'siz çalışmıyor (Faz 3/5'te çözülecek).
 
 **⚑ Yön değişikliği (2026-09-23):** Proje amacı tek hedefe indirgendi: *tek bir aracın, düz gittiği bir
 doğru boyunca hızı.* Bu amaç için en yalın yöntem **cross-ratio** (kaçış noktası + bilinen uzunlukla 1B

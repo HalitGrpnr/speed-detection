@@ -449,3 +449,21 @@ Format:
   yeniden doğrulamayı gerektirirdi — ek risk, sıfır kazanç.
 - **Alternatifler / neden seçilmedi:** A (sıfırdan) — iskelet "navigasyonu imkânsız" değil; sorunlar
   yerel ve temizlenebilir.
+
+## [2026-09-23] T28 — Seçenek C onaylandı + Faz 1 cross-ratio çekirdeği biçimi
+- **Karar 1:** Kullanıcı Faz 0 önerisini onayladı → **Seçenek C (yeniden odakla)**. Kökteki izlenmeyen
+  `test_browser.py` (sabit yerel yollu Playwright scripti) kullanıcı isteğiyle silindi.
+- **Karar 2 (çekirdek biçimi):** Cross-ratio, VP'ye görüntü uzaklığı `r` üzerinden kapalı biçimde
+  uygulanır: `X(r) = L·r2·(r1−r) / ((r1−r2)·r)` (gerçek konum 1/r ile affine). Hız = konum–zaman
+  **ağırlıklı** doğrusal fit eğimi; ağırlık = 1/(1 px'in metre karşılığı)² → yakın kareler baskın,
+  uzak (VP'ye yakın) kareler düşük ağırlıklı. VP=None → düz oran dalı; uzak VP bu dala yakınsar.
+- **CI:** eğim standart hatası × t(0.975, n−2), dağılım piksel varsayımından küçük çıkarsa piksel
+  tabanı kullanılır (max(χ²_red, 1)); bilinen-uzunluk belirsizliği oransal, karesel toplanır.
+  VP belirsizliği Faz 3'te eklenecek.
+- **Bilinen sınır:** Tüm noktalar (referanslar + temas noktaları) **aynı görüntü doğrusunda**
+  varsayılır. Dingil için doğal olarak sağlanır (aynı taraf tekerlekleri). Olay yeri mesafesi başka
+  bir paralel doğrudaysa ölçek aktarımı ikinci (enine) VP gerektirir; şimdilik dik sapma
+  (`max_offset_px`) raporlanır ve 4 px üstünde uyarı verilir. Faz 3/4'te operatöre "mesafeyi aracın
+  izi üzerinde işaretleyin" yönlendirmesi yapılacak.
+- **Alternatifler:** Nokta çiftlerine formülü tek tek uygulayıp medyan almak — eşdeğer ama daha
+  gürültülü, reddedildi. Homografiden 1B dilim almak — H bağımlılığını geri getirir, reddedildi.
