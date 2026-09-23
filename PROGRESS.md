@@ -4,8 +4,17 @@
 > "Nerede kaldık" sorusunun cevabı burası + `git log`'tur. Oturum-oturum detay için git
 > geçmişine bakılır; bu dosya yalnızca **anlık durumun özetini** tutar (şişirmeyin).
 
-**Son güncelleme:** 2026-09-17
-**Aktif görev:** — (T26 tamamlandı; sıradaki: T3/T4 tarayıcı testleri veya T9 paketleme)
+**Son güncelleme:** 2026-09-23
+**Aktif görev:** **T28 — Cross-ratio hız yöntemi** (`tasks/T28.md`). 🟡 **Faz 0 bitti** → öneri **Seçenek C (yeniden odakla)**, kullanıcı onayı bekleniyor (`DECISIONS.md` 2026-09-23). Sıradaki: onay → Faz 1 `src/speed/cross_ratio.py` + testler.
+**Bilinen:** testleri `pytest tests/` ile koşun (kökteki `test_browser.py` çıplak toplamayı kırıyor); pipeline şu an H'siz çalışmıyor (Faz 3/5'te çözülecek).
+
+**⚑ Yön değişikliği (2026-09-23):** Proje amacı tek hedefe indirgendi: *tek bir aracın, düz gittiği bir
+doğru boyunca hızı.* Bu amaç için en yalın yöntem **cross-ratio** (kaçış noktası + bilinen uzunlukla 1B
+projektif ölçüm) seçildi. Homografi-birincil hız, aks doğrulama, dingil adımlama, kuş bakışı, enterpolasyon
+vb. **artık birincil değil** — yolda bulunmuş ara çözümlerdi. Gerekçe ve sezgisel anlatım:
+`docs/cross-ratio-degerlendirme.md` + `docs/yontemler-gorsel-anlatim.md`. T28 iki fazlı: **Faz 0** mevcut
+iskeletin sağlığını ölçüp "yeniden odakla (C) vs sıfırdan (A)" kararını verir (→ `DECISIONS.md` + kullanıcı
+onayı); **Faz 1+** cross-ratio'yu çekirdek + operatörü elinden tutan detaylı sihirbaz akışıyla uygular.
 
 **En son (önemli, forensic-etkili bir düzeltme):** Kullanıcı gerçek video analizinde şunu fark
 etti: araç kareye girdiği an overlay videoda ~25 km/h, birkaç kare sonra "aniden" ~65 km/h
@@ -100,6 +109,16 @@ Durum işaretleri: ⬜ Başlanmadı · 🟡 Devam ediyor · ✅ Bitti · ⛔ Eng
 - **Adli kurallar (CLAUDE.md):** orijinal dosyaya yazılmaz + SHA-256 loglanır; sunucu-tarafı H
   yeniden hesaplanır; her hız CI + güven seviyesi taşır (çıplak sayı yok); harici ağ çağrısı yok
   (fontlar self-host).
+
+## Son Oturum (2026-09-17) — PDF Rapor İyileştirmeleri
+
+- **Türkçe karakter desteği:** DejaVuSans TTF bundlelandı (`src/output/fonts/`). Tüm ASCII-Türkçe metinler (Hiz→Hız, Guven→Güven vb.) düzeltildi.
+- **Video ekran görüntüsü:** İlk kare otomatik çekiliyor, kontrol noktaları renkli overlay ile PDF başına ekleniyor.
+- **Yöntem özeti genişletildi:** Homografi/temas noktası/güven seviyesi 3 paragrafta teknik anlatım.
+- **Kalibrasyon alanı:** Enine/boyuna m tablosuna eklendi.
+- **Hız limiti karşılaştırması:** `speed_limit_kmh` parametresi — aşım + durma mesafesi tablosu (d=v·t_r+v²/2a, t_r=1s, a=7.5 m/s²).
+- Frontend `WheelSpeedPanel`: "Rapor oluştur" bölümüne hız limiti giriş alanı eklendi.
+- 290/290 test geçiyor. Commit: `8bf5c0a`.
 
 ## Son Oturum (2026-09-17) — T24 + T25 + T26
 

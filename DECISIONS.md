@@ -413,3 +413,39 @@ Format:
   - Alt-%2 (iki tekerlek kümesi): post-processing karmaşıklığı artar, ayrı görev gerekir.
   - Tekerlek-özel fine-tune: SafeTensors + doğrulanmış model gerektirir; kapsam dışı.
 - **SHA-256 pin:** `yolo11n-seg.pt` = `55ed65c56c91713d23e8402371c6c49a6fd84f257f7dce452e8d70e41dcbe152`
+
+## [2026-09-23] T28 Faz 0 — İskelet sağlık kontrolü: Seçenek C (yeniden odakla) önerildi
+- **Durum:** Önerildi — **kullanıcı onayı bekleniyor** (onaysız Faz 1'e geçilmez).
+- **Karar (öneri):** Sıfırdan başlanmaz (A); mevcut iskelet korunur, cross-ratio çekirdek + odaklı
+  sihirbaz olarak eklenir, rakip yöntemler Faz 5'te gizlenir/sökülür (C).
+- **Ölçüm (tahmin değil):**
+  - `pytest tests/` → **300/300 yeşil** (4.8 s). `npm run build` → temiz (1.4 s).
+  - Uygulama ayağa kalkıyor: uvicorn + `/` 200; `docs/test.mp4` yükleme → meta + SHA-256 doğru döndü.
+  - Video I/O (`detection/video.py`, `ui/app.py::_read_frame`): sade, kareye-git çalışıyor.
+  - Adli katman: yükleme ayrı kopyaya yazılıyor (orijinale dokunulmuyor), SHA-256 her job'da
+    hesaplanıyor, `session_log.jsonl` audit izi var; `src/` içinde dış ağ çağrısı yok
+    (yalnızca launcher'ın `127.0.0.1` açması).
+  - VP tespiti: `calibration/vanishing.py::detect_vanishing_point` (Canny+Hough+RANSAC) bağımsız
+    ve `(x, y)` döndürüyor → şerit sağlayıcısı olarak doğrudan kullanılabilir.
+  - Canvas: `CalibrationCanvas` zaten 4 panelde (Calibration/WheelSpeed/AxleCheck/AxleTiming)
+    yeniden kullanılıyor → nokta işaretleme bileşeni kanıtlı.
+  - Tekerlek-temas işaretleme akışı (`WheelSpeedPanel` + `wheel_auto.py` önerileri) mevcut;
+    sihirbazın 4. adımı için temel.
+  - PDF (`output/report.py`): bölüm-bölüm `story` yapısı; yeni bölüm eklemek düşük maliyetli.
+- **Bulunan sorunlar (C'yi engellemiyor, Faz planına alındı):**
+  1. **H bağımlılığı:** Tespit+takip boru hattı (`output/pipeline.py`) homografi kalibrasyonu
+     olmadan çalışmıyor (`load_calibration` zorunlu). Cross-ratio H gerektirmez → pipeline'ın
+     H'siz (yalnızca tespit+takip) çalışabilmesi gerekiyor (Faz 3/5).
+  2. **Dağınıklık:** `app.py` 1679 satır / 34 endpoint; `CalibrationStep.tsx` 927, `WheelSpeedPanel`
+     603 satır. Rakip yöntemler (aks doğrulama, dingil adımlama, kuş bakışı, enterpolasyon)
+     sihirbazda yan yana → tek hikâye yok (Faz 5 temizliği).
+  3. Kökteki izlenmeyen `test_browser.py` (Playwright) çıplak `pytest` toplamasını kırıyor;
+     testler `pytest tests/` ile koşulmalı (veya dosya `scripts/`'e taşınmalı).
+  4. Çalışma ağacında T28'e ait olmayan commit'lenmemiş UI değişiklikleri var (WelcomePage,
+     Header "VeloProof", sidebar toggle, WheelSpeedPanel sadeleştirme, overlay etiketi). Bu görevde
+     dokunulmadı; sahibi tarafından commit'lenmeli.
+- **Gerekçe:** Maliyetin ~%95'i iskelette (video, canvas, adli, rapor) ve hepsi ölçümle sağlam
+  çıktı; yöntem ~50 satırlık saf NumPy. Sıfırdan yazmak adli katmanı yeniden kurmayı ve
+  yeniden doğrulamayı gerektirirdi — ek risk, sıfır kazanç.
+- **Alternatifler / neden seçilmedi:** A (sıfırdan) — iskelet "navigasyonu imkânsız" değil; sorunlar
+  yerel ve temizlenebilir.

@@ -46,6 +46,7 @@
 | T25 | Tekerlek hızı overlay + bbox/tekerlek video toggle | UI + Backend | Orta | T16 | ✅ |
 | T26 | Kapsamlı UI/UX yeniden tasarımı | UI | Büyük | T24, T25 | ✅ |
 | T27 | H-bağımsız dingil adımlama (axle timing) | Hız çekirdeği + UI | Orta | — | ✅ |
+| T28 | Cross-ratio hız yöntemi: iskelet sağlık kontrolü + odaklı uygulama | Hız çekirdeği + UX | Büyük | — | 🟡 |
 
 Durum: ⬜ Başlanmadı · 🟡 Devam ediyor · ✅ Bitti · ⛔ Engellendi
 
