@@ -228,6 +228,22 @@ def measure_cross_ratio(
             "Aracın kameraya yakın olduğu kareleri tercih edin; uzak kareler ölçüme az katkı verir.",
         ))
 
+    # İşaretler zamanda geri gidemez: ardışık konum farkı genel yönün tersine ve işaretleme
+    # gürültüsünün (2 px karşılığı) ötesindeyse, işaret yanlış kareye/yanlış yere konmuştur.
+    x_pos = np.asarray(core.positions_m)
+    step_sign = np.sign(x_pos[-1] - x_pos[0]) or 1.0
+    back = [
+        int(marks[k].frame) for k in range(1, len(marks))
+        if (x_pos[k] - x_pos[k - 1]) * step_sign < -2.0 * pixel_sigma * max(sens[k], sens[k - 1])
+    ]
+    if back:
+        gates.append(QualityGate(
+            "non_monotonic", "error",
+            f"Kare {back}: temas işareti bir önceki kareye göre GERİDE — araç geri gidemez. Bu işaret yanlış "
+            "kareye veya tekerden farklı bir yere konmuş; sonuç bu hâliyle güvenilmez.",
+            "İlgili kareye gidip ön/arka tekerin yere değdiği noktayı yeniden işaretleyin.",
+        ))
+
     # ── Bilinen uzunluk ──
     ref_off = max(scale.ref_offsets_px)
     if ref_off > OFFSET_WARN_PX:

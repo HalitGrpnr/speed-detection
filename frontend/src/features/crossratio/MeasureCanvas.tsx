@@ -40,6 +40,10 @@ export function MeasureCanvas({ imageUrl, shapes, onClick, onDrag, cursor = 'cro
   // Yüklenen görüntü state'te: kare değişince çizim MUTLAKA yeni görüntüyle tetiklenir
   // (yalnızca ref tutulursa eski kare ekranda kalır — adli araçta yanlış kareye işaret riski).
   const [loaded, setLoaded] = useState<HTMLImageElement | null>(null)
+  const [loadedUrl, setLoadedUrl] = useState<string | null>(null)
+  // Yeni kare yüklenene kadar ekrandaki görüntü ÖNCEKİ karedir: bu sırada tıklama kabul edilmez,
+  // şekiller eski görüntünün üzerine çizilmez (yanlış kareye işaret yazılmasını engeller).
+  const pending = loadedUrl !== imageUrl
   const [hoverHandle, setHoverHandle] = useState(false)
   const scale = fitScale * zoom
   const fitRef = useRef(fitScale)
@@ -64,6 +68,7 @@ export function MeasureCanvas({ imageUrl, shapes, onClick, onDrag, cursor = 'cro
       imgRef.current = img
       if (first) layout()
       setLoaded(img)
+      setLoadedUrl(imageUrl)
       setReady(true)
     }
     img.src = imageUrl
@@ -79,7 +84,7 @@ export function MeasureCanvas({ imageUrl, shapes, onClick, onDrag, cursor = 'cro
   useEffect(() => {
     const canvas = canvasRef.current
     const img = loaded
-    if (!canvas || !img || !ready) return
+    if (!canvas || !img || !ready || pending) return
     const ctx = canvas.getContext('2d')
     if (!ctx) return
     const W = img.naturalWidth
@@ -192,7 +197,7 @@ export function MeasureCanvas({ imageUrl, shapes, onClick, onDrag, cursor = 'cro
       }
       ctx.restore()
     }
-  }, [shapes, scale, ready, loaded])
+  }, [shapes, scale, ready, loaded, pending])
 
   useEffect(() => {
     const wrap = wrapRef.current
@@ -266,12 +271,14 @@ export function MeasureCanvas({ imageUrl, shapes, onClick, onDrag, cursor = 'cro
           style={{ cursor: hoverHandle ? 'grab' : cursor }}
           className={cn('mx-auto block', !ready && 'hidden')}
           onMouseDown={(e) => {
+            if (pending) return
             const p = toImage(e)
             const h = handleAt(p)
             if (h) { dragRef.current = h; return }
             onClick?.(clampImg(p))
           }}
           onMouseMove={(e) => {
+            if (pending) return
             const p = toImage(e)
             if (dragRef.current) { onDrag?.(dragRef.current, clampImg(p)); return }
             setHoverHandle(handleAt(p) != null)
@@ -280,6 +287,11 @@ export function MeasureCanvas({ imageUrl, shapes, onClick, onDrag, cursor = 'cro
           onMouseLeave={() => { dragRef.current = null }}
         />
       </div>
+      {ready && pending && (
+        <div className="pointer-events-auto absolute inset-0 flex items-center justify-center rounded-xl bg-slate-900/55 text-sm font-medium text-white">
+          Kare yükleniyor…
+        </div>
+      )}
       {ready && (
         <div className="absolute right-3 top-3 flex items-center gap-1 rounded-lg border border-white/15 bg-slate-900/85 p-1 text-white shadow-pop backdrop-blur">
           <button type="button" onClick={() => zoomBy(1 / 1.3)} disabled={zoom <= MIN_ZOOM + 1e-6}

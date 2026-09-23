@@ -5,7 +5,7 @@ import { api } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { StatusBanner } from '@/components/common/StatusBanner'
 import { cn } from '@/lib/utils'
-import { perpDistance, sensitivityMPerPx, type Pt } from './geometry'
+import { nonMonotonicFrames, perpDistance, sensitivityMPerPx, type Pt } from './geometry'
 import { bboxAt, extendLine, frameUrl, useChosenVp, useMeasureLine, useSelectedTrack, useVideoId, windowPoints } from './hooks'
 import { MeasureCanvas, type Shape } from './MeasureCanvas'
 import { ContactPointDiagram, FrameScrubber, StepGuide, type Check } from './parts'
@@ -84,10 +84,13 @@ export function ContactMarksStep() {
   const offBad = all.filter((m) => m.off != null && m.off > OFF_LINE_PX)
   const farBad = all.filter((m) => m.sens != null && m.sens > FAR_M_PER_PX)
   const autos = all.filter((m) => m.source === 'auto')
+  const backwards = line ? nonMonotonicFrames(line, all.map((m) => ({ f: m.f, p: m.pixel }))) : []
   const coverage = frames.length >= 2 ? (frames[frames.length - 1] - frames[0]) / Math.max(1, frameEnd - frameStart) : 0
   const curStats = cur ? stats(cur.pixel) : null
 
   const checks: Check[] = [
+    { ok: frames.length >= 3 ? backwards.length === 0 : null, text: 'İşaretler zaman sırasıyla tek yönde ilerliyor',
+      hint: `Kare ${backwards.join(', ')}: işaret bir önceki kareden GERİDE — araç geri gidemez. O karede yanlış yere (ya da görüntü yüklenmeden) tıklanmış olabilir; kareye gidip tekeri yeniden işaretleyin.` },
     { ok: frames.length >= 4 ? true : frames.length >= 2 ? false : null, text: `${frames.length} kare işaretli (en az 4 önerilir)`,
       hint: 'Önerilen karelerden devam edin — daha çok kare, tutarlılık kontrolü ve daha dar güven aralığı demektir.' },
     { ok: frames.length < 2 ? null : coverage >= 0.5, text: `İşaretler aralığın %${Math.round(coverage * 100)}'ini kapsıyor`,
@@ -122,7 +125,8 @@ export function ContactMarksStep() {
           title="5 · Tekerlek temas noktalarını işaretleyin"
           instruction={<>Aralıktaki birkaç karede, <b>hep aynı tekerleğin</b> (önerilen: 4. adımda işaretlediğiniz tarafın
             arka tekeri) <b>yere değdiği noktaya</b> tıklayın. Mor kesikli çizgi, işaretlerin üzerine düşmesi gereken
-            ölçüm çizgisidir; turuncu halka bir önceki işaretinizdir.</>}
+            ölçüm çizgisidir — yalnızca <b>kılavuzdur</b>: tıklamayı çizgiye değil, <b>lastiğe</b> yapın; ikisi uyuşmazsa
+            sistem uyarır. Turuncu halka bir önceki işaretinizdir.</>}
           why={<>Her işaretin gerçek konumu (metre) perspektif referansı ve bilinen uzunlukla hesaplanır; konumların zamana
             göre eğimi hızdır. Kutu alt kenarı yerine gerçek teker–zemin temasını kullanmak, gövde yüksekliğinden gelen
             sistematik hatayı ortadan kaldırır. Yakın kareler daha hassastır: uzaktaki bir pikselin metre karşılığı büyüktür.</>}

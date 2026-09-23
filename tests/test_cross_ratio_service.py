@@ -179,3 +179,14 @@ def test_agreeing_sources_add_no_systematic_term():
     m = measure_cross_ratio(lane, kl, marks, FPS, vp_alternative=traj)
     assert "vp_disagreement" not in m.ci_components_kmh
     assert m.speed_alternative_kmh == pytest.approx(m.speed_kmh, rel=0.01)
+
+
+def test_backwards_mark_is_error():
+    # Bir kareye başka karenin temas konumu yazılmış (ekranda eski kare kalmışken tıklama)
+    _, lane, marks, kl = _setup(lane_noise=0.2)
+    wrong = list(marks)
+    wrong[1] = ContactMark(marks[1].frame, marks[4].pixel)
+    m = measure_cross_ratio(lane, kl, wrong, FPS)
+    g = next(g for g in m.gates if g.code == "non_monotonic")
+    assert g.severity == "error" and m.confidence_level == "low"
+    assert not any(g.code == "non_monotonic" for g in measure_cross_ratio(lane, kl, marks, FPS).gates)

@@ -79,3 +79,17 @@ export function edgePointToward(target: Pt, w: number, h: number, margin = 18): 
 }
 
 export const bboxBottomCenter = (b: readonly number[]): Pt => [(b[0] + b[2]) / 2, b[3]]
+
+/** Zaman sırasına dizilmiş işaretlerin ölçüm doğrusu boyunca tek yönde ilerleyip ilerlemediği.
+ * Döner: geri giden karelerin listesi (boşsa sorun yok). tolPx: işaretleme gürültüsü payı. */
+export function nonMonotonicFrames(line: MeasureLine, marks: { f: number; p: Pt }[], tolPx = 2): number[] {
+  const seq = [...marks].sort((a, b) => a.f - b.f).map((m) => ({ f: m.f, c: dot(sub(m.p, line.origin), line.dir) }))
+  if (seq.length < 3) return []
+  const total = seq[seq.length - 1].c - seq[0].c
+  const dirSign = Math.sign(total) || 1
+  const bad: number[] = []
+  for (let i = 1; i < seq.length; i++) {
+    if ((seq[i].c - seq[i - 1].c) * dirSign < -tolPx) bad.push(seq[i].f)
+  }
+  return bad
+}

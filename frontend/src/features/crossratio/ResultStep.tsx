@@ -12,7 +12,7 @@ import { useCrossRatio, XR_STEPS, type XrStepId } from './store'
 /** Kalite kapısı → düzeltileceği adım. */
 const GATE_STEP: Record<string, XrStepId> = {
   vp_disagreement_in_ci: 3,
-  too_few_marks: 5, auto_marks_unconfirmed: 5, not_straight: 5, far_marks: 5,
+  non_monotonic: 5, too_few_marks: 5, auto_marks_unconfirmed: 5, not_straight: 5, far_marks: 5,
   ref_off_line: 4, length_sigma_default: 4,
   vp_note: 3, vp_infinite: 3, vp_unreliable: 3, vp_uncertain: 3, vp_disagree: 3, trajectory_vp_failed: 3,
   fps_suspicious: 1,

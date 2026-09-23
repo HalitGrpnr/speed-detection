@@ -553,3 +553,15 @@ Format:
   plandayken takip sorgusunun durması (`refetchIntervalInBackground`).
 - **Bilinen:** `frontend/eslint.config.js:15` bu görevden önce de bozuk (`… 'recommended'` undefined) — lint
   çalışmıyor; ayrı küçük görev önerisi.
+
+## [2026-09-24] T28 — Yanlış kareye işaret koruması (kullanıcı testi bulgusu)
+- **Bulgu:** Kullanıcı testinde 55. karenin temas işareti, 60. karedeki teker konumuna yazıldı (kare değişirken
+  yeni görüntü yüklenene kadar ekranda eski kare kalıyor, tıklama yeni kare numarasıyla kaydediliyordu).
+  Sonuç 54,6 ± 32,4 km/h "düşük güven" — kapılar uyardı ama hatalı işaretin girmesi engellenmemişti.
+- **Karar:** (1) `MeasureCanvas` yüklenen görüntünün URL'sini izler; mevcut kareye ait görüntü gelene kadar
+  tıklama/sürükleme kabul edilmez, üzerine "Kare yükleniyor" katmanı çizilir. (2) Zamanda geri giden işaret
+  (ardışık konum farkı genel yönün tersine ve 2 px işaret gürültüsünün ötesinde) sunucuda `non_monotonic`
+  **error** kapısı + istemcide canlı kontrol. (3) Talimat: mor çizgi yalnızca kılavuzdur, tıklama lastiğe yapılır.
+- **Gerekçe:** Adli araçta işaretin ait olduğu kare kesin olmalı; ekranda görünen kare ile kaydedilen kare
+  numarası hiçbir an ayrışmamalı. Fiziksel imkânsızlık (geri giden araç) sunucuda da yakalanmalı ki arayüzden
+  bağımsız bir güvence olsun.
